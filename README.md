@@ -21,6 +21,7 @@ Whether you're a professional trainer, a dog walker, or an everyday owner, Kanix
 | **Treat Bag Mount** | Folding hinge mount for a treat pouch carabiner loop | [Wilderdog Treat Bag](https://www.amazon.com/Wilderdog-Training-Magnetic-Carabiner-Adjustable/dp/B0FCVFF9J9) |
 | **Flashlight Holster (Wuben C3)** | Holster for the Wuben C3 flashlight | [Wuben C3](https://www.amazon.com/dp/B086WJBB7K) |
 | **Flashlight Holster (Wuben G5)** | Holster for the Wuben G5 EDC flashlight | [Wuben G5](https://www.amazon.com/dp/B0DT6SS412) |
+| **Pepper Spray Holster (Dual)** | Side-by-side holster for two compact pepper spray canisters | [Guard Dog Security Pepper Spray](https://www.amazon.com/Guard-Dog-Security-Pepper-Spray/dp/B0CCZ1D6YQ) |
 | **Kanix™ Plate** | Universal mounting plate with 3x3 bolt pattern and integrated hinge | |
 
 ## What You Need
