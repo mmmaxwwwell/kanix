@@ -1,5 +1,5 @@
 // Copyright (c) 2026 mmmaxwwwell
-// Licensed under CC BY-NC 4.0 — https://creativecommons.org/licenses/by-nc/4.0/
+// Licensed under CC BY-NC 4.0, https://creativecommons.org/licenses/by-nc/4.0/
 // Free for personal use. Commercial use requires a separate license.
 //
 // First Aid Kit Mount - Kanix Belt Mount
@@ -77,7 +77,7 @@ interlock_id      = kanix_screw_d + 1.5;  // mm inner diameter (clearance around
 interlock_od      = 10;         // mm outer diameter
 interlock_clearance = 0.15;     // mm radial clearance per side
 
-// Ring of radial teeth — even=true for even-numbered teeth, even=false for odd
+// Ring of radial teeth, even=true for even-numbered teeth, even=false for odd
 module interlock_ring(even = true) {
     tooth_angle = 360 / interlock_teeth;
     ir = interlock_id / 2;
@@ -188,7 +188,7 @@ module perpendicular_piece() {
     }
 }
 
-// ===== Render — print layout =====
+// ===== Render, print layout =====
 print_gap = 10;  // mm between pieces
 bar_width = kanix_hole_spacing * 2 + plate_margin * 2;
 

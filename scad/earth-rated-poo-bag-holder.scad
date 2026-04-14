@@ -1,5 +1,5 @@
 // Copyright (c) 2026 mmmaxwwwell
-// Licensed under CC BY-NC 4.0 — https://creativecommons.org/licenses/by-nc/4.0/
+// Licensed under CC BY-NC 4.0, https://creativecommons.org/licenses/by-nc/4.0/
 // Free for personal use. Commercial use requires a separate license.
 //
 // Earth Rated Poo Bag Holder - Kanix Belt Mount
@@ -76,7 +76,7 @@ module plate_shape() {
     }
 }
 
-// V-slit cutout — V shape when viewed top-down.
+// V-slit cutout, V shape when viewed top-down.
 // Apex at x=0 centered in the wall on -Y side.
 // Two legs, each 0.2mm (slit_gap) wide, radiating from apex.
 // Each leg: tall slit from bottom to near top, then widens to guide_notch_w at container_h.

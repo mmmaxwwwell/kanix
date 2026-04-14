@@ -43,7 +43,7 @@ Some modules depend on the [BOSL2](https://github.com/BelfrySCAD/BOSL2) library.
 ### Printing Tips
 
 - Recommended material: hard TPU (64D Shore hardness) for impact resistance and flexibility
-- 4+ walls, 1+mm floor/ceiling thickness — the walls give these parts their strength, not the infill
+- 4+ walls, 1+mm floor/ceiling thickness, as the walls give these parts their strength, not the infill
 - 15% gyroid infill
 - Some modules may require supports depending on your printer and orientation
 
@@ -62,7 +62,7 @@ The build pipeline automatically renders all `.scad` files to `.stl` using OpenS
 
 ## Disclaimer
 
-These designs are provided "as is" without warranty of any kind. The creator assumes no liability for injury, damage, or loss resulting from the use of these designs or any parts printed from them. You are solely responsible for ensuring that printed parts are suitable and safe for your intended use, including material selection, print quality, and structural integrity. 3D-printed parts can fail without warning — inspect your gear regularly and replace any parts showing signs of wear or damage. Use at your own risk.
+These designs are provided "as is" without warranty of any kind. The creator assumes no liability for injury, damage, or loss resulting from the use of these designs or any parts printed from them. You are solely responsible for ensuring that printed parts are suitable and safe for your intended use, including material selection, print quality, and structural integrity. 3D-printed parts can fail without warning, so inspect your gear regularly and replace any parts showing signs of wear or damage. Use at your own risk.
 
 ## License
 
