@@ -24,7 +24,6 @@ module hinge(
     segments = 1,
     inner = true,
     gap = 0.2,
-    cutout = false,
     fn = 64
 ) {
     r = outer_diam / 2;
@@ -64,10 +63,9 @@ module hinge(
         }
     }
 
-    if (cutout == "segments") {
-        // Segment-shaped cutouts for clearing block material
+    module segment_cutouts() {
         for (i = [0 : segments - 1]) {
-            fill = inner ? (i % 2 == 0) : (i % 2 == 1);
+            fill = inner ? (i % 2 == 1) : (i % 2 == 0);
             if (fill) {
                 raw_start = i * seg_width - length / 2 - gap/2;
                 translate([0, 0, raw_start])
@@ -80,8 +78,9 @@ module hinge(
                 }
             }
         }
-    } else if (cutout == "cones") {
-        // Cone indent shapes only, for subtracting from block+hinge union
+    }
+
+    module cone_indents() {
         for (i = [0 : segments - 1]) {
             fill = inner ? (i % 2 == 0) : (i % 2 == 1);
             if (fill) {
@@ -101,8 +100,9 @@ module hinge(
                     cone_pin(cone_h);
             }
         }
-    } else if (cutout == "protrusions") {
-        // Protruding cones for outer segments, added after difference
+    }
+
+    module cone_protrusions() {
         for (i = [0 : segments - 1]) {
             fill = inner ? (i % 2 == 0) : (i % 2 == 1);
             if (fill) {
@@ -122,8 +122,9 @@ module hinge(
                     cone_pin(cone_h);
             }
         }
-    } else {
-        // Solid barrel segments only (no cones)
+    }
+
+    module barrel_segments() {
         for (i = [0 : segments - 1]) {
             fill = inner ? (i % 2 == 0) : (i % 2 == 1);
             if (fill) {
@@ -138,4 +139,16 @@ module hinge(
             }
         }
     }
+
+    difference() {
+        union() {
+            children();
+            barrel_segments();
+        }
+        segment_cutouts();
+        if (inner)
+            cone_indents();
+    }
+    if (!inner)
+        cone_protrusions();
 }

@@ -63,16 +63,15 @@ module mounting_plate() {
     }
 }
 
-module our_hinge(inner, cutout){
+module our_hinge(inner){
     translate([0,-block_length/2,block_height/2])
     rotate([0, 90, 0])
     hinge(
         length = plate_size,
         outer_diam = hinge_od,
         segments = 7,
-        inner = inner,
-        cutout = cutout
-    );
+        inner = inner
+    ) children();
 }
 
 module right_angle_fillet(diameter, length){
@@ -81,10 +80,10 @@ module right_angle_fillet(diameter, length){
         cube([length, diameter, diameter], center = true);
         rotate([0,90,0])
         cylinder(d = diameter, h = length, center = true, $fn=32);
-        
+
         translate([0,diameter/2,0])
         cube([length, diameter, diameter], center = true);
-        
+
         translate([0,0,diameter/2])
         cube([length, diameter, diameter], center = true);
 
@@ -95,17 +94,10 @@ module top_block(inner = false){
     translate([0, -block_offset, block_height / 2]){
         translate([0,block_length/2, 0.875])
         right_angle_fillet(diameter = 1.4, length = plate_size);
-        difference(){
-            union(){
-                cube([plate_size, block_length, block_height], center = true);
-                our_hinge(inner);
-            }
-            our_hinge(!inner, cutout = "segments");
-            if (inner)
-                our_hinge(inner, cutout = "cones");
-        }
-        if (!inner)
-            our_hinge(inner, cutout = "protrusions");
+        our_hinge(inner)
+            rotate([0, -90, 0])
+            translate([0, block_length/2, -block_height/2])
+            cube([plate_size, block_length, block_height], center = true);
     }
 }
 
@@ -133,14 +125,14 @@ module front(){
 }
 
 //split
-// translate([160,0,0]){
-//     rotate([0,0,180])
-//     translate([0, module_offset + 5 ,0])
-//     back();
+translate([160,0,0]){
+    rotate([0,0,180])
+    translate([0, module_offset + 5 ,0])
+    back();
 
-//     translate([0, module_offset + 5  ,0])
-//     front();
-// }
+    translate([0, module_offset + 5  ,0])
+    front();
+}
 
 //open
 translate([80,0,0]){
@@ -153,8 +145,8 @@ translate([80,0,0]){
 }
 
 // //closed
-// translate([0,0,plate_thickness*2 + belt_thickness])
-// rotate([0,180,0]){
-//     front();
-// }
-// back();
+translate([0,0,plate_thickness*2 + belt_thickness])
+rotate([0,180,0]){
+    front();
+}
+back();
