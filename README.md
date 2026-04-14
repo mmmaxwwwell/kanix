@@ -26,7 +26,7 @@ Whether you're a professional trainer, a dog walker, or an everyday owner, Kanix
 ## What You Need
 
 - A **2" duty belt** - any rigid 2" (51mm) belt will work. We prototype with [this one](https://www.amazon.com/dp/B0FXRGCY7C).
-- **M5 hardware** - M5 self-tapping screws for mounting modules to belt clips
+- **[M5x10 button head cap screws](https://www.amazon.com/dp/B08DS7XJN8)** - used to mount most modules to belt clips
 - **A 3D printer**
 
 ## Getting Started
