@@ -42,10 +42,10 @@ Some modules depend on the [BOSL2](https://github.com/BelfrySCAD/BOSL2) library.
 
 ### Printing Tips
 
-- All modules are designed for FDM printing with no supports required
 - Recommended material: hard TPU (64D Shore hardness) for impact resistance and flexibility
-- 4+ walls, 1+mm floor/ceiling thickness
-- 30% infill minimum for structural modules (holsters, spray mount)
+- 4+ walls, 1+mm floor/ceiling thickness — the walls give these parts their strength, not the infill
+- 15% gyroid infill
+- Some modules may require supports depending on your printer and orientation
 
 ## Development (Website)
 
