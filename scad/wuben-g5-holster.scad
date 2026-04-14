@@ -38,8 +38,8 @@ cavity_len = 40;
 pocket_w = cavity_w + wall_side * 2;
 pocket_t = cavity_t + wall_front;  // back wall is the plate
 
-// Vertical positioning: centered on plate
-pocket_bottom = -(cavity_len + wall_bottom) / 2;
+// Vertical positioning: pocket bottom flush with plate bottom edge for supportless printing
+pocket_bottom = -plate_height / 2;
 pocket_top    = pocket_bottom + cavity_len + wall_bottom;
 pocket_len    = pocket_top - pocket_bottom;
 
@@ -88,69 +88,85 @@ module pocket_outer() {
 }
 
 // ===== Assembly =====
-difference() {
-    union() {
-        kanix_plate();
-        pocket_outer();
-    }
-
-    // Cavity - centered in pocket, open at top
-    translate([0, pocket_bottom + wall_bottom, pocket_back_z])
-        hull() {
-            cr = 1;
-            for (x = [-cavity_w/2 + cr, cavity_w/2 - cr])
-                for (z = [cr, cavity_t - cr])
-                    translate([x, 0, z])
-                        rotate([-90, 0, 0])
-                            cylinder(r = cr, h = pocket_len - wall_bottom + 0.2);
+rotate([90, 0, 0]) {
+    difference() {
+        union() {
+            kanix_plate();
+            pocket_outer();
+            // Fill between plate front face and pocket at the bottom edge
+            // Bridges the Z gap so there's no overhang when printed opening-up
+            hull() {
+                // Bottom edge of plate
+                translate([0, pocket_bottom, plate_thickness / 2])
+                    cube([pocket_w, 0.01, plate_thickness], center = true);
+                // Bottom edge of pocket
+                translate([0, pocket_bottom, pocket_back_z + pocket_t / 2])
+                    cube([pocket_w, 0.01, pocket_t], center = true);
+            }
         }
 
-    // Screw holes - all 9 holes
-    for (col = [0 : kanix_grid_size - 1])
-        for (row = [0 : kanix_grid_size - 1])
-            translate([
-                (col - grid_offset) * kanix_hole_spacing,
-                (row - grid_offset) * kanix_hole_spacing,
-                -0.1
-            ])
-                cylinder(d = kanix_screw_d, h = screw_depth + 0.1);
+        // Cavity - centered in pocket, open at top
+        translate([0, pocket_bottom + wall_bottom, pocket_back_z])
+            hull() {
+                cr = 1;
+                for (x = [-cavity_w/2 + cr, cavity_w/2 - cr])
+                    for (z = [cr, cavity_t - cr])
+                        translate([x, 0, z])
+                            rotate([-90, 0, 0])
+                                cylinder(r = cr, h = pocket_len - wall_bottom + 0.2);
+            }
 
-    // Front flex cutout
-    cutout_len = pocket_top - cutout_bottom_y + 0.1;
-    cutout_r = cutout_width / 2;
-    cutout_chamfer = 1;
-    n_arc = 16;
-    slot_path = concat(
-        [[cutout_r, 0],
-         [cutout_r, cutout_len - cutout_r],
-         [-cutout_r, cutout_len - cutout_r],
-         [-cutout_r, 0]],
-        [for (i = [1:n_arc-1])
-            let(a = 180 + i * 180 / n_arc)
-            [cutout_r * cos(a), cutout_r * sin(a)]
-        ]
-    );
-    // Centered on front face of pocket
-    translate([0, cutout_bottom_y + cutout_r, pocket_back_z + cavity_t/2])
-        offset_sweep(slot_path, height = pocket_t,
-            top = os_chamfer(width = cutout_chamfer),
-            bottom = os_chamfer(width = cutout_chamfer),
-            steps = 16);
+        // Screw holes - all 9 holes
+        for (col = [0 : kanix_grid_size - 1])
+            for (row = [0 : kanix_grid_size - 1])
+                translate([
+                    (col - grid_offset) * kanix_hole_spacing,
+                    (row - grid_offset) * kanix_hole_spacing,
+                    -0.1
+                ])
+                    cylinder(d = kanix_screw_d, h = screw_depth + 0.1);
 
-    // Cut off anything below plate back (Z=0)
-    translate([0, 0, -50])
-        cube([200, 200, 100], center = true);
+        // Front flex cutout
+        cutout_len = pocket_top - cutout_bottom_y + 0.1;
+        cutout_r = cutout_width / 2;
+        cutout_chamfer = 1;
+        n_arc = 16;
+        slot_path = concat(
+            [[cutout_r, 0],
+             [cutout_r, cutout_len - cutout_r],
+             [-cutout_r, cutout_len - cutout_r],
+             [-cutout_r, 0]],
+            [for (i = [1:n_arc-1])
+                let(a = 180 + i * 180 / n_arc)
+                [cutout_r * cos(a), cutout_r * sin(a)]
+            ]
+        );
+        // Centered on front face of pocket
+        translate([0, cutout_bottom_y + cutout_r, pocket_back_z + cavity_t/2])
+            offset_sweep(slot_path, height = pocket_t,
+                top = os_chamfer(width = cutout_chamfer),
+                bottom = os_chamfer(width = cutout_chamfer),
+                steps = 16);
+
+        // Cut off anything below plate back (Z=0)
+        translate([0, 0, -50])
+            cube([200, 200, 100], center = true);
+
+        // Cut off anything below plate bottom edge (Y)
+        translate([0, pocket_bottom - 50, 0])
+            cube([200, 100, 200], center = true);
+    }
+
+    // Retention bumps - 4 bumps on front and back faces
+    bump_d = 1.5;
+    for (z = [pocket_back_z, pocket_back_z + cavity_t])  // back and front
+        for (x_off = [-cavity_w/4, cavity_w/4])           // two per face
+            translate([x_off, pocket_bottom + wall_bottom, z])
+                rotate([-90, 0, 0])
+                    hull() {
+                        translate([0, 0, bump_d/2])
+                            sphere(d = bump_d, $fn = 16);
+                        translate([0, 0, 20 - bump_d/2])
+                            sphere(d = bump_d, $fn = 16);
+                    }
 }
-
-// Retention bumps - 4 bumps on front and back faces
-bump_d = 1.5;
-for (z = [pocket_back_z, pocket_back_z + cavity_t])  // back and front
-    for (x_off = [-cavity_w/4, cavity_w/4])           // two per face
-        translate([x_off, pocket_bottom + wall_bottom, z])
-            rotate([-90, 0, 0])
-                hull() {
-                    translate([0, 0, bump_d/2])
-                        sphere(d = bump_d, $fn = 16);
-                    translate([0, 0, 20 - bump_d/2])
-                        sphere(d = bump_d, $fn = 16);
-                }

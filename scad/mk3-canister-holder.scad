@@ -92,11 +92,11 @@ difference() {
     translate([0, -holder_outer_d / 2, holder_height - front_cutout_h])
         hull() {
             translate([-front_cutout_w / 2, -0.1, 0])
-                cube([front_cutout_w, wall_thickness + 0.2, front_cutout_h + 0.1]);
+                cube([front_cutout_w, holder_outer_d / 2 + 0.2, front_cutout_h + 0.1]);
             // Round the bottom of the cutout
-            translate([0, wall_thickness / 2, 0])
+            translate([0, holder_outer_d / 4, 0])
                 rotate([90, 0, 0])
-                cylinder(d = front_cutout_w, h = wall_thickness + 0.2, center = true);
+                cylinder(d = front_cutout_w, h = holder_outer_d / 2 + 0.2, center = true);
         }
 
     // Screw holes - 2x3 grid (skip middle column), drilled through plate + hull
@@ -111,3 +111,20 @@ difference() {
                 rotate([90, 0, 0])
                 cylinder(d = kanix_screw_d, h = screw_depth);
 }
+
+// Retention bumps - 4 hulled sphere pairs at 90° intervals in bottom 20mm of bore
+// 1.5mm diameter, protrude 0.75mm into cavity. Added after bore subtraction so they survive.
+bump_d = 1.5;
+bump_r_offset = holder_inner_d / 2;
+for (a = [45, 135, 225, 315])
+    translate([
+        bump_r_offset * cos(a),
+        bump_r_offset * sin(a),
+        bottom_thickness
+    ])
+        hull() {
+            translate([0, 0, bump_d / 2])
+                sphere(d = bump_d, $fn = 16);
+            translate([0, 0, 20 - bump_d / 2])
+                sphere(d = bump_d, $fn = 16);
+        }

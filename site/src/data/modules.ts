@@ -106,6 +106,20 @@ export const modules: Module[] = [
     ],
   },
   {
+    slug: "pepper-spray-holster",
+    name: "Pepper Spray Holster (Dual)",
+    description:
+      "Side-by-side holster for two compact pepper spray canisters. Quick-draw access to personal protection.",
+    scadFile: "scad/pepper-spray-holster.scad",
+    stlFile: "pepper-spray-holster.stl",
+    products: [
+      {
+        name: "Guard Dog Security Pepper Spray",
+        url: "https://www.amazon.com/Guard-Dog-Security-Pepper-Spray/dp/B0CCZ1D6YQ",
+      },
+    ],
+  },
+  {
     slug: "kanix-plate",
     name: "Kanix™ Plate",
     description:

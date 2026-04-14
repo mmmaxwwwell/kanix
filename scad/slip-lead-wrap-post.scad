@@ -14,8 +14,8 @@ kanix_grid_size = 3;
 screw_depth     = 7.5;
 
 // ===== Post Parameters =====
-post_diameter = 30;
-post_height   = 20;
+post_diameter = 20;
+post_height   = 10;
 
 // ===== Plate Parameters =====
 plate_thickness = 8;
@@ -73,9 +73,10 @@ cutout_edge_r = 2;            // rounded edges on the cutout
 kanix_plate();
 
 fillet_r = 5;
-cone_h = 5;
 cone_edge_r = 1;
-cone_top_r = plate_width / 2;
+cone_top_r = plate_width / 2 + 10;
+// Set cone height to match radial difference for a 45° self-supporting angle
+cone_h = cone_top_r - post_diameter / 2;
 total_post_h = post_height + cone_h;
 
 difference() {
@@ -91,21 +92,14 @@ difference() {
                     translate([post_diameter / 2 + fillet_r, fillet_r])
                         circle(r = fillet_r);
                 }
-                // Top fillet: curves outward from post wall to cone
-                translate([0, post_height - fillet_r])
-                    difference() {
-                        square([post_diameter / 2 + fillet_r, fillet_r]);
-                        translate([post_diameter / 2 + fillet_r, 0])
-                            circle(r = fillet_r);
-                    }
             }
 
         // Cone flaring out at top of post, with 1mm rounded top outer edge
         translate([0, 0, plate_thickness + post_height])
             rotate_extrude()
                 hull() {
-                    // Bottom of cone (post radius + fillet width)
-                    square([post_diameter / 2 + fillet_r, 0.01]);
+                    // Bottom of cone (matches post radius)
+                    square([post_diameter / 2, 0.01]);
                     // Main cone body up to where rounding starts
                     translate([0, cone_h - cone_edge_r])
                         square([cone_top_r - cone_edge_r, 0.01]);
@@ -123,9 +117,9 @@ difference() {
         [ cutout_width/2,  slot_len/2],
         [-cutout_width/2,  slot_len/2]
     ];
-    translate([0, 0, plate_thickness])
+    translate([0, 0, plate_thickness + post_height + 10])
         offset_sweep(slot_path,
-            height = total_post_h + fillet_r + 0.1,
+            height = cone_h - 10 + 0.1,
             bottom = os_circle(r = cutout_edge_r),
             top = os_circle(r = cutout_edge_r),
             steps = 16);
