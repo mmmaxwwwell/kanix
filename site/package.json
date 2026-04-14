@@ -1,0 +1,22 @@
+{
+  "name": "kanix-site",
+  "type": "module",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "render": "bash scripts/render-stl.sh",
+    "dev": "astro dev",
+    "build": "npm run render && astro build",
+    "test": "bash scripts/check-links.sh",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.1",
+    "astro": "^6.1.6",
+    "tailwindcss": "^4.2.1",
+    "three": "^0.172.0"
+  }
+}

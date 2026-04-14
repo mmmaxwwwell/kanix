@@ -1,0 +1,53 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-scad:
+    name: OpenSCAD compilation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install OpenSCAD
+        run: sudo apt-get update && sudo apt-get install -y openscad xvfb
+
+      - name: Install BOSL2
+        run: |
+          mkdir -p ~/.local/share/OpenSCAD/libraries
+          git clone --depth 1 https://github.com/BelfrySCAD/BOSL2.git ~/.local/share/OpenSCAD/libraries/BOSL2
+
+      - name: Test all models compile
+        run: xvfb-run bash scripts/test-scad.sh
+
+  test-site:
+    name: Site build & link check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./site
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install OpenSCAD
+        run: sudo apt-get update && sudo apt-get install -y openscad xvfb
+
+      - name: Install BOSL2
+        run: |
+          mkdir -p ~/.local/share/OpenSCAD/libraries
+          git clone --depth 1 https://github.com/BelfrySCAD/BOSL2.git ~/.local/share/OpenSCAD/libraries/BOSL2
+
+      - run: npm ci
+
+      - name: Build site
+        run: xvfb-run npm run build
+
+      - name: Check links
+        run: npm test
