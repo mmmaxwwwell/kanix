@@ -63,15 +63,37 @@ module mounting_plate() {
     }
 }
 
-module our_hinge(inner){
+module hinge_transform(){
     translate([0,-block_length/2,block_height/2])
     rotate([0, 90, 0])
+    children();
+}
+
+module our_hinge(inner){
+    hinge_transform()
     hinge(
         length = plate_size,
         outer_diam = hinge_od,
         segments = 7,
         inner = inner
-    ) children();
+    );
+}
+
+module our_hinge_cutout(inner){
+    hinge_transform()
+    hinge(
+        length = plate_size,
+        outer_diam = hinge_od,
+        segments = 7,
+        inner = inner,
+        cutout = true
+    );
+}
+
+module mounting_block(){
+    rotate([0, -90, 0])
+    translate([0, block_length/2, -block_height/2])
+    cube([plate_size, block_length, block_height], center = true);
 }
 
 module right_angle_fillet(diameter, length){
@@ -94,10 +116,12 @@ module top_block(inner = false){
     translate([0, -block_offset, block_height / 2]){
         translate([0,block_length/2, 0.875])
         right_angle_fillet(diameter = 1.4, length = plate_size);
-        our_hinge(inner)
-            rotate([0, -90, 0])
-            translate([0, block_length/2, -block_height/2])
-            cube([plate_size, block_length, block_height], center = true);
+        difference() {
+            hinge_transform()
+            mounting_block();
+            our_hinge_cutout(inner);
+        }
+        our_hinge(inner);
     }
 }
 
@@ -124,29 +148,31 @@ module front(){
     // bottom_block();
 }
 
-//split
-translate([160,0,0]){
-    rotate([0,0,180])
-    translate([0, module_offset + 5 ,0])
-    back();
-
-    translate([0, module_offset + 5  ,0])
-    front();
-}
-
 //open
-translate([80,0,0]){
-    rotate([0,0,180])
-    translate([0, module_offset ,0])
-    back();
+translate([0, module_offset ,0])
+front();
 
-    translate([0, module_offset ,0])
-    front();
-}
-
-// //closed
-translate([0,0,plate_thickness*2 + belt_thickness])
-rotate([0,180,0]){
-    front();
-}
+rotate([0,0,180])
+translate([0, module_offset ,0])
 back();
+
+if ($preview) {
+    //split
+    translate([160,0,0]){
+        rotate([0,0,180])
+        translate([0, module_offset + 5 ,0])
+        back();
+
+        translate([0, module_offset + 5  ,0])
+        front();
+    }
+
+    //closed
+    translate([80,0,0])
+    translate([0,0,plate_thickness*2 + belt_thickness])
+    rotate([0,180,0]){
+        front();
+    }
+    translate([80,0,0])
+    back();
+}

@@ -70,22 +70,49 @@ module leaf() {
     }
 }
 
-module top_block(inner = false){
+module hinge_transform(){
     translate([0, -block_offset, 0])
     translate([0, -block_length/2, block_height/2])
     rotate([0, 90, 0])
+    children();
+}
+
+module our_hinge(inner = false){
+    hinge_transform()
     hinge(
         length = plate_width,
         outer_diam = knuckle_diam,
         segments = hinge_segs,
         inner = inner,
         gap = hinge_gap
-    ) {
-        // Block in hinge-local coords: undo rotate then undo translate
-        rotate([0, -90, 0])
-        translate([0, block_length/2, -block_height/2])
-            cube([plate_width, block_length, block_height], center = true);
+    );
+}
+
+module our_hinge_cutout(inner = false){
+    hinge_transform()
+    hinge(
+        length = plate_width,
+        outer_diam = knuckle_diam,
+        segments = hinge_segs,
+        inner = inner,
+        gap = hinge_gap,
+        cutout = true
+    );
+}
+
+module mounting_block(){
+    rotate([0, -90, 0])
+    translate([0, block_length/2, -block_height/2])
+        cube([plate_width, block_length, block_height], center = true);
+}
+
+module top_block(inner = false){
+    difference() {
+        hinge_transform()
+        mounting_block();
+        our_hinge_cutout(inner);
     }
+    our_hinge(inner);
 }
 
 module half(inner = false){

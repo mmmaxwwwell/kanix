@@ -16,6 +16,7 @@
 //   inner      - if true, fills even segments (0,2,4...); if false, odd (1,3,5...)
 //   gap        - total gap between mating segments (each segment side insets by gap/2,
 //                except the outer edges of end segments)
+//   cutout     - if true, renders only the negative volume for mounting block integration
 //   fn         - facet count for circles (default: 64)
 
 module hinge(
@@ -24,6 +25,7 @@ module hinge(
     segments = 1,
     inner = true,
     gap = 0.2,
+    cutout = false,
     fn = 64
 ) {
     r = outer_diam / 2;
@@ -140,15 +142,22 @@ module hinge(
         }
     }
 
-    difference() {
-        union() {
-            children();
-            barrel_segments();
-        }
+    if (cutout) {
+        // Negative volume for the consuming module to difference from its mounting block.
+        // Clears the opposing segment shapes and cone indent cavities.
         segment_cutouts();
-        if (inner)
-            cone_indents();
+        cone_indents();
+    } else {
+        difference() {
+            union() {
+                children();
+                barrel_segments();
+            }
+            segment_cutouts();
+            if (inner)
+                cone_indents();
+        }
+        if (!inner)
+            cone_protrusions();
     }
-    if (!inner)
-        cone_protrusions();
 }
