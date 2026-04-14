@@ -11,7 +11,7 @@ jobs:
     name: OpenSCAD compilation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install OpenSCAD
         run: sudo apt-get update && sudo apt-get install -y openscad xvfb
@@ -31,9 +31,9 @@ jobs:
       run:
         working-directory: ./site
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
