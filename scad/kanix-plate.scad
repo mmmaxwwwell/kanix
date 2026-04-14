@@ -2,8 +2,8 @@
 // Licensed under CC BY-NC 4.0, https://creativecommons.org/licenses/by-nc/4.0/
 // Free for personal use. Commercial use requires a separate license.
 
-use <hinge.scad>
-include <common.scad>
+use <lib/hinge.scad>
+include <lib/common.scad>
 
 // Belt dimensions
 belt_height = 51;      // mm (2" duty belt)

@@ -22,7 +22,7 @@ front_cutout_w   = 20;        // mm width of front thumb cutout
 front_cutout_h   = 50;        // mm height of cutout from top edge down
 front_cutout_r   = 5;         // mm corner radius for cutout
 
-include <common.scad>
+include <lib/common.scad>
 
 kanix_grid_size = 3;
 screw_depth     = 15;          // mm depth for screw holes through hull

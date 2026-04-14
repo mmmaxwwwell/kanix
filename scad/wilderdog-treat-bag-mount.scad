@@ -7,8 +7,8 @@
 // Each plate has 3 Kanix mounting holes (one column).
 // Folds to hook onto a treat pouch carabiner loop.
 
-include <common.scad>
-use <hinge.scad>
+include <lib/common.scad>
+use <lib/hinge.scad>
 holes_per_side       = 3;
 
 // ===== Plate Parameters =====

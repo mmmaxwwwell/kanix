@@ -8,7 +8,7 @@
 // Center cutout for strap/webbing pass-through.
 
 include <BOSL2/std.scad>
-include <common.scad>
+include <lib/common.scad>
 
 // ===== Plate Parameters =====
 plate_thickness = 8;          // mm

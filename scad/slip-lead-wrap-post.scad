@@ -8,7 +8,7 @@
 
 include <BOSL2/std.scad>
 include <BOSL2/rounding.scad>
-include <common.scad>
+include <lib/common.scad>
 
 kanix_grid_size = 3;
 screw_depth     = 7.5;
