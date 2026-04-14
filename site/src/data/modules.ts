@@ -62,6 +62,12 @@ export const modules: Module[] = [
       'A post for securely wrapping a 5/8" x 5\' slip lead. Keeps your lead tidy and instantly accessible.',
     scadFile: "scad/slip-lead-wrap-post.scad",
     stlFile: "slip-lead-wrap-post.stl",
+    products: [
+      {
+        name: "Mendota Products Slip Lead",
+        url: "https://www.amazon.com/dp/B086WMV7G7",
+      },
+    ],
   },
   {
     slug: "treat-bag-mount",

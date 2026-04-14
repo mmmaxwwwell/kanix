@@ -17,7 +17,7 @@ Whether you're a professional trainer, a dog walker, or an everyday owner, Kanix
 | **Poo Bag Dispenser** | Holds a standard roll of poo bags with a screw-in cap and front dispensing slit | [Earth Rated Dog Poo Bags](https://www.amazon.com/Earth-Rated-Leak-Proof-Extra-Thick-Unscented/dp/B0CS8GCYS1) |
 | **First Aid Kit Mount** | Mounting plate with center cutout for strap pass-through | [Individual First Aid Kit](https://www.amazon.com/dp/B0F311WTPC) |
 | **MK3 Canister Holder** | Holder for an MK-3 pepper spray canister | [Sabre Protector Dog Spray](https://www.amazon.com/dp/B00AU6J68Q) |
-| **Slip Lead Wrap Post** | Post for securely wrapping a 5/8" x 5' slip lead | |
+| **Slip Lead Wrap Post** | Post for securely wrapping a 5/8" x 5' slip lead | [Mendota Products Slip Lead](https://www.amazon.com/dp/B086WMV7G7) |
 | **Treat Bag Mount** | Folding hinge mount for a treat pouch carabiner loop | [Wilderdog Treat Bag](https://www.amazon.com/Wilderdog-Training-Magnetic-Carabiner-Adjustable/dp/B0FCVFF9J9) |
 | **Flashlight Holster (Wuben C3)** | Holster for the Wuben C3 flashlight | [Wuben C3](https://www.amazon.com/dp/B086WJBB7K) |
 | **Flashlight Holster (Wuben G5)** | Holster for the Wuben G5 EDC flashlight | [Wuben G5](https://www.amazon.com/dp/B0DT6SS412) |
