@@ -57,14 +57,15 @@ module leaf_outline() {
     square([plate_width, plate_length], center = true);
 }
 
-module leaf() {
+module leaf(holes = true) {
     difference() {
         linear_extrude(height = plate_thickness, center = true)
             leaf_outline();
 
-        for (i = [0 : holes_per_side - 1])
-            translate([0, (i - (holes_per_side - 1) / 2) * kanix_hole_spacing, -plate_thickness / 2])
-                cylinder(d = kanix_screw_d, h = plate_thickness + 2);
+        if (holes)
+            for (i = [0 : holes_per_side - 1])
+                translate([0, (i - (holes_per_side - 1) / 2) * kanix_hole_spacing, -plate_thickness / 2])
+                    cylinder(d = kanix_screw_d, h = plate_thickness + 2);
     }
 }
 
@@ -165,7 +166,7 @@ module half(inner = false){
     translate([0, 0, plate_thickness/2])
     intersection() {
         union() {
-            leaf();
+            leaf(holes = !inner);
             center_block(inner);
             end_block(inner);
         }
