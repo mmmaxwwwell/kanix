@@ -17,13 +17,19 @@ plate_width     = 30;   // mm (hinge axis)
 plate_thickness = 3.65; // mm
 
 // ===== Hinge Parameters =====
-knuckle_diam = plate_thickness;
-hinge_segs   = 7;
-hinge_gap    = 0.2;
+knuckle_diam     = plate_thickness * 2;
+end_knuckle_diam = plate_thickness * 2;
+center_hinge_segs = 5;
+end_hinge_segs    = 5;
+hinge_gap        = 0.2;
 
-block_length = knuckle_diam/2 + hinge_gap/4;
-block_height = plate_thickness;
-block_offset = plate_length / 2 + block_length / 2;
+block_length     = knuckle_diam/2 + hinge_gap/4;
+block_height     = plate_thickness;
+block_offset     = plate_length / 2 + block_length / 2;
+
+end_block_length = end_knuckle_diam/2 + hinge_gap/4;
+end_block_height = plate_thickness;
+end_block_offset = plate_length / 2 + end_block_length / 2;
 
 module_offset = plate_length/2 + block_length + hinge_gap/2;
 
@@ -36,8 +42,8 @@ corner_r = 5; // mm, X-Y corner radius on leaf
 module leaf_profile() {
     // Cross-section: rounded bottom edge, tall top to not clip hinge
     hull() {
-        // Top flat edge
-        translate([0, plate_thickness])
+        // Top flat edge — tall enough to clear hinge barrel + arms
+        translate([0, plate_thickness + end_knuckle_diam])
             square([plate_width, 0.02], center = true);
         // Bottom rounded corners
         for (x = [-plate_width/2 + edge_r, plate_width/2 - edge_r])
@@ -47,16 +53,8 @@ module leaf_profile() {
 }
 
 module leaf_outline() {
-    // 2D outline of the leaf in X-Y
-    hull() {
-        // Square hinge-side edge
-        translate([0, -plate_length/2 + 0.01])
-            square([plate_width, 0.02], center = true);
-        // Rounded far-end corners
-        for (x = [-plate_width/2 + corner_r, plate_width/2 - corner_r])
-            translate([x, plate_length/2 - corner_r])
-                circle(r = corner_r);
-    }
+    // 2D outline of the leaf in X-Y — square on both ends for hinge blocks
+    square([plate_width, plate_length], center = true);
 }
 
 module leaf() {
@@ -70,49 +68,97 @@ module leaf() {
     }
 }
 
-module hinge_transform(){
+module center_hinge_transform(){
     translate([0, -block_offset, 0])
     translate([0, -block_length/2, block_height/2])
     rotate([0, 90, 0])
     children();
 }
 
-module our_hinge(inner = false){
-    hinge_transform()
+module end_hinge_transform(){
+    translate([0, end_block_offset, 0])
+    translate([0, end_block_length/2, end_block_height/2])
+    rotate([0, -90, 0])
+    rotate([0, 0, 180])
+    children();
+}
+
+module center_hinge(inner = false){
+    center_hinge_transform()
     hinge(
         length = plate_width,
         outer_diam = knuckle_diam,
-        segments = hinge_segs,
+        segments = center_hinge_segs,
         inner = inner,
         gap = hinge_gap
     );
 }
 
-module our_hinge_cutout(inner = false){
-    hinge_transform()
+module end_hinge(inner = false){
+    end_hinge_transform()
+    hinge(
+        length = plate_width,
+        outer_diam = end_knuckle_diam,
+        segments = end_hinge_segs,
+        inner = inner,
+        gap = hinge_gap,
+        latch = true
+    );
+}
+
+module center_hinge_cutout(inner = false){
+    center_hinge_transform()
     hinge(
         length = plate_width,
         outer_diam = knuckle_diam,
-        segments = hinge_segs,
+        segments = center_hinge_segs,
         inner = inner,
         gap = hinge_gap,
         cutout = true
     );
 }
 
-module mounting_block(){
+module end_hinge_cutout(inner = false){
+    end_hinge_transform()
+    hinge(
+        length = plate_width,
+        outer_diam = end_knuckle_diam,
+        segments = end_hinge_segs,
+        inner = inner,
+        gap = hinge_gap,
+        cutout = true,
+        latch = true
+    );
+}
+
+module center_mounting_block(){
     rotate([0, -90, 0])
     translate([0, block_length/2, -block_height/2])
         cube([plate_width, block_length, block_height], center = true);
 }
 
-module top_block(inner = false){
+module end_mounting_block(){
+    rotate([0, -90, 0])
+    translate([0, end_block_length/2, -end_block_height/2])
+        cube([plate_width, end_block_length, end_block_height], center = true);
+}
+
+module center_block(inner = false){
     difference() {
-        hinge_transform()
-        mounting_block();
-        our_hinge_cutout(inner);
+        center_hinge_transform()
+        center_mounting_block();
+        center_hinge_cutout(inner);
     }
-    our_hinge(inner);
+    center_hinge(inner);
+}
+
+module end_block(inner = false){
+    difference() {
+        end_hinge_transform()
+        end_mounting_block();
+        end_hinge_cutout(inner);
+    }
+    end_hinge(inner);
 }
 
 module half(inner = false){
@@ -120,7 +166,8 @@ module half(inner = false){
     intersection() {
         union() {
             leaf();
-            top_block(inner);
+            center_block(inner);
+            end_block(inner);
         }
         // Clip everything to the rounded profile
         rotate([90, 0, 0])
@@ -137,9 +184,31 @@ module front(){
     half();
 }
 
+//open
+translate([0, module_offset, 0])
+front();
+
 rotate([0, 0, 180])
 translate([0, module_offset, 0])
 back();
 
-translate([0, module_offset, 0])
-front();
+if ($preview) {
+    //split
+    translate([80, 0, 0]){
+        rotate([0, 0, 180])
+        translate([0, module_offset + 5, 0])
+        back();
+
+        translate([0, module_offset + 5, 0])
+        front();
+    }
+
+    //closed
+    translate([40, 0, 0]){
+        translate([0, 0, plate_thickness*2])
+        rotate([0, 180, 0]){
+            front();
+        }
+        back();
+    }
+}

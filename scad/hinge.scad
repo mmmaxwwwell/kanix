@@ -26,6 +26,7 @@ module hinge(
     inner = true,
     gap = 0.2,
     cutout = false,
+    latch = false,
     fn = 64
 ) {
     r = outer_diam / 2;
@@ -51,9 +52,11 @@ module hinge(
 
     seg_width = length / segments;
     tip_r = 0.5;
+    cone_scale = latch ? 0.5 : 1;
 
     module cone_pin(h) {
-        cylinder(h = h, r1 = h, r2 = tip_r, $fn = 32);
+        sh = h * cone_scale;
+        cylinder(h = sh, r1 = sh, r2 = tip_r, $fn = 32);
     }
 
     module barrel_segment(seg_len) {
