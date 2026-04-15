@@ -74,10 +74,15 @@ kanix_plate();
 
 fillet_r = 5;
 cone_edge_r = 1;
-cone_top_r = plate_width / 2 + 10;
-// Set cone height to match radial difference for a 45° self-supporting angle
-cone_h = cone_top_r - post_diameter / 2;
-total_post_h = post_height + cone_h;
+// Full-size 30° cone height, then scale to 3/4
+full_cone_h = (plate_width / 2 + 10 - post_diameter / 2) / tan(30);
+cone_h = full_cone_h * 3 / 4;
+// Top radius shrinks to maintain 30° angle
+cone_top_r = post_diameter / 2 + cone_h * tan(30);
+// Original 45° cone height (preserves top-of-cone position)
+old_cone_h = (plate_width / 2 + 10) - post_diameter / 2;
+cone_base_z = plate_thickness + post_height + old_cone_h - cone_h;
+total_post_h = post_height + old_cone_h;
 
 difference() {
     union() {

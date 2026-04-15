@@ -1,6 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
-import { modules } from "../data/modules";
+import { modules, comingSoonModules } from "../data/modules";
 
 const repoUrl = "https://github.com/mmmaxwwwell/kanix";
 ---
@@ -294,6 +294,21 @@ const repoUrl = "https://github.com/mmmaxwwwell/kanix";
         Each module mounts to a standard 3x3 Kanix™ bolt pattern with M5 hardware. Mix, match, and rearrange to suit your needs.
       </p>
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {comingSoonModules.map(({ slug, name, description }) => (
+          <a
+            href={`${import.meta.env.BASE_URL}coming-soon/${slug}/`}
+            class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col hover:border-neutral-600 transition-colors group relative"
+          >
+            <span class="absolute top-4 right-4 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-500 rounded-full border border-amber-500/20">
+              Coming Soon
+            </span>
+            <h3 class="text-lg font-semibold mb-2 text-white group-hover:text-amber-500 transition-colors pr-24">{name}</h3>
+            <p class="text-neutral-400 leading-relaxed mb-4 flex-1">{description}</p>
+            <span class="text-sm text-amber-500 group-hover:text-amber-400 transition-colors font-medium">
+              View Details &rarr;
+            </span>
+          </a>
+        ))}
         {modules.map(({ slug, name, description }) => (
           <a
             href={`${import.meta.env.BASE_URL}modules/${slug}/`}
@@ -395,6 +410,9 @@ const repoUrl = "https://github.com/mmmaxwwwell/kanix";
           suitable and safe for your intended use, including material selection, print quality, and
           structural integrity. 3D-printed parts can fail without warning, so inspect your gear
           regularly and replace any parts showing signs of wear or damage. Use at your own risk.
+        </p>
+        <p class="text-neutral-500 text-xs leading-relaxed mt-4">
+          Kanix™ is not affiliated with, endorsed by, or associated with Dogtra, E-Collar Technologies, Mini Educator, The Company of Animals, PetsTEK, or any other product manufacturers referenced on this site. All product names, trademarks, and registered trademarks are the property of their respective owners. Product links are provided for reference only.
         </p>
       </div>
     </div>

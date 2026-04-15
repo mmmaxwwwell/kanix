@@ -12,6 +12,13 @@ export interface Module {
   products?: Product[];
 }
 
+export interface ComingSoonModule {
+  slug: string;
+  name: string;
+  description: string;
+  products?: Product[];
+}
+
 export const modules: Module[] = [
   {
     slug: "poo-bag-dispenser",
@@ -125,12 +132,89 @@ export const modules: Module[] = [
       },
     ],
   },
+];
+
+export const comingSoonModules: ComingSoonModule[] = [
   {
     slug: "kanix-plate",
     name: "Kanix™ Plate",
     description:
       "The universal mounting plate. 3x3 bolt pattern with integrated hinge mechanism. The foundation every module attaches to.",
-    scadFile: "scad/kanix-plate.scad",
-    stlFile: "kanix-plate.stl",
+  },
+  {
+    slug: "dogtra-200c-202c-arc-holder",
+    name: "E-Collar Holder (Dogtra 200C/202C/ARC)",
+    description:
+      "Compact holder for Dogtra 200C/202C series e-collar receivers. Keep your remote trainer secured on your belt for instant access during training sessions. Also fits the Dogtra 280C, Tom Davis 280C 2.0, and Dogtra ARC receivers.",
+    products: [
+      {
+        name: "Dogtra 200C",
+        url: "https://www.amazon.com/Dogtra-200C-Remote-Training-Collar/dp/B07FSG5V8C",
+      },
+      {
+        name: "Dogtra 202C (2-Dog)",
+        url: "https://www.amazon.com/Dogtra-202C-Remote-Training-Collar/dp/B07FSKBQ1L",
+      },
+      {
+        name: "Dogtra 280C",
+        url: "https://www.amazon.com/Dogtra-280C-Remote-Training-Collar/dp/B07FSLZCS8",
+      },
+      {
+        name: "Dogtra ARC",
+        url: "https://www.amazon.com/Dogtra-ARC-Remote-Training-Collar/dp/B00NXYXVU6",
+      },
+    ],
+  },
+  {
+    slug: "dogtra-280x-arcx-holder",
+    name: "E-Collar Holder (Dogtra 280X/ARC-X)",
+    description:
+      "Dual-purpose holder designed for the Dogtra 280X compact receiver and the slim ARC-X receiver. Two profiles, one module.",
+    products: [
+      {
+        name: "Dogtra 280X",
+        url: "https://www.amazon.com/Dogtra-280X-Stubborn-Waterproof-Vibration/dp/B0DBMW4YN9",
+      },
+      {
+        name: "Dogtra ARC-X",
+        url: "https://www.amazon.com/Dogtra-ARC-X-Collar-Dog-Training/dp/B0FC1LN2VW",
+      },
+    ],
+  },
+  {
+    slug: "mini-educator-holder",
+    name: "E-Collar Holder (Mini Educator)",
+    description:
+      "Purpose-built holder for the Mini Educator ET-300 receiver, the most popular remote trainer among professional dog trainers. Also fits the Educator ET-400 (identical receiver) and Micro Educator ME-300.",
+    products: [
+      {
+        name: "Mini Educator ET-300",
+        url: "https://www.amazon.com/Mini-Educator-Dog-Training-Collar/dp/B0190P0NG6",
+      },
+      {
+        name: "Educator ET-400 (3/4 Mile)",
+        url: "https://www.amazon.com/Educator-Collar-Training-Collar-System/dp/B07WXSMKGQ",
+      },
+      {
+        name: "Micro Educator ME-300",
+        url: "https://www.amazon.com/Collar-Waterproof-Educator-Vibration-Stimulation/dp/B07SK953K4",
+      },
+    ],
+  },
+  {
+    slug: "pet-corrector-holster",
+    name: "Pet Corrector Holster",
+    description:
+      "Quick-draw holster for the Pet Corrector compressed air spray. Interrupts unwanted behaviors with a short hiss — keep it on your belt so it's there when you need it. Also fits the PSSSTTT spray and other similarly sized aerosol trainers.",
+    products: [
+      {
+        name: "Pet Corrector (50mL)",
+        url: "https://www.amazon.com/Company-Animals-Pet-Corrector/dp/B0051GO5WM",
+      },
+      {
+        name: "PSSSTTT Spray for Dogs",
+        url: "https://www.amazon.com/PSSSTTT-Spray-Dogs-3-5-99g/dp/B0CGY2XQYB",
+      },
+    ],
   },
 ];

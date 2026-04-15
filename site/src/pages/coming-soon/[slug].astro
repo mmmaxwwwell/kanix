@@ -1,0 +1,90 @@
+---
+import Base from "../../layouts/Base.astro";
+import { comingSoonModules } from "../../data/modules";
+
+export function getStaticPaths() {
+  return comingSoonModules.map((mod) => ({
+    params: { slug: mod.slug },
+    props: mod,
+  }));
+}
+
+const { name, description, products } = Astro.props;
+---
+
+<Base title={`${name} - Coming Soon - Kanix™`} description={description}>
+  <nav class="fixed top-0 w-full z-50 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href={import.meta.env.BASE_URL} class="text-xl font-extrabold tracking-tight hover:text-neutral-300 transition-colors">KANIX<sup class="text-[0.5em] align-super">™</sup></a>
+      <span class="text-sm text-amber-500 font-semibold uppercase tracking-wider">Coming Soon</span>
+    </div>
+  </nav>
+
+  <main id="main" class="pt-20 pb-16 px-4 sm:px-6">
+    <div class="max-w-4xl mx-auto">
+      <a href={`${import.meta.env.BASE_URL}#coming-soon`} class="text-sm text-neutral-500 hover:text-white transition-colors mb-4 inline-block">
+        &larr; Back to all modules
+      </a>
+
+      <div class="flex items-center gap-3 mb-2">
+        <h1 class="text-2xl sm:text-4xl font-bold tracking-tight">{name}</h1>
+        <span class="px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-500 rounded-full border border-amber-500/20">
+          Coming Soon
+        </span>
+      </div>
+      <p class="text-neutral-400 text-base sm:text-lg leading-relaxed mb-8">{description}</p>
+
+      <!-- Coming Soon Visual -->
+      <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-12 sm:p-16 mb-8 text-center">
+        <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-amber-500/10 text-amber-500 mb-6">
+          <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-2.25-1.313M21 7.5v2.25m0-2.25l-2.25 1.313M3 7.5l2.25-1.313M3 7.5l2.25 1.313M3 7.5v2.25m9 3l2.25-1.313M12 12.75l-2.25-1.313M12 12.75V15m0 6.75l2.25-1.313M12 21.75V19.5m0 2.25l-2.25-1.313m0-16.875L12 2.25l2.25 1.313M21 14.25v2.25l-2.25 1.313m-13.5 0L3 16.5v-2.25" />
+          </svg>
+        </div>
+        <h2 class="text-xl sm:text-2xl font-bold text-white mb-3">Module In Development</h2>
+        <p class="text-neutral-400 max-w-md mx-auto">
+          This module is currently being designed and tested. Check back soon or open an issue on GitHub to express interest.
+        </p>
+      </div>
+
+      {products && products.length > 0 && (
+        <div class="mb-8">
+          <h2 class="text-lg font-semibold text-white mb-4">Compatible Products</h2>
+          <div class="grid sm:grid-cols-2 gap-4">
+            {products.map(({ name: productName, url }) => (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="bg-neutral-900 border border-neutral-800 rounded-xl p-5 flex items-center justify-between hover:border-amber-500/30 transition-colors group"
+              >
+                <span class="text-neutral-300 group-hover:text-white transition-colors font-medium">{productName}</span>
+                <span class="text-amber-500 group-hover:text-amber-400 transition-colors text-sm font-medium whitespace-nowrap ml-4">
+                  Amazon &rarr;
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div class="text-center mb-8">
+        <a
+          href="https://github.com/mmmaxwwwell/kanix/issues/new"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-2 px-6 py-2.5 border border-neutral-700 text-neutral-300 font-semibold rounded-lg hover:border-neutral-500 hover:text-white transition-colors text-sm"
+        >
+          Request This Module on GitHub &rarr;
+        </a>
+      </div>
+
+      <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+        <h3 class="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-3">Disclaimer</h3>
+        <p class="text-neutral-500 text-xs leading-relaxed">
+          Kanix™ is not affiliated with, endorsed by, or associated with Dogtra, E-Collar Technologies, Mini Educator, The Company of Animals, PetsTEK, or any other product manufacturers referenced on this site. All product names, trademarks, and registered trademarks are the property of their respective owners. Product links are provided for reference only.
+        </p>
+      </div>
+    </div>
+  </main>
+</Base>

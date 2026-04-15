@@ -71,7 +71,14 @@ const stlPath = `${import.meta.env.BASE_URL}models/${stlFile}`;
 
       <STLViewer stlPath={stlPath} name={name} />
 
-      <p class="text-neutral-600 text-xs sm:text-sm mt-2 text-center">Drag to rotate. Scroll to zoom. Pinch on mobile.</p>
+      <p class="text-neutral-600 text-xs sm:text-sm mt-2 text-center mb-8">Drag to rotate. Scroll to zoom. Pinch on mobile.</p>
+
+      <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+        <h3 class="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-3">Disclaimer</h3>
+        <p class="text-neutral-500 text-xs leading-relaxed">
+          Kanix™ is not affiliated with, endorsed by, or associated with any product manufacturers referenced on this site. All product names, trademarks, and registered trademarks are the property of their respective owners. Product links are provided for reference only.
+        </p>
+      </div>
     </div>
   </main>
 </Base>
