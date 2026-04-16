@@ -112,16 +112,51 @@ module right_angle_fillet(diameter, length){
     }
 }
 
+fillet_d = 5;
+
 module top_block(inner = false){
     translate([0, -block_offset, block_height / 2]){
-        translate([0,block_length/2, 0.875])
-        right_angle_fillet(diameter = 1.4, length = plate_size);
+        
+        tri_base = plate_thickness/2;
+
         difference() {
-            hinge_transform()
-            mounting_block();
-            our_hinge_cutout(inner);
+            union() {
+                translate([0, block_length/2, plate_thickness - block_height/2])
+                right_angle_fillet(diameter = fillet_d, length = plate_size);
+                difference() {
+                    hinge_transform()
+                    mounting_block();
+                    our_hinge_cutout(inner);
+                }
+                our_hinge(inner);
+            }
+            // Chamfer the corner where the block meets the plate base
+            translate([-plate_size/2 - 0.5, -block_length/2, -block_height/2])
+            rotate([90,0,0])
+            rotate([0, 90, 0])
+            linear_extrude(height = plate_size + 1)
+                polygon(points = [
+                    [0, 0],
+                    [tri_base, 0],
+                    [0, tri_base],
+                ]);
+            // Cut screw hole insets through fillet material on the back plate
+            if (inner)
+                for (col = [0 : hole_cols - 1])
+                    for (row = [0 : hole_rows - 1])
+                        translate([
+                            (col - (hole_cols - 1) / 2) * kanix_hole_spacing,
+                            (row - (hole_rows - 1) / 2) * kanix_hole_spacing + block_offset,
+                            -block_height / 2 - 0.5
+                        ]) {
+                            bolt_hole();
+                            // Extend counterbore through fillet
+                            translate([0, 0, plate_thickness - counterbore_depth])
+                                cylinder(h = fillet_d + counterbore_depth + 1, d = counterbore_d, $fn = 48);
+                        }
         }
-        our_hinge(inner);
+
+
     }
 }
 
