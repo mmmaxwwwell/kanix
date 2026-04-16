@@ -214,7 +214,7 @@ module latch_block_rx(){
 
 module latch_block_tx(){
     translate([plate_size/2 - side_locking_tab_depth*1.5,plate_size/2 + bottom_block_length/2,plate_thickness+belt_thickness/2]){
-        cube([side_locking_tab_depth,bottom_block_length - rx_wall_width * 2,belt_thickness],center = true);
+        cube([side_locking_tab_depth,bottom_block_length,belt_thickness],center = true);
         difference(){
             translate([side_locking_tab_depth/2,bottom_block_length/2 - rx_wall_width,0]){
                 rotate([90,0,0])
