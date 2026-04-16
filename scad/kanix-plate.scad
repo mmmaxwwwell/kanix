@@ -38,6 +38,7 @@ module_offset = plate_size/2 + top_block_length + hinge_gap/2;
 
 side_locking_tab_depth = 5;
 rx_wall_width = 2;
+tx_tip_cutoff = 1.5;
 
 module plate_body() {
     translate([-plate_size/2, -plate_size/2, 0])
@@ -186,10 +187,29 @@ module back_cutout(){
     back_cutout_feature();
 }
 
-module back(){
-    mounting_plate();
-    top_block(inner = true);
-    bottom_block();
+module latch_block_rx(){
+    translate([plate_size/2 - side_locking_tab_depth/2,plate_size/2 + bottom_block_length/2,plate_thickness+belt_thickness/2]){
+        difference(){
+
+            //outer block
+            cube([
+                    side_locking_tab_depth,
+                    bottom_block_length ,
+                    belt_thickness
+                ],
+                center = true
+            );
+            //difference block
+            translate([-tx_tip_cutoff/2,0,-belt_thickness/4])
+            cube([
+                    side_locking_tab_depth - tx_tip_cutoff,
+                    bottom_block_length - rx_wall_width * 2,
+                    belt_thickness/2 + hinge_gap
+                ],
+                center = true
+            );
+        }
+    }
 }
 
 module latch_block_tx(){
@@ -224,6 +244,15 @@ module front(){
     latch_block_tx();
     mirror([1,0,0])
     latch_block_tx();
+}
+
+module back(){
+    mounting_plate();
+    top_block(inner = true);
+    bottom_block();
+    latch_block_rx();
+    mirror([1,0,0])
+    latch_block_rx();
 }
 
 
