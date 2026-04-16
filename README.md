@@ -14,7 +14,7 @@ Whether you're a professional trainer, a dog walker, or an everyday owner, Kanix
 
 | Module | Description | Compatible Product |
 |--------|-------------|-------------------|
-| **Poo Bag Dispenser** | Holds a standard roll of poo bags with a screw-in cap and front dispensing slit | [Earth Rated Dog Poo Bags](https://www.amazon.com/Earth-Rated-Leak-Proof-Extra-Thick-Unscented/dp/B0CS8GCYS1) |
+| **Waste Bag Dispenser** | Holds a standard roll of waste bags with a screw-in cap and front dispensing slit | [Earth Rated Dog Waste Bags](https://www.amazon.com/Earth-Rated-Leak-Proof-Extra-Thick-Unscented/dp/B0CS8GCYS1) |
 | **First Aid Kit Mount** | Mounting plate with center cutout for strap pass-through | [Individual First Aid Kit](https://www.amazon.com/dp/B0F311WTPC) |
 | **MK3 Canister Holder** | Holder for an MK-3 pepper spray canister | [Sabre Protector Dog Spray](https://www.amazon.com/dp/B00AU6J68Q) |
 | **Slip Lead Wrap Post** | Post for securely wrapping a 5/8" x 5' slip lead | [Mendota Products Slip Lead](https://www.amazon.com/dp/B086WMV7G7) |

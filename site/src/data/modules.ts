@@ -21,15 +21,15 @@ export interface ComingSoonModule {
 
 export const modules: Module[] = [
   {
-    slug: "poo-bag-dispenser",
-    name: "Poo Bag Dispenser",
+    slug: "waste-bag-dispenser",
+    name: "Waste Bag Dispenser",
     description:
-      "Holds a standard roll of poo bags with a screw-in cap and front dispensing slit. Never fumble for a bag again.",
-    scadFile: "scad/earth-rated-poo-bag-holder.scad",
-    stlFile: "earth-rated-poo-bag-holder.stl",
+      "Holds a standard roll of waste bags with a screw-in cap and front dispensing slit. Never fumble for a bag again.",
+    scadFile: "scad/earth-rated-waste-bag-holder.scad",
+    stlFile: "earth-rated-waste-bag-holder.stl",
     products: [
       {
-        name: "Earth Rated Dog Poo Bags",
+        name: "Earth Rated Dog Waste Bags",
         url: "https://www.amazon.com/Earth-Rated-Leak-Proof-Extra-Thick-Unscented/dp/B0CS8GCYS1",
       },
     ],

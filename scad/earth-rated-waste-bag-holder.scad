@@ -2,8 +2,8 @@
 // Licensed under CC BY-NC 4.0, https://creativecommons.org/licenses/by-nc/4.0/
 // Free for personal use. Commercial use requires a separate license.
 //
-// Earth Rated Poo Bag Holder - Kanix Belt Mount
-// Holds a roll of poo bags (63mm tall, 32mm diameter).
+// Earth Rated Waste Bag Holder - Kanix Belt Mount
+// Holds a roll of waste bags (63mm tall, 32mm diameter).
 // Screw-in cap with bowl grip, front slit for dispensing.
 // Threads recessed into wall so bags pass through freely.
 // Mounts to a Kanix belt clip.
