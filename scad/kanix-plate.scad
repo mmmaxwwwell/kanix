@@ -27,15 +27,17 @@ hole_rows = 3;
 hinge_od = belt_thickness;
 hinge_gap = 0.2;
 
-block_length = hinge_od/2 - hinge_gap/2;
-block_height = plate_thickness + belt_thickness / 2;
-block_offset = plate_size / 2 + block_length / 2;
+top_block_length = hinge_od/2 - hinge_gap/2;
+top_block_height = plate_thickness + belt_thickness / 2;
+top_block_offset = plate_size / 2 + top_block_length / 2;
 
-bottom_block_length = 8;
+bottom_block_length = 10;
 bottom_block_offset = plate_size / 2 + bottom_block_length / 2;
 
-module_offset = plate_size/2 + block_length + hinge_gap/2;
+module_offset = plate_size/2 + top_block_length + hinge_gap/2;
 
+side_locking_tab_depth = 5;
+rx_wall_width = 2;
 
 module plate_body() {
     translate([-plate_size/2, -plate_size/2, 0])
@@ -64,7 +66,7 @@ module mounting_plate() {
 }
 
 module hinge_transform(){
-    translate([0,-block_length/2,block_height/2])
+    translate([0,-top_block_length/2,top_block_height/2])
     rotate([0, 90, 0])
     children();
 }
@@ -92,8 +94,8 @@ module our_hinge_cutout(inner){
 
 module mounting_block(){
     rotate([0, -90, 0])
-    translate([0, block_length/2, -block_height/2])
-    cube([plate_size, block_length, block_height], center = true);
+    translate([0, top_block_length/2, -top_block_height/2])
+    cube([plate_size, top_block_length, top_block_height], center = true);
 }
 
 module right_angle_fillet(diameter, length){
@@ -115,13 +117,13 @@ module right_angle_fillet(diameter, length){
 fillet_d = 5;
 
 module top_block(inner = false){
-    translate([0, -block_offset, block_height / 2]){
+    translate([0, -top_block_offset, top_block_height / 2]){
         
         tri_base = plate_thickness/2;
 
         difference() {
             union() {
-                translate([0, block_length/2, plate_thickness - block_height/2])
+                translate([0, top_block_length/2, plate_thickness - top_block_height/2])
                 right_angle_fillet(diameter = fillet_d, length = plate_size);
                 difference() {
                     hinge_transform()
@@ -131,7 +133,7 @@ module top_block(inner = false){
                 our_hinge(inner);
             }
             // Chamfer the corner where the block meets the plate base
-            translate([-plate_size/2 - 0.5, -block_length/2, -block_height/2])
+            translate([-plate_size/2 - 0.5, -top_block_length/2, -top_block_height/2])
             rotate([90,0,0])
             rotate([0, 90, 0])
             linear_extrude(height = plate_size + 1)
@@ -146,8 +148,8 @@ module top_block(inner = false){
                     for (row = [0 : hole_rows - 1])
                         translate([
                             (col - (hole_cols - 1) / 2) * kanix_hole_spacing,
-                            (row - (hole_rows - 1) / 2) * kanix_hole_spacing + block_offset,
-                            -block_height / 2 - 0.5
+                            (row - (hole_rows - 1) / 2) * kanix_hole_spacing + top_block_offset,
+                            -top_block_height / 2 - 0.5
                         ]) {
                             bolt_hole();
                             // Extend counterbore through fillet
@@ -162,26 +164,69 @@ module top_block(inner = false){
 
 
 module bottom_block(){
-    translate([0, bottom_block_offset, plate_thickness/2 + belt_thickness/2]){
-        difference() {
-            cube([plate_size, bottom_block_length, plate_thickness + belt_thickness ], center = true);
-            cube([plate_size - bottom_block_length*2, bottom_block_length, plate_thickness + belt_thickness ], center = true);
-        }
+    translate([0, bottom_block_offset, plate_thickness/2 ]){
+        cube([plate_size, bottom_block_length, plate_thickness ], center = true);
     }
     
+}
+
+module back_cutout_feature(){
+    translate([plate_size/2 - side_locking_tab_depth*0.75 -side_locking_tab_depth * 2,0,plate_thickness/2]){
+        hull(){
+            cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
+            translate([0,plate_size,0])
+            cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
+        }
+    }
+}
+
+module back_cutout(){
+    back_cutout_feature();
+    mirror([1,0,0])
+    back_cutout_feature();
 }
 
 module back(){
     mounting_plate();
     top_block(inner = true);
-    // bottom_block();
+    bottom_block();
+}
+
+module latch_block_tx(){
+    translate([plate_size/2 - side_locking_tab_depth*1.5,plate_size/2 + bottom_block_length/2,plate_thickness+belt_thickness/2]){
+        cube([side_locking_tab_depth,bottom_block_length - rx_wall_width * 2,belt_thickness],center = true);
+        difference(){
+            translate([side_locking_tab_depth/2,bottom_block_length/2 - rx_wall_width,0]){
+                rotate([90,0,0])
+                linear_extrude(height = bottom_block_length - rx_wall_width * 2)
+                polygon(points = [
+                    [0, 0],
+                    [side_locking_tab_depth+1, 0],
+                    [0, belt_thickness/2],
+                ]);
+            }
+            translate([13.5,0,0])
+            cube([15,15,15],center = true);
+        }
+    }
 }
 
 module front(){
-    plate_body();
-    top_block();
-    // bottom_block();
+    difference(){
+        union(){
+            plate_body();
+            top_block();
+            bottom_block();
+        }
+        back_cutout();
+    }
+
+    latch_block_tx();
+    mirror([1,0,0])
+    latch_block_tx();
 }
+
+
 
 //open
 translate([0, module_offset ,0])
