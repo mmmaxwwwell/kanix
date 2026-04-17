@@ -100,6 +100,10 @@ import {
   createLowStockAlertService,
   type LowStockAlertService,
 } from "./services/low-stock-alert.js";
+import {
+  createTaxAdapter,
+  type TaxAdapter,
+} from "./services/tax-adapter.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -132,12 +136,15 @@ export interface CreateServerOptions {
   reservationCleanupIntervalMs?: number;
   /** Override the low-stock alert service (useful for testing). */
   lowStockAlertService?: LowStockAlertService;
+  /** Override the tax adapter (useful for testing). */
+  taxAdapter?: TaxAdapter;
 }
 
 export interface ServerInstance {
   app: FastifyInstance;
   shutdownManager: ShutdownManager;
   lowStockAlertService: LowStockAlertService;
+  taxAdapter: TaxAdapter;
   start(): Promise<string>;
 }
 
@@ -168,6 +175,10 @@ const APP_VERSION = "0.1.0";
 export async function createServer(options: CreateServerOptions): Promise<ServerInstance> {
   const { config, processRef = process, database, githubUserFetcher } = options;
   const lowStockAlertService = options.lowStockAlertService ?? createLowStockAlertService();
+  const taxAdapter = options.taxAdapter ?? createTaxAdapter({
+    stripeTaxEnabled: config.STRIPE_TAX_ENABLED,
+    stripeSecretKey: config.STRIPE_SECRET_KEY,
+  });
 
   const logger = createLogger({
     level: config.LOG_LEVEL,
@@ -2605,5 +2616,5 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     return address;
   }
 
-  return { app, shutdownManager, lowStockAlertService, start };
+  return { app, shutdownManager, lowStockAlertService, taxAdapter, start };
 }

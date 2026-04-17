@@ -172,7 +172,7 @@
 - [x] T047 Implement kit composition system [FR-007, FR-008, FR-009, FR-010, FR-011]
   Done when: kit_definition, kit_class_requirement, cart_kit_selection entities; POST /api/cart/kits (add kit to cart with selected variants per class); validation: all class requirements satisfied, all selected variants in stock and match class membership; kit price_minor stored on kit_definition (admin-set fixed price); UI shows savings vs individual; inventory reservation per component; integration tests: valid kit → added; incomplete kit → rejected with message "Select 2 more from Plates"; out-of-stock component → rejected with swap suggestion
 
-- [ ] T048 Implement Stripe Tax adapter [FR-117, FR-118, FR-119, FR-120]
+- [x] T048 Implement Stripe Tax adapter [FR-117, FR-118, FR-119, FR-120]
   Done when: `taxAdapter.calculate(lineItems, shippingAddress)` returns tax amount; production mode: calls Stripe Tax API when STRIPE_TAX_ENABLED=true and valid key; stub mode: returns 0 tax when STRIPE_TAX_ENABLED=false; tax included in Stripe PaymentIntent metadata; integration tests: (stub mode) tax = 0; (if Stripe test key available) tax calculated for TX address
 
 - [ ] T049 Implement checkout flow [FR-012, FR-015, FR-016, FR-017, FR-018, FR-022, FR-023, FR-025, FR-026]

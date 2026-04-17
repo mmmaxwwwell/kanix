@@ -57,3 +57,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Kit validation checks class requirements first (fail fast on missing selections), then validates each variant individually — this ordering gives the best error messages ("Select 2 more from Plates" vs generic "invalid selection")
 - The dynamic import `await import("../schema/product-class.js")` inside `addKitToCart` works for getting the `productClass` table reference when constructing the human-readable error message — avoid circular deps by not importing it at top level alongside `productClassMembership`
 - Out-of-stock swap suggestions scan all products in the same class for active, in-stock variants — limit results with `.slice(0, 3)` to avoid bloating the error response
+
+## T048 — Implement Stripe Tax adapter
+- The `stripe` package (v22) has a clean `stripe.tax.calculations.create()` API — pass `customer_details.address_source: "shipping"` to calculate tax based on the shipping address
+- Use the same factory + DI pattern as `LowStockAlertService` — expose `taxAdapter` on `ServerInstance` and accept an override in `CreateServerOptions` so tests can inject a stub without calling the real Stripe API
+- Stripe Tax integration tests should be conditionally skipped (`STRIPE_TAX_ENABLED=true` + `sk_test_` prefix) so the test suite passes in environments without Stripe test keys
