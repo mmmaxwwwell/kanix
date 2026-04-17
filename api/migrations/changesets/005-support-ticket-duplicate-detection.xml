@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="005-support-ticket-duplicate-detection" author="kanix">
+        <comment>Add duplicate ticket detection columns to support_ticket (FR-E028)</comment>
+        <addColumn tableName="support_ticket">
+            <column name="potential_duplicate" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false" />
+            </column>
+            <column name="linked_ticket_id" type="uuid">
+                <constraints nullable="true"
+                             foreignKeyName="fk_support_ticket_linked_ticket"
+                             references="support_ticket(id)" />
+            </column>
+            <column name="duplicate_dismissed" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false" />
+            </column>
+            <column name="merged_into_ticket_id" type="uuid">
+                <constraints nullable="true"
+                             foreignKeyName="fk_support_ticket_merged_into"
+                             references="support_ticket(id)" />
+            </column>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

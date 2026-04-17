@@ -1,0 +1,24 @@
+{
+  "task_id": "T061a",
+  "status": "complete",
+  "summary": "Implemented duplicate ticket detection: tickets for same order/customer within 24h flagged with potential_duplicate=true and linked_ticket_id; admin dismiss-duplicate and merge endpoints; 9 integration tests passing",
+  "commands_run": [
+    {"command": "pnpm db:migrate", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm vitest run src/duplicate-ticket.integration.test.ts", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/migrations/changesets/005-support-ticket-duplicate-detection.xml",
+    "api/src/duplicate-ticket.integration.test.ts"
+  ],
+  "files_modified": [
+    "api/src/db/schema/support.ts",
+    "api/src/db/queries/support-ticket.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

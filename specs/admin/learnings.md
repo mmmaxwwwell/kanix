@@ -51,3 +51,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The support_ticket Drizzle schema, DB migration, and CAPABILITIES (SUPPORT_READ, SUPPORT_MANAGE) all already existed — only the query layer, routes, and integration tests needed to be created
 - Customer-facing routes at `/api/support/tickets` use `verifySession + requireVerifiedEmail` (no admin middleware), while admin routes at `/api/admin/support-tickets` use `requireAdmin + requireCapability`
 - The `listTicketMessages` function takes an `includeInternalNotes` option — admin routes pass `true`, customer routes pass `false` to enforce the is_internal_note visibility boundary
+
+## T061a — Implement duplicate ticket detection
+- Self-referencing FKs (`linked_ticket_id`, `merged_into_ticket_id` → `support_ticket.id`) require clearing these columns before deleting tickets in test cleanup, otherwise FK violations occur
+- Duplicate detection is best done in the `createSupportTicket` query function itself (not in routes) so both customer and admin ticket creation paths benefit automatically
+- The `support_ticket_status_history.actor_admin_user_id` has a real FK constraint — test code using fake admin UUIDs (e.g., `00000000-...01`) will fail on insert; use `null` in tests without a real admin user

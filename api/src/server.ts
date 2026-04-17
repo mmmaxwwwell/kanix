@@ -168,6 +168,8 @@ import {
   createTicketMessage,
   listTicketMessages,
   findTicketStatusHistory,
+  dismissDuplicate,
+  mergeTicket,
 } from "./db/queries/support-ticket.js";
 import Stripe from "stripe";
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -2113,6 +2115,97 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         }
         const history = await findTicketStatusHistory(database.db, id);
         return { history };
+      },
+    );
+
+    // POST /api/admin/support-tickets/:id/dismiss-duplicate — dismiss duplicate flag
+    app.post(
+      "/api/admin/support-tickets/:id/dismiss-duplicate",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SUPPORT_MANAGE)],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+
+        try {
+          const ticket = await dismissDuplicate(database.db, id);
+
+          request.auditContext = {
+            action: "support_ticket.dismiss_duplicate",
+            entityType: "support_ticket",
+            entityId: id,
+            afterJson: { duplicateDismissed: true },
+          };
+
+          return { ticket };
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_TICKET_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_TICKET_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_NOT_DUPLICATE") {
+            return reply.status(400).send({
+              error: "ERR_NOT_DUPLICATE",
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // POST /api/admin/support-tickets/:id/merge — merge ticket into another
+    app.post(
+      "/api/admin/support-tickets/:id/merge",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SUPPORT_MANAGE)],
+        schema: {
+          body: {
+            type: "object",
+            required: ["target_ticket_id"],
+            properties: {
+              target_ticket_id: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { target_ticket_id: string };
+        const actorAdminUserId = request.adminContext?.adminUserId ?? "";
+
+        try {
+          const ticket = await mergeTicket(
+            database.db,
+            id,
+            body.target_ticket_id,
+            actorAdminUserId,
+          );
+
+          request.auditContext = {
+            action: "support_ticket.merge",
+            entityType: "support_ticket",
+            entityId: id,
+            afterJson: {
+              mergedIntoTicketId: body.target_ticket_id,
+              status: "closed",
+            },
+          };
+
+          return { ticket };
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_TICKET_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_TICKET_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          throw err;
+        }
       },
     );
 

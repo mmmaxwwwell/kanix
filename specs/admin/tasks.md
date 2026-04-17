@@ -249,7 +249,7 @@
 - [x] T061 Implement support ticket system [FR-050, FR-051, FR-052, FR-054]
   Done when: POST /api/support/tickets (customer) and POST /admin/support/tickets (admin); state machine: open→waiting_on_customer/waiting_on_internal→resolved→closed; message threading: POST /support/tickets/:id/messages (customer-visible) and POST /admin/support/tickets/:id/internal-notes (admin-only, is_internal_note=true); tickets linkable to order_id, shipment_id; integration tests: customer creates ticket → admin replies → internal note (not visible to customer) → resolve → close
 
-- [ ] T061a Implement duplicate ticket detection [FR-E028]
+- [x] T061a Implement duplicate ticket detection [FR-E028]
   Done when: when a customer creates a ticket for an order that already has an open/waiting ticket from the same customer within 24 hours, the new ticket is created but flagged with `potential_duplicate=true` and linked to the existing ticket; admin sees flag in ticket queue; admin can merge or dismiss; integration test: create ticket for order → create second ticket for same order within 24h → second ticket flagged; tickets >24h apart → no flag
 
 - [ ] T062 Implement ticket attachments [FR-053]

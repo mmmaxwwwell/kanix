@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, gte, inArray } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import {
   supportTicket,
@@ -72,6 +72,10 @@ export interface TicketRecord {
   priority: string;
   status: string;
   source: string;
+  potentialDuplicate: boolean;
+  linkedTicketId: string | null;
+  duplicateDismissed: boolean;
+  mergedIntoTicketId: string | null;
   createdAt: Date;
   updatedAt: Date;
   resolvedAt: Date | null;
@@ -82,6 +86,36 @@ export async function createSupportTicket(
   input: CreateTicketInput,
 ): Promise<TicketRecord> {
   const ticketNumber = generateTicketNumber();
+
+  // Duplicate detection: check if the same customer has an open/waiting ticket
+  // for the same order within the last 24 hours
+  let potentialDuplicate = false;
+  let linkedTicketId: string | null = null;
+
+  if (input.customerId && input.orderId) {
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const activeStatuses = ["open", "waiting_on_customer", "waiting_on_internal"];
+
+    const [existingTicket] = await db
+      .select({ id: supportTicket.id })
+      .from(supportTicket)
+      .where(
+        and(
+          eq(supportTicket.customerId, input.customerId),
+          eq(supportTicket.orderId, input.orderId),
+          inArray(supportTicket.status, activeStatuses),
+          gte(supportTicket.createdAt, twentyFourHoursAgo),
+        ),
+      )
+      .orderBy(desc(supportTicket.createdAt))
+      .limit(1);
+
+    if (existingTicket) {
+      potentialDuplicate = true;
+      linkedTicketId = existingTicket.id;
+    }
+  }
+
   const [row] = await db
     .insert(supportTicket)
     .values({
@@ -94,22 +128,10 @@ export async function createSupportTicket(
       priority: input.priority ?? "normal",
       status: "open",
       source: input.source,
+      potentialDuplicate,
+      linkedTicketId,
     })
-    .returning({
-      id: supportTicket.id,
-      ticketNumber: supportTicket.ticketNumber,
-      customerId: supportTicket.customerId,
-      orderId: supportTicket.orderId,
-      shipmentId: supportTicket.shipmentId,
-      subject: supportTicket.subject,
-      category: supportTicket.category,
-      priority: supportTicket.priority,
-      status: supportTicket.status,
-      source: supportTicket.source,
-      createdAt: supportTicket.createdAt,
-      updatedAt: supportTicket.updatedAt,
-      resolvedAt: supportTicket.resolvedAt,
-    });
+    .returning(ticketColumns);
   return row;
 }
 
@@ -128,6 +150,10 @@ const ticketColumns = {
   priority: supportTicket.priority,
   status: supportTicket.status,
   source: supportTicket.source,
+  potentialDuplicate: supportTicket.potentialDuplicate,
+  linkedTicketId: supportTicket.linkedTicketId,
+  duplicateDismissed: supportTicket.duplicateDismissed,
+  mergedIntoTicketId: supportTicket.mergedIntoTicketId,
   createdAt: supportTicket.createdAt,
   updatedAt: supportTicket.updatedAt,
   resolvedAt: supportTicket.resolvedAt,
@@ -402,4 +428,95 @@ export async function findTicketStatusHistory(
     .from(supportTicketStatusHistory)
     .where(eq(supportTicketStatusHistory.ticketId, ticketId))
     .orderBy(desc(supportTicketStatusHistory.createdAt));
+}
+
+// ---------------------------------------------------------------------------
+// Duplicate ticket management — merge and dismiss
+// ---------------------------------------------------------------------------
+
+export async function dismissDuplicate(
+  db: PostgresJsDatabase,
+  ticketId: string,
+): Promise<TicketRecord> {
+  const [current] = await db
+    .select(ticketColumns)
+    .from(supportTicket)
+    .where(eq(supportTicket.id, ticketId));
+
+  if (!current) {
+    throw {
+      code: "ERR_TICKET_NOT_FOUND",
+      message: `Support ticket ${ticketId} not found`,
+    };
+  }
+
+  if (!current.potentialDuplicate) {
+    throw {
+      code: "ERR_NOT_DUPLICATE",
+      message: "Ticket is not flagged as a potential duplicate",
+    };
+  }
+
+  const [updated] = await db
+    .update(supportTicket)
+    .set({ duplicateDismissed: true, updatedAt: new Date() })
+    .where(eq(supportTicket.id, ticketId))
+    .returning(ticketColumns);
+
+  return updated;
+}
+
+export async function mergeTicket(
+  db: PostgresJsDatabase,
+  sourceTicketId: string,
+  targetTicketId: string,
+  actorAdminUserId?: string,
+): Promise<TicketRecord> {
+  return db.transaction(async (tx) => {
+    const [source] = await tx
+      .select(ticketColumns)
+      .from(supportTicket)
+      .where(eq(supportTicket.id, sourceTicketId));
+
+    if (!source) {
+      throw {
+        code: "ERR_TICKET_NOT_FOUND",
+        message: `Source ticket ${sourceTicketId} not found`,
+      };
+    }
+
+    const [target] = await tx
+      .select({ id: supportTicket.id, status: supportTicket.status })
+      .from(supportTicket)
+      .where(eq(supportTicket.id, targetTicketId));
+
+    if (!target) {
+      throw {
+        code: "ERR_TICKET_NOT_FOUND",
+        message: `Target ticket ${targetTicketId} not found`,
+      };
+    }
+
+    // Close the source ticket and mark it as merged
+    const now = new Date();
+    const [updated] = await tx
+      .update(supportTicket)
+      .set({
+        status: "closed",
+        mergedIntoTicketId: targetTicketId,
+        updatedAt: now,
+      })
+      .where(eq(supportTicket.id, sourceTicketId))
+      .returning(ticketColumns);
+
+    // Record status history for the merge/close
+    await tx.insert(supportTicketStatusHistory).values({
+      ticketId: sourceTicketId,
+      oldStatus: source.status,
+      newStatus: "closed",
+      actorAdminUserId: actorAdminUserId ?? null,
+    });
+
+    return updated;
+  });
 }
