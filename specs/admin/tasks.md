@@ -48,7 +48,7 @@
 - [x] T012 Implement api/src/config.ts — single config module [FR-112, FR-113, FR-114]
   Done when: config loads from defaults → .env file → env vars; fail-fast validation on startup logs every missing/invalid key and exits non-zero; secrets (DATABASE_URL, STRIPE_SECRET_KEY, etc.) only from env vars; sensitive values never appear in logs ("present"/"missing" only); STRIPE_TAX_ENABLED flag controls tax adapter selection; unit tests cover: valid config, missing required, invalid type, sensitive redaction
 
-- [ ] T013 Implement api/src/errors.ts — typed error hierarchy [FR-105]
+- [x] T013 Implement api/src/errors.ts — typed error hierarchy [FR-105]
   Done when: AppError base class with subclasses: ValidationError (400), NotFoundError (404), ConflictError (409), AuthenticationError (401), AuthorizationError (403), ExternalServiceError (502), RateLimitError (429), InternalError (500); each has errorCode (e.g., ERR_ORDER_NOT_FOUND), HTTP status, userFacing flag; unit tests verify all mappings
 
 - [ ] T014 Implement api/src/logger.ts — Pino structured logging [FR-104]

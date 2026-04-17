@@ -47,3 +47,6 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T012 — Config module
 - ESLint `@typescript-eslint/no-non-null-assertion` rule is enabled — use `?? ""` fallback instead of `!` assertions even when validation guarantees presence
 - Node 22 has `process.loadEnvFile()` but it modifies `process.env` directly — for layered precedence (defaults → .env → env vars) implement a custom parser
+
+## T013 — Error hierarchy
+- Straightforward module — no external dependencies needed. Prettier reformats constructor signatures with multiple params to single-line; run `pnpm format` before lint check
