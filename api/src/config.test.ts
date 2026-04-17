@@ -17,6 +17,7 @@ function validEnv(): Record<string, string> {
     SUPERTOKENS_API_KEY: "supertokens-key",
     SUPERTOKENS_CONNECTION_URI: "http://localhost:3567",
     EASYPOST_API_KEY: "EZAK_abc123",
+    EASYPOST_WEBHOOK_SECRET: "ep_whsec_test123",
     GITHUB_OAUTH_CLIENT_ID: "gh-client-id",
     GITHUB_OAUTH_CLIENT_SECRET: "gh-client-secret",
   };

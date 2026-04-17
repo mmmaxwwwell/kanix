@@ -132,6 +132,10 @@ import {
   buyShipmentLabel,
   transitionShipmentStatus,
   findLabelPurchasesByShipmentId,
+  findShipmentByTrackingNumber,
+  hasShipmentEventBeenProcessed,
+  storeShipmentEvent,
+  handleTrackingUpdate,
 } from "./db/queries/shipment.js";
 import {
   insertPolicySnapshot,
@@ -151,6 +155,7 @@ import {
 } from "./db/queries/webhook.js";
 import { processRefund, findRefundsByOrderId } from "./db/queries/refund.js";
 import Stripe from "stripe";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -4024,6 +4029,145 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           // Unhandled event type — acknowledge receipt
           logger.info({ eventType }, "Unhandled Stripe webhook event type");
         }
+
+        return reply.status(200).send({ received: true });
+      },
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // EasyPost Webhook Handler
+  // -------------------------------------------------------------------------
+
+  if (database) {
+    const db = database.db;
+
+    app.post("/webhooks/easypost", {
+      config: { rawBody: true },
+      preParsing: async (request, _reply, payload) => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of payload) {
+          chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+        }
+        const rawBody = Buffer.concat(chunks);
+        (request as unknown as Record<string, unknown>).rawBody = rawBody;
+        const { Readable } = await import("node:stream");
+        return Readable.from(rawBody);
+      },
+      handler: async (request, reply) => {
+        const rawBody = (request as unknown as Record<string, unknown>).rawBody as Buffer;
+        const bodyString = rawBody.toString("utf8");
+
+        // Verify webhook signature if secret is configured
+        if (config.EASYPOST_WEBHOOK_SECRET) {
+          const hmacSignature = request.headers["x-hmac-signature"] as string | undefined;
+          if (!hmacSignature) {
+            return reply.status(401).send({
+              error: "ERR_MISSING_SIGNATURE",
+              message: "Missing x-hmac-signature header",
+            });
+          }
+
+          const expectedSig = createHmac("sha256", config.EASYPOST_WEBHOOK_SECRET)
+            .update(bodyString)
+            .digest("hex");
+
+          // EasyPost sends HMAC-SHA256 hex digest
+          const sigToCompare = hmacSignature.startsWith("hmac-sha256-hex=")
+            ? hmacSignature.slice("hmac-sha256-hex=".length)
+            : hmacSignature;
+
+          try {
+            const sigBuf = Buffer.from(sigToCompare, "hex");
+            const expectedBuf = Buffer.from(expectedSig, "hex");
+            if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) {
+              return reply.status(401).send({
+                error: "ERR_INVALID_SIGNATURE",
+                message: "Invalid webhook signature",
+              });
+            }
+          } catch {
+            return reply.status(401).send({
+              error: "ERR_INVALID_SIGNATURE",
+              message: "Invalid webhook signature format",
+            });
+          }
+        }
+
+        // Parse the event payload
+        let event: {
+          id: string;
+          description: string;
+          result: {
+            id: string;
+            tracking_code: string;
+            status: string;
+            tracking_details?: {
+              status: string;
+              message: string;
+              datetime: string;
+              tracking_location?: {
+                city: string | null;
+                state: string | null;
+              };
+            }[];
+          };
+        };
+        try {
+          event = JSON.parse(bodyString);
+        } catch {
+          return reply.status(400).send({
+            error: "ERR_INVALID_PAYLOAD",
+            message: "Invalid JSON payload",
+          });
+        }
+
+        // Only handle tracker events
+        if (!event.description?.startsWith("tracker.")) {
+          logger.info({ description: event.description }, "Unhandled EasyPost webhook event type");
+          return reply.status(200).send({ received: true, skipped: true });
+        }
+
+        // Idempotency check
+        if (event.id) {
+          const alreadyProcessed = await hasShipmentEventBeenProcessed(db, event.id);
+          if (alreadyProcessed) {
+            return reply.status(200).send({ received: true, duplicate: true });
+          }
+        }
+
+        const tracker = event.result;
+        if (!tracker?.tracking_code) {
+          logger.warn("EasyPost webhook missing tracking_code");
+          return reply.status(200).send({ received: true, skipped: true });
+        }
+
+        // Find the shipment by tracking number
+        const shipmentRecord = await findShipmentByTrackingNumber(db, tracker.tracking_code);
+        if (!shipmentRecord) {
+          logger.warn(
+            { trackingCode: tracker.tracking_code },
+            "No shipment found for tracking code",
+          );
+          return reply.status(200).send({ received: true, skipped: true });
+        }
+
+        // Store the shipment event
+        const latestDetail = tracker.tracking_details?.length
+          ? tracker.tracking_details[tracker.tracking_details.length - 1]
+          : null;
+
+        await storeShipmentEvent(db, {
+          shipmentId: shipmentRecord.id,
+          providerEventId: event.id,
+          status: tracker.status,
+          description: latestDetail?.message ?? tracker.status,
+          occurredAt: latestDetail?.datetime ? new Date(latestDetail.datetime) : new Date(),
+          rawPayloadJson: event,
+        });
+
+        // Update shipment and order status
+        await handleTrackingUpdate(db, shipmentRecord, tracker.status);
 
         return reply.status(200).send({ received: true });
       },

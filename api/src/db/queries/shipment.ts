@@ -4,10 +4,12 @@ import {
   shipment,
   shipmentPackage,
   shipmentLine,
+  shipmentEvent,
   shippingLabelPurchase,
 } from "../schema/fulfillment.js";
 import { order, orderLine } from "../schema/order.js";
 import type { ShippingAdapter, BuyLabelResult } from "../../services/shipping-adapter.js";
+import { transitionOrderStatus } from "./order-state-machine.js";
 
 // ---------------------------------------------------------------------------
 // Shipment status values and state machine (6.E)
@@ -479,4 +481,203 @@ export async function findLabelPurchasesByShipmentId(
     })
     .from(shippingLabelPurchase)
     .where(eq(shippingLabelPurchase.shipmentId, shipmentId));
+}
+
+// ---------------------------------------------------------------------------
+// Find shipment by tracking number (for webhook routing)
+// ---------------------------------------------------------------------------
+
+export async function findShipmentByTrackingNumber(
+  db: PostgresJsDatabase,
+  trackingNumber: string,
+): Promise<ShipmentRecord | null> {
+  const [row] = await db
+    .select({
+      id: shipment.id,
+      orderId: shipment.orderId,
+      shipmentNumber: shipment.shipmentNumber,
+      status: shipment.status,
+      carrier: shipment.carrier,
+      serviceLevel: shipment.serviceLevel,
+      trackingNumber: shipment.trackingNumber,
+      trackingUrl: shipment.trackingUrl,
+      labelUrl: shipment.labelUrl,
+      createdAt: shipment.createdAt,
+      updatedAt: shipment.updatedAt,
+    })
+    .from(shipment)
+    .where(eq(shipment.trackingNumber, trackingNumber));
+  return row ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Shipment event idempotency check
+// ---------------------------------------------------------------------------
+
+export async function hasShipmentEventBeenProcessed(
+  db: PostgresJsDatabase,
+  providerEventId: string,
+): Promise<boolean> {
+  const [existing] = await db
+    .select({ id: shipmentEvent.id })
+    .from(shipmentEvent)
+    .where(eq(shipmentEvent.providerEventId, providerEventId));
+  return !!existing;
+}
+
+// ---------------------------------------------------------------------------
+// Store shipment event (immutable audit record)
+// ---------------------------------------------------------------------------
+
+export interface StoreShipmentEventInput {
+  shipmentId: string;
+  providerEventId: string;
+  status: string;
+  description: string | null;
+  occurredAt: Date;
+  rawPayloadJson: unknown;
+}
+
+export async function storeShipmentEvent(
+  db: PostgresJsDatabase,
+  input: StoreShipmentEventInput,
+): Promise<{ id: string }> {
+  const [row] = await db
+    .insert(shipmentEvent)
+    .values({
+      shipmentId: input.shipmentId,
+      providerEventId: input.providerEventId,
+      status: input.status,
+      description: input.description,
+      occurredAt: input.occurredAt,
+      rawPayloadJson: input.rawPayloadJson,
+    })
+    .returning({ id: shipmentEvent.id });
+  return row;
+}
+
+// ---------------------------------------------------------------------------
+// Find shipment events by shipment ID
+// ---------------------------------------------------------------------------
+
+export async function findShipmentEventsByShipmentId(
+  db: PostgresJsDatabase,
+  shipmentId: string,
+): Promise<
+  {
+    id: string;
+    shipmentId: string;
+    providerEventId: string | null;
+    status: string;
+    description: string | null;
+    occurredAt: Date;
+  }[]
+> {
+  return db
+    .select({
+      id: shipmentEvent.id,
+      shipmentId: shipmentEvent.shipmentId,
+      providerEventId: shipmentEvent.providerEventId,
+      status: shipmentEvent.status,
+      description: shipmentEvent.description,
+      occurredAt: shipmentEvent.occurredAt,
+    })
+    .from(shipmentEvent)
+    .where(eq(shipmentEvent.shipmentId, shipmentId));
+}
+
+// ---------------------------------------------------------------------------
+// EasyPost status → shipment status mapping
+// ---------------------------------------------------------------------------
+
+/**
+ * Map EasyPost tracker status to our shipment status.
+ * Returns null if the status should not trigger a transition.
+ */
+export function mapEasyPostStatusToShipmentStatus(easypostStatus: string): string | null {
+  switch (easypostStatus) {
+    case "in_transit":
+      return "in_transit";
+    case "out_for_delivery":
+      return "in_transit"; // shipment doesn't have out_for_delivery
+    case "delivered":
+      return "delivered";
+    case "return_to_sender":
+      return "returned";
+    case "failure":
+    case "error":
+      return "exception";
+    default:
+      return null; // pre_transit, unknown, etc.
+  }
+}
+
+/**
+ * Map EasyPost tracker status to our order shipping_status.
+ * Returns null if the status should not trigger a transition.
+ */
+export function mapEasyPostStatusToOrderShippingStatus(easypostStatus: string): string | null {
+  switch (easypostStatus) {
+    case "in_transit":
+      return "in_transit";
+    case "out_for_delivery":
+      return "out_for_delivery";
+    case "delivered":
+      return "delivered";
+    case "return_to_sender":
+      return "returned";
+    case "failure":
+    case "error":
+      return "delivery_exception";
+    default:
+      return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Handle tracking event: update shipment + order status
+// ---------------------------------------------------------------------------
+
+function isTransitionError(err: unknown): boolean {
+  return (err as { code?: string })?.code === "ERR_INVALID_TRANSITION";
+}
+
+export async function handleTrackingUpdate(
+  db: PostgresJsDatabase,
+  shipmentRecord: ShipmentRecord,
+  easypostStatus: string,
+): Promise<{ shipmentTransitioned: boolean; orderTransitioned: boolean }> {
+  let shipmentTransitioned = false;
+  let orderTransitioned = false;
+
+  // 1. Update shipment status
+  const newShipmentStatus = mapEasyPostStatusToShipmentStatus(easypostStatus);
+  if (newShipmentStatus && newShipmentStatus !== shipmentRecord.status) {
+    try {
+      await transitionShipmentStatus(db, shipmentRecord.id, newShipmentStatus);
+      shipmentTransitioned = true;
+    } catch (err: unknown) {
+      if (!isTransitionError(err)) throw err;
+      // Already in target state or invalid transition — skip
+    }
+  }
+
+  // 2. Propagate to order.shipping_status
+  const newOrderShippingStatus = mapEasyPostStatusToOrderShippingStatus(easypostStatus);
+  if (newOrderShippingStatus) {
+    try {
+      await transitionOrderStatus(db, {
+        orderId: shipmentRecord.orderId,
+        statusType: "shipping_status",
+        newValue: newOrderShippingStatus,
+        reason: `Tracking update: ${easypostStatus} (webhook: tracker.updated)`,
+      });
+      orderTransitioned = true;
+    } catch (err: unknown) {
+      if (!isTransitionError(err)) throw err;
+      // Already in target state or invalid transition — skip
+    }
+  }
+
+  return { shipmentTransitioned, orderTransitioned };
 }

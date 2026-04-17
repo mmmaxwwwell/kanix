@@ -224,7 +224,7 @@
 - [x] T058 Implement shipment system [FR-044, FR-046, FR-047, FR-048]
   Done when: POST /admin/shipments creates draft shipment for order; shipment_package with weight/dimensions; shipment_line maps order_lines to shipment with quantities; POST /admin/shipments/:id/buy-label purchases via EasyPost adapter and records cost in shipping_label_purchase; shipment status machine: draft→label_pending→label_purchased→ready→shipped→in_transit→delivered; integration tests: create shipment → buy label → mark shipped
 
-- [ ] T059 Implement tracking webhook handler [FR-045, FR-046] [consumes: IC-006]
+- [x] T059 Implement tracking webhook handler [FR-045, FR-046] [consumes: IC-006]
   Done when: POST /webhooks/easypost processes tracking events; creates shipment_event records with status/description/occurred_at/raw_payload; updates shipment.status based on event; propagates to order.shipping_status; integration test: simulate tracking events → shipment status updates → order shipping_status updates
 
 - [ ] T059a Implement shipment void-label API [FR-E027] [P]

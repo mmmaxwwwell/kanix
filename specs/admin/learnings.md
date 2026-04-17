@@ -93,3 +93,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - All shipment-related schema tables (shipment, shipment_package, shipment_line, shipment_event, shipping_label_purchase) were already defined in `fulfillment.ts` — only the query layer, state machine, routes, and tests needed to be created
 - The `buyShipmentLabel` function takes the `ShippingAdapter` as a parameter (DI pattern) — this allows tests to inject the stub adapter without external API calls, consistent with the pattern used for fulfillment tasks and payment
 - Shipment number generation uses `SHP-<orderNumber>-<timestamp_base36>` — sufficient for V1 since each order typically has one shipment, but could collide in high-concurrency scenarios (consider a sequence table later)
+
+## T059 — Implement tracking webhook handler
+- Adding a new required Config key (`EASYPOST_WEBHOOK_SECRET`) requires updating ALL test config objects across ~30 test files — use sed/batch replace to add the field consistently, but verify the easypost webhook test's config isn't duplicated
+- EasyPost webhook events are routed by `tracking_code` (→ `shipment.trackingNumber`) rather than a separate `trackerId` column — avoids schema migration since tracking number is already stored on shipment from label purchase
+- Shipment status doesn't have `out_for_delivery` but order `shipping_status` does — map EasyPost `out_for_delivery` to shipment `in_transit` while propagating the more granular `out_for_delivery` to the order level

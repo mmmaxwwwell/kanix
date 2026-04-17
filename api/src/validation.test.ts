@@ -17,6 +17,7 @@ function testConfig(overrides: Partial<Config> = {}): Config {
     SUPERTOKENS_API_KEY: "test-key",
     SUPERTOKENS_CONNECTION_URI: "http://localhost:3567",
     EASYPOST_API_KEY: "test-key",
+    EASYPOST_WEBHOOK_SECRET: "",
     GITHUB_OAUTH_CLIENT_ID: "test-id",
     GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
     CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
