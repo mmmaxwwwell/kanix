@@ -190,7 +190,7 @@
 - [x] T053 Implement order cancellation API (admin) [FR-024] [P]
   Done when: POST /admin/orders/:id/cancel with reason; validates: not shipped (ERR_ORDER_ALREADY_SHIPPED); releases inventory reservations; initiates full refund if paid; order.status → canceled; audit log; integration tests: cancel unpaid → reservations released; cancel paid → refund + reservations released; cancel shipped → rejected
 
-- [ ] T054 Implement policy acknowledgment [FR-062, FR-063]
+- [x] T054 Implement policy acknowledgment [FR-062, FR-063]
   Done when: checkout captures policy_snapshot_id for current warranty/returns/terms policies; order_policy_acknowledgment created linking order to policy version; policy_snapshot table with versioned content_html/content_text; integration test: checkout → acknowledgment record exists with correct policy version
 
 - [ ] T054a Implement kit cart re-validation on definition change [FR-E005, FR-E006]

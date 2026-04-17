@@ -87,3 +87,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - "Shipped" validation must check multiple shipping statuses beyond just "shipped" — `in_transit`, `out_for_delivery`, `delivered`, `delivery_exception`, and `returned` all indicate the order has left the warehouse
 - The cancel function passes the `PaymentAdapter` through the input rather than importing it at the query layer — this follows the existing DI pattern and keeps the query module testable without service-level dependencies
 - When an auto-formatter or linter runs on save, it can strip newly added imports if the code using them hasn't been saved yet — always add the import and its usage in the same edit to avoid this race condition
+
+## T054 — Implement policy acknowledgment
+- The `policySnapshot` and `orderPolicyAcknowledgment` Drizzle schema tables were already defined in `evidence.ts` — check existing schema files before creating new ones
+- Policy acknowledgment in checkout is non-critical — wrap in try/catch so checkout still works when no policies are seeded yet (e.g., fresh dev environments)
+- No `POLICIES_READ/WRITE` capability exists yet — policy admin routes reuse `PRODUCTS_READ` / `PRODUCTS_WRITE` capabilities since policies are content management

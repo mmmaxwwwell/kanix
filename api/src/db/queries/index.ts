@@ -152,3 +152,13 @@ export {
 export type { RefundRecord } from "./refund.js";
 export { cancelOrder } from "./order-cancel.js";
 export type { CancelOrderInput, CancelOrderResult } from "./order-cancel.js";
+export {
+  insertPolicySnapshot,
+  findPolicySnapshotById,
+  findCurrentPolicyByType,
+  findPoliciesByType,
+  createPolicyAcknowledgment,
+  findAcknowledgmentsByOrderId,
+  createCheckoutAcknowledgments,
+} from "./policy.js";
+export type { NewPolicySnapshot, PolicySnapshot, PolicyAcknowledgment } from "./policy.js";

@@ -1,0 +1,24 @@
+{
+  "task_id": "T054",
+  "status": "complete",
+  "summary": "Implemented policy acknowledgment: policy query module with CRUD + checkout acknowledgments, admin policy routes (POST/GET /admin/policies, GET /admin/policies/current), checkout flow creates order_policy_acknowledgment records for all effective policies, integration test verifying acknowledgment records created during checkout",
+  "commands_run": [
+    {"command": "npx tsc --noEmit", "exit_code": 0},
+    {"command": "pnpm test -- --run", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/policy.ts",
+    "api/src/policy-acknowledgment.integration.test.ts",
+    "specs/admin/claims/completion-T054.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/index.ts",
+    "api/src/db/schema/index.ts",
+    "api/src/server.ts",
+    "specs/admin/learnings.md",
+    "specs/admin/tasks.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

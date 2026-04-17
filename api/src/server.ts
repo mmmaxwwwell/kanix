@@ -114,6 +114,12 @@ import {
 import type { OrderStatusType } from "./db/queries/order-state-machine.js";
 import { cancelOrder } from "./db/queries/order-cancel.js";
 import {
+  insertPolicySnapshot,
+  findPoliciesByType,
+  findCurrentPolicyByType,
+  createCheckoutAcknowledgments,
+} from "./db/queries/policy.js";
+import {
   hasEventBeenProcessed,
   findPaymentByIntentId,
   findPaymentByChargeId,
@@ -2610,6 +2616,126 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         return reply.status(204).send();
       },
     );
+
+    // -----------------------------------------------------------------------
+    // Policy Snapshot routes — /admin/policies
+    // -----------------------------------------------------------------------
+
+    // Create a new policy snapshot — requires products.write (content management)
+    app.post(
+      "/api/admin/policies",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.PRODUCTS_WRITE)],
+      },
+      async (request, reply) => {
+        const body = request.body as {
+          policy_type?: string;
+          version?: number;
+          content_html?: string;
+          content_text?: string;
+          effective_at?: string;
+        };
+
+        if (!body.policy_type?.trim()) {
+          return reply
+            .status(400)
+            .send({ error: "ERR_VALIDATION", message: "policy_type is required" });
+        }
+        if (body.version == null || typeof body.version !== "number") {
+          return reply
+            .status(400)
+            .send({ error: "ERR_VALIDATION", message: "version is required (integer)" });
+        }
+        if (!body.content_html?.trim()) {
+          return reply
+            .status(400)
+            .send({ error: "ERR_VALIDATION", message: "content_html is required" });
+        }
+        if (!body.content_text?.trim()) {
+          return reply
+            .status(400)
+            .send({ error: "ERR_VALIDATION", message: "content_text is required" });
+        }
+        if (!body.effective_at) {
+          return reply
+            .status(400)
+            .send({ error: "ERR_VALIDATION", message: "effective_at is required" });
+        }
+
+        try {
+          const snapshot = await insertPolicySnapshot(database.db, {
+            policyType: body.policy_type,
+            version: body.version,
+            contentHtml: body.content_html,
+            contentText: body.content_text,
+            effectiveAt: new Date(body.effective_at),
+          });
+
+          request.auditContext = {
+            action: "CREATE",
+            entityType: "policy_snapshot",
+            entityId: snapshot.id,
+            beforeJson: null,
+            afterJson: snapshot,
+          };
+
+          return reply.status(201).send({ policy_snapshot: snapshot });
+        } catch (err: unknown) {
+          const dbErr = err as { constraint?: string };
+          if (dbErr.constraint === "uq_policy_snapshot_type_version") {
+            return reply.status(409).send({
+              error: "ERR_DUPLICATE_VERSION",
+              message: `Version ${body.version} already exists for policy type ${body.policy_type}`,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // List policy snapshots by type — requires products.read
+    app.get(
+      "/api/admin/policies",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.PRODUCTS_READ)],
+      },
+      async (request, reply) => {
+        const query = request.query as { policy_type?: string };
+        if (!query.policy_type?.trim()) {
+          return reply
+            .status(400)
+            .send({ error: "ERR_VALIDATION", message: "policy_type query param is required" });
+        }
+
+        const snapshots = await findPoliciesByType(database.db, query.policy_type);
+        return reply.send({ policy_snapshots: snapshots });
+      },
+    );
+
+    // Get current effective policy by type — requires products.read
+    app.get(
+      "/api/admin/policies/current",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.PRODUCTS_READ)],
+      },
+      async (request, reply) => {
+        const query = request.query as { policy_type?: string };
+        if (!query.policy_type?.trim()) {
+          return reply
+            .status(400)
+            .send({ error: "ERR_VALIDATION", message: "policy_type query param is required" });
+        }
+
+        const snapshot = await findCurrentPolicyByType(database.db, query.policy_type);
+        if (!snapshot) {
+          return reply.status(404).send({
+            error: "ERR_NOT_FOUND",
+            message: `No effective policy found for type ${query.policy_type}`,
+          });
+        }
+        return reply.send({ policy_snapshot: snapshot });
+      },
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -3159,7 +3285,14 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         stripePaymentIntentId: paymentIntentId,
       });
 
-      // 7. Update reservations with order ID
+      // 7. Create policy acknowledgments for current effective policies
+      try {
+        await createCheckoutAcknowledgments(db, newOrder.id);
+      } catch {
+        // Non-critical — policies may not be seeded yet
+      }
+
+      // 8. Update reservations with order ID
       for (const rid of reservationIds) {
         try {
           await db.execute(
