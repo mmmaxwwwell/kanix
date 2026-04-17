@@ -13,7 +13,7 @@ import type {
   BuyLabelResult,
   TrackingResult,
 } from "../../services/shipping-adapter.js";
-import { transitionOrderStatus } from "./order-state-machine.js";
+import { transitionOrderStatus, findOrderById } from "./order-state-machine.js";
 
 // ---------------------------------------------------------------------------
 // Shipment status values and state machine (6.E)
@@ -785,7 +785,7 @@ export async function handleTrackingUpdate(
   db: PostgresJsDatabase,
   shipmentRecord: ShipmentRecord,
   easypostStatus: string,
-): Promise<{ shipmentTransitioned: boolean; orderTransitioned: boolean }> {
+): Promise<{ shipmentTransitioned: boolean; orderTransitioned: boolean; orderCompleted: boolean }> {
   let shipmentTransitioned = false;
   let orderTransitioned = false;
 
@@ -801,9 +801,9 @@ export async function handleTrackingUpdate(
     }
   }
 
-  // 2. Propagate to order.shipping_status
+  // 2. Propagate to order.shipping_status (non-delivered events use direct transition)
   const newOrderShippingStatus = mapEasyPostStatusToOrderShippingStatus(easypostStatus);
-  if (newOrderShippingStatus) {
+  if (newOrderShippingStatus && newOrderShippingStatus !== "delivered") {
     try {
       await transitionOrderStatus(db, {
         orderId: shipmentRecord.orderId,
@@ -818,7 +818,19 @@ export async function handleTrackingUpdate(
     }
   }
 
-  return { shipmentTransitioned, orderTransitioned };
+  // 3. For delivered: use aggregate check (all non-voided shipments must be delivered)
+  if (newOrderShippingStatus === "delivered") {
+    const delivered = await propagateOrderDeliveredStatus(db, shipmentRecord.orderId);
+    if (delivered) orderTransitioned = true;
+  }
+
+  // 4. Check if fulfillment status should be updated
+  await propagateOrderFulfillmentStatus(db, shipmentRecord.orderId);
+
+  // 5. Check if order can be auto-completed
+  const orderCompleted = await tryAutoCompleteOrder(db, shipmentRecord.orderId);
+
+  return { shipmentTransitioned, orderTransitioned, orderCompleted };
 }
 
 // ---------------------------------------------------------------------------
@@ -941,4 +953,133 @@ export async function refreshShipmentTracking(
     shipmentTransitioned,
     orderTransitioned,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Fulfillment → shipping status propagation (T060)
+// ---------------------------------------------------------------------------
+
+/** Shipped-or-later statuses that indicate an order line is fulfilled */
+const SHIPPED_OR_LATER = ["shipped", "in_transit", "delivered", "returned"];
+
+/**
+ * Check if all order lines are covered by shipment_lines in shipped/delivered
+ * shipments. If so, transition order.fulfillment_status → fulfilled.
+ */
+export async function propagateOrderFulfillmentStatus(
+  db: PostgresJsDatabase,
+  orderId: string,
+): Promise<boolean> {
+  // 1. Get all order lines for this order
+  const orderLines = await db
+    .select({ id: orderLine.id, quantity: orderLine.quantity })
+    .from(orderLine)
+    .where(eq(orderLine.orderId, orderId));
+
+  if (orderLines.length === 0) return false;
+
+  // 2. Get all shipments for this order with their statuses
+  const orderShipments = await db
+    .select({ id: shipment.id, status: shipment.status })
+    .from(shipment)
+    .where(eq(shipment.orderId, orderId));
+
+  const qualifyingShipmentIds = new Set(
+    orderShipments.filter((s) => SHIPPED_OR_LATER.includes(s.status)).map((s) => s.id),
+  );
+
+  if (qualifyingShipmentIds.size === 0) return false;
+
+  // 3. For each order line, check if total shipped quantity covers the ordered quantity
+  for (const ol of orderLines) {
+    const slRows = await db
+      .select({ quantity: shipmentLine.quantity, shipmentId: shipmentLine.shipmentId })
+      .from(shipmentLine)
+      .where(eq(shipmentLine.orderLineId, ol.id));
+
+    const shippedQty = slRows
+      .filter((sl) => qualifyingShipmentIds.has(sl.shipmentId))
+      .reduce((sum, sl) => sum + sl.quantity, 0);
+
+    if (shippedQty < ol.quantity) return false;
+  }
+
+  // 4. All order lines fully covered — transition to fulfilled
+  try {
+    await transitionOrderStatus(db, {
+      orderId,
+      statusType: "fulfillment_status",
+      newValue: "fulfilled",
+      reason: "All order lines shipped/delivered",
+    });
+    return true;
+  } catch (err: unknown) {
+    if (!isTransitionError(err)) throw err;
+    return false;
+  }
+}
+
+/**
+ * Check if all non-voided shipments for an order are delivered.
+ * If so, transition order.shipping_status → delivered.
+ */
+export async function propagateOrderDeliveredStatus(
+  db: PostgresJsDatabase,
+  orderId: string,
+): Promise<boolean> {
+  const orderShipments = await db
+    .select({ id: shipment.id, status: shipment.status })
+    .from(shipment)
+    .where(eq(shipment.orderId, orderId));
+
+  const activeShipments = orderShipments.filter((s) => s.status !== "voided");
+  if (activeShipments.length === 0) return false;
+
+  const allDelivered = activeShipments.every((s) => s.status === "delivered");
+  if (!allDelivered) return false;
+
+  try {
+    await transitionOrderStatus(db, {
+      orderId,
+      statusType: "shipping_status",
+      newValue: "delivered",
+      reason: "All shipments delivered",
+    });
+    return true;
+  } catch (err: unknown) {
+    if (!isTransitionError(err)) throw err;
+    return false;
+  }
+}
+
+/**
+ * Auto-complete an order when fulfillment_status=fulfilled AND
+ * shipping_status=delivered AND status=confirmed.
+ */
+export async function tryAutoCompleteOrder(
+  db: PostgresJsDatabase,
+  orderId: string,
+): Promise<boolean> {
+  const orderRow = await findOrderById(db, orderId);
+  if (!orderRow) return false;
+
+  if (
+    orderRow.fulfillmentStatus === "fulfilled" &&
+    orderRow.shippingStatus === "delivered" &&
+    orderRow.status === "confirmed"
+  ) {
+    try {
+      await transitionOrderStatus(db, {
+        orderId,
+        statusType: "status",
+        newValue: "completed",
+        reason: "Auto-completed: all items fulfilled and delivered",
+      });
+      return true;
+    } catch (err: unknown) {
+      if (!isTransitionError(err)) throw err;
+      return false;
+    }
+  }
+  return false;
 }

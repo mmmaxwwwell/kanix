@@ -106,7 +106,7 @@ export const SHIPPING_STATUS_TRANSITIONS: Record<string, string[]> = {
   label_pending: ["label_purchased", "canceled"],
   label_purchased: ["shipped", "canceled"],
   shipped: ["in_transit"],
-  in_transit: ["out_for_delivery", "delivery_exception"],
+  in_transit: ["out_for_delivery", "delivered", "delivery_exception"],
   out_for_delivery: ["delivered", "delivery_exception"],
   delivered: ["returned"],
   delivery_exception: ["returned"],

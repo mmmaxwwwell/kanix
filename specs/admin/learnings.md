@@ -116,3 +116,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Per-resource rate limiting (max 1 per 5 minutes per order) is best done with an in-memory Map keyed by orderId — simpler than database tracking and sufficient since the rate limit is non-critical (prevents spam, not a security boundary)
 - The `NotificationService` follows the same DI pattern as `AdminAlertService` — in-memory queue with `getSent()` for test assertions, injectable via `CreateServerOptions`
 - Resend-confirmation uses `ORDERS_MANAGE` capability (not a new capability) since it's an order management action, consistent with the transition endpoint
+
+## T060 — Implement fulfillment → shipping status propagation
+- The order `shipping_status` transition map needed `in_transit → delivered` added because the aggregate `propagateOrderDeliveredStatus` check skips `out_for_delivery` — not all carriers report this intermediate status, and multi-shipment orders may have mixed paths
+- The `handleTrackingUpdate` return type was extended with `orderCompleted: boolean` — this is backwards-compatible since existing code destructures only `shipmentTransitioned` and `orderTransitioned`
+- Propagation functions (`propagateOrderFulfillmentStatus`, `propagateOrderDeliveredStatus`, `tryAutoCompleteOrder`) use try/catch on `ERR_INVALID_TRANSITION` to be best-effort — if the fulfillment workflow hasn't reached a compatible state (e.g., still in `queued`), the propagation silently skips

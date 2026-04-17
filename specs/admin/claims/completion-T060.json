@@ -1,0 +1,23 @@
+{
+  "task_id": "T060",
+  "status": "complete",
+  "summary": "Implemented fulfillment→shipping status propagation: propagateOrderFulfillmentStatus checks all order lines are covered by shipped/delivered shipments, propagateOrderDeliveredStatus checks all non-voided shipments are delivered, tryAutoCompleteOrder transitions order to completed when both conditions met. Modified handleTrackingUpdate to use aggregate delivered check and auto-complete. Added in_transit→delivered to shipping_status transitions. Integration tests cover single/multi-shipment, partial coverage, voided shipments, and full e2e flow.",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm test -- --run", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/fulfillment-propagation.integration.test.ts",
+    "specs/admin/claims/completion-T060.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/shipment.ts",
+    "api/src/db/queries/order-state-machine.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

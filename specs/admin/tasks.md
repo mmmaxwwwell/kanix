@@ -239,7 +239,7 @@
 - [x] T059d Implement order resend-confirmation API [P]
   Done when: POST /admin/orders/:id/resend-confirmation queues order confirmation notification (via notification service / email stub); rate-limited to prevent spam (max 1 per 5 minutes per order); integration test: resend → email logged to stub; rapid resend → rate limited
 
-- [ ] T060 Implement fulfillment → shipping status propagation [FR-039, FR-044]
+- [x] T060 Implement fulfillment → shipping status propagation [FR-039, FR-044]
   Done when: when all shipment_lines for an order are in shipped/delivered shipments, order.fulfillment_status → fulfilled; when all shipments delivered, order.shipping_status → delivered; when fulfillment_status=fulfilled AND shipping_status=delivered, order.status can transition to completed; integration test: complete fulfillment → all shipped → delivered → order completable
 
 ---
