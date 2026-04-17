@@ -21,3 +21,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T004 — api/ sub-flake
 - `jdk21_headless` and `postgresql_16` are available in nixpkgs unstable — no need for version-specific overlays
 - `nix flake check` needs `--extra-experimental-features 'nix-command flakes'` if nix.conf isn't configured (or use `NIX_REMOTE=daemon` per T001 learning)
+
+## T005 — admin/ and customer/ Flutter sub-flakes
+- nixpkgs flutter package ships `flutter_tester` binary without execute permission — `flutter test` fails with "lacked sufficient permissions to execute". Workaround: set `FLUTTER_ROOT` env var to a symlink-farm copy where only `flutter_tester` is a real file with `+x`. The flutter wrapper binary uses `setenv("FLUTTER_ROOT", ..., 0)` (no-overwrite), so a pre-set `FLUTTER_ROOT` takes precedence.
+- When building the symlink-farm, each directory level must be `mkdir -p` then symlink children selectively (excluding the next level down). Don't `mkdir -p` the full path first then symlink siblings — `ln -sf` can't replace a real directory with a symlink.
+- `.flutter-patched/` directories should be gitignored; they're created per-project by the shellHook on first `nix develop`.

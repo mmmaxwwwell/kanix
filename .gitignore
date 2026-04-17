@@ -49,3 +49,9 @@ dist/
 coverage/
 .nyc_output/
 htmlcov/
+
+.pnpm-store/
+
+# Flutter
+.flutter-patched/
+.dart_tool/

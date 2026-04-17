@@ -20,7 +20,7 @@
 - [x] T004 Create api/ project skeleton with flake.nix [FR-098]
   Done when: `api/flake.nix` provides nodejs_22, pnpm, liquibase, jdk21_headless, postgresql_16; `api/package.json` has all scripts; `api/tsconfig.json` has strict mode; pnpm install succeeds
 
-- [ ] T005 Create admin/ and customer/ Flutter project skeletons with flake.nix [FR-098]
+- [x] T005 Create admin/ and customer/ Flutter project skeletons with flake.nix [FR-098]
   Done when: `admin/flake.nix` and `customer/flake.nix` provide flutter SDK; `flutter create` scaffold exists; `flutter test` runs (empty)
 
 - [ ] T006 Create deploy/ with flake.nix for infrastructure tooling [FR-098]

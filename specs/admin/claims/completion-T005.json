@@ -1,0 +1,34 @@
+{
+  "task_id": "T005",
+  "status": "complete",
+  "summary": "Created admin/ and customer/ Flutter project skeletons with flake.nix providing flutter SDK, including shellHook workaround for nixpkgs flutter_tester permission bug",
+  "commands_run": [
+    {"command": "flutter create --project-name kanix_admin --org com.kanix admin", "exit_code": 0},
+    {"command": "flutter create --project-name kanix_customer --org com.kanix customer", "exit_code": 0},
+    {"command": "nix flake check (admin/)", "exit_code": 0},
+    {"command": "nix flake check (customer/)", "exit_code": 0},
+    {"command": "nix flake check (root)", "exit_code": 0},
+    {"command": "FLUTTER_ROOT=.flutter-patched flutter test (admin/)", "exit_code": 0},
+    {"command": "FLUTTER_ROOT=.flutter-patched flutter test (customer/)", "exit_code": 0}
+  ],
+  "files_created": [
+    "admin/flake.nix",
+    "admin/pubspec.yaml",
+    "admin/lib/main.dart",
+    "admin/test/smoke_test.dart",
+    "customer/flake.nix",
+    "customer/pubspec.yaml",
+    "customer/lib/main.dart",
+    "customer/test/smoke_test.dart",
+    "customer/test/widget_test.dart",
+    "specs/admin/claims/completion-T005.json"
+  ],
+  "files_modified": [
+    "flake.nix",
+    ".gitignore",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
