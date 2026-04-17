@@ -17,7 +17,7 @@
 - [x] T003 Update site/ with its own flake.nix [FR-098]
   Done when: `site/flake.nix` provides nodejs_22 + pnpm; `cd site && nix develop && pnpm install && pnpm build` works; root flake includes site as input
 
-- [ ] T004 Create api/ project skeleton with flake.nix [FR-098]
+- [x] T004 Create api/ project skeleton with flake.nix [FR-098]
   Done when: `api/flake.nix` provides nodejs_22, pnpm, liquibase, jdk21_headless, postgresql_16; `api/package.json` has all scripts; `api/tsconfig.json` has strict mode; pnpm install succeeds
 
 - [ ] T005 Create admin/ and customer/ Flutter project skeletons with flake.nix [FR-098]

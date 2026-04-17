@@ -17,3 +17,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T003 — site/ sub-flake
 - Simple sub-flakes (just packages, no custom derivations) need only nixpkgs + flake-utils — no special packaging logic required
 - pnpm from nixpkgs works directly with existing `package.json` that was using npm — `pnpm install` migrates seamlessly (moves npm-installed modules to `.ignored`)
+
+## T004 — api/ sub-flake
+- `jdk21_headless` and `postgresql_16` are available in nixpkgs unstable — no need for version-specific overlays
+- `nix flake check` needs `--extra-experimental-features 'nix-command flakes'` if nix.conf isn't configured (or use `NIX_REMOTE=daemon` per T001 learning)
