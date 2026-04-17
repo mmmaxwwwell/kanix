@@ -43,3 +43,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - No `admin_setting` table existed in the data model — created a generic key-value table (`key` TEXT PK, `value_json` JSONB, `updated_at`) to store settings like shipping config; this pattern supports future settings keys without schema changes
 - `ROLE_CAPABILITIES.super_admin` uses `Object.values(CAPABILITIES)` so new capability constants (like `SETTINGS_MANAGE`) are automatically included — no need to manually add them to the super_admin role
 - Drizzle's `onConflictDoUpdate` with `target: adminSetting.key` provides upsert for settings — first GET returns defaults from code (no row needed), first PATCH creates the row via upsert
+
+## T072 — Implement WebSocket server with auth
+- `@fastify/websocket` v11 handler signature is `(socket: WebSocket, request: FastifyRequest)` — no `SocketStream` wrapper; `WebSocket` type comes from `ws` package (needs `@types/ws` as devDependency)
+- `Session.getSessionWithoutRequestResponse(token)` validates an access token without HTTP request/reply — useful for WebSocket upgrade auth where there's no standard Fastify request lifecycle
+- `ws` must be added as a direct dependency (not just transitive via `@fastify/websocket`) for test files that import it as a WebSocket client — pnpm strict hoisting prevents resolving transitive deps

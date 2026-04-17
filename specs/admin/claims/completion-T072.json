@@ -1,0 +1,28 @@
+{
+  "task_id": "T072",
+  "status": "complete",
+  "summary": "Implemented WebSocket server with @fastify/websocket: auth via SuperTokens session token (admin/customer) or cart token (guest), channel-based pub/sub with wildcard support for admins, IC-008 message format {type, entity, entityId, data, sequenceId}, exponential backoff reconnection guidance, and 8 integration tests",
+  "commands_run": [
+    {"command": "pnpm add @fastify/websocket", "exit_code": 0},
+    {"command": "pnpm add ws", "exit_code": 0},
+    {"command": "pnpm add -D @types/ws", "exit_code": 0},
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/ws/manager.ts",
+    "api/src/websocket.integration.test.ts",
+    "specs/admin/claims/completion-T072.json"
+  ],
+  "files_modified": [
+    "api/package.json",
+    "api/pnpm-lock.yaml",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

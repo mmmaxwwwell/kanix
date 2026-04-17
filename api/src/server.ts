@@ -224,6 +224,7 @@ import {
 } from "./db/queries/customer.js";
 import { getShippingSettings, updateShippingSettings } from "./db/queries/setting.js";
 import type { ShippingSettings } from "./db/queries/setting.js";
+import { registerWebSocket, type WsManager } from "./ws/manager.js";
 import Stripe from "stripe";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { randomUUID } from "node:crypto";
@@ -283,6 +284,7 @@ export interface ServerInstance {
   paymentAdapter: PaymentAdapter;
   notificationService: NotificationService;
   storageAdapter: StorageAdapter;
+  wsManager?: WsManager;
   start(): Promise<string>;
 }
 
@@ -6661,6 +6663,15 @@ export async function createServer(options: CreateServerOptions): Promise<Server
   }
 
   // -------------------------------------------------------------------------
+  // WebSocket support
+  // -------------------------------------------------------------------------
+
+  let wsManager: WsManager | undefined;
+  if (database) {
+    wsManager = await registerWebSocket({ app, db: database.db });
+  }
+
+  // -------------------------------------------------------------------------
   // Shutdown manager
   // -------------------------------------------------------------------------
 
@@ -6731,6 +6742,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     paymentAdapter,
     notificationService,
     storageAdapter,
+    wsManager,
     start,
   };
 }

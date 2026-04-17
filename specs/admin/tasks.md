@@ -313,7 +313,7 @@
 - [x] T071c Implement admin settings APIs [P]
   Done when: GET /admin/settings/shipping returns shipping config (default carrier, service levels, label settings); PATCH /admin/settings/shipping updates config; permission: `admin.settings.manage`; integration test: read → update → read → verify change persisted
 
-- [ ] T072 Implement WebSocket server with auth [FR-081, FR-082, FR-083] [produces: IC-008]
+- [x] T072 Implement WebSocket server with auth [FR-081, FR-082, FR-083] [produces: IC-008]
   Done when: @fastify/websocket configured; WebSocket upgrade validates token (admin session, customer session, or cart token); authenticated connections subscribe to relevant entity channels; message format: `{type, entity, entityId, data, sequenceId}`; automatic reconnection guidance (client uses exponential backoff); integration tests: admin connects → receives events; unauthenticated → rejected; guest with cart token → receives cart/order events only
 
 - [ ] T073 Implement server-side message buffering [FR-083]
