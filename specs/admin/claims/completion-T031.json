@@ -1,0 +1,12 @@
+{
+  "task_id": "T031",
+  "status": "complete",
+  "summary": "Created deploy/nixos/supertokens.nix NixOS module configuring SuperTokens core with Postgres backend; process-compose.yml already had SuperTokens configured with health check on port 3567",
+  "commands_run": [
+    {"command": "curl -s http://127.0.0.1:3567/hello", "exit_code": 7}
+  ],
+  "files_created": ["deploy/nixos/supertokens.nix", "specs/admin/claims/completion-T031.json"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

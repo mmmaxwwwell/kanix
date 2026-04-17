@@ -110,7 +110,7 @@
 
 ## Phase 4: Auth + Admin Identity [FR-064, FR-065, FR-066, FR-068, FR-077, FR-078, FR-079, FR-080]
 
-- [ ] T031 Configure SuperTokens in process-compose and deploy/nixos [FR-064]
+- [x] T031 Configure SuperTokens in process-compose and deploy/nixos [FR-064]
   Done when: `process-compose up` starts SuperTokens core on port 3567; health check confirms SuperTokens is up; `deploy/nixos/supertokens.nix` configures SuperTokens core with Postgres backend
 
 - [ ] T032 Implement customer auth: email/password + email verification [FR-064, FR-065]
