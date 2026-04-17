@@ -69,7 +69,7 @@
 - [x] T019 Implement global error handler [FR-105]
   Done when: Fastify error handler catches all errors at boundary; AppError subclasses return correct HTTP status + error code; unknown errors return 500 with generic message (no stack leak); all errors logged with correlationId, errorCode, stack; integration test covers: ValidationError→400, NotFoundError→404, unknown Error→500
 
-- [ ] T020 Set up CI workflow: lint, typecheck, test, security scan [FR-111] [P]
+- [x] T020 Set up CI workflow: lint, typecheck, test, security scan [FR-111] [P]
   Done when: `.github/workflows/api-ci.yml` runs on push/PR; stages: pnpm install → lint → typecheck → test → trivy fs → semgrep → gitleaks detect → npm audit; SARIF uploads to GitHub Security tab for trivy + semgrep + gitleaks; security-events: write permission; workflow passes on clean codebase
 
 - [ ] T021 Create security scanner script for local fix-validate loop [FR-111] [P]

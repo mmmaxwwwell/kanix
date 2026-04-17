@@ -75,3 +75,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T019 — Global error handler
 - Fastify supports only one `setErrorHandler` — the global error handler must unify validation errors, AppError subclasses, and unknown errors in a single handler. Moved `formatFieldPath` from validation.ts into error-handler.ts.
 - Use `"validation" in error` check to detect Fastify validation errors (they have a `.validation` array), then `instanceof AppError` for typed errors, with unknown errors as the fallback.
+
+## T020 — CI workflow
+- `returntocorp/semgrep-action@v1` has limited control over SARIF output path — using `pip install semgrep` + CLI directly gives better control over `--sarif --output` flags
+- `gitleaks/gitleaks-action@v2` doesn't support custom `args` input — install gitleaks CLI directly for SARIF output control via `--report-format sarif --report-path`
+- Security scan steps should use `|| true` or `if: always()` to avoid blocking the pipeline on findings while still uploading SARIF results

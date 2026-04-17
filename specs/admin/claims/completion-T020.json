@@ -1,0 +1,10 @@
+{
+  "task_id": "T020",
+  "status": "complete",
+  "summary": "Created .github/workflows/api-ci.yml with lint, typecheck, test, and security scan (trivy, semgrep, gitleaks, npm audit) stages with SARIF uploads",
+  "commands_run": [],
+  "files_created": [".github/workflows/api-ci.yml", "specs/admin/claims/completion-T020.json"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
