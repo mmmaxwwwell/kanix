@@ -44,3 +44,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `supertokens-node` Fastify integration exports `plugin` (not `middleware`) from `supertokens-node/framework/fastify/index.js` — register it as a Fastify plugin, it handles `/auth/*` routes via a `preHandler` hook
 - `supertokens.init()` can only be called once per process — guard with an `initialized` flag to make it idempotent for tests that create multiple server instances
 - `createServer` must be `async` after adding SuperTokens middleware registration — all existing tests calling `createServer` need `await` added
+
+## T033 — Implement GitHub OAuth: link GitHub account
+- SuperTokens `ThirdParty.init()` accepts providers via `signInAndUpFeature.providers` array — pass an empty array when GitHub OAuth creds are not configured to avoid errors
+- For integration testing GitHub OAuth without real GitHub API, inject a mock `GitHubUserFetcher` via `CreateServerOptions.githubUserFetcher` — the server falls back to the real fetcher when none is provided
+- The `github_user_id` column uses a partial unique index (`WHERE github_user_id IS NOT NULL`) since it's nullable — Drizzle's `eq()` filter works correctly for the duplicate-link check

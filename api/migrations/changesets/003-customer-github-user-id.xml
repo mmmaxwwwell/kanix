@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="003-add-customer-github-user-id" author="kanix">
+        <comment>Add github_user_id column to customer table for GitHub OAuth linking (FR-068)</comment>
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE customer ADD COLUMN github_user_id text;
+            CREATE UNIQUE INDEX uq_customer_github_user_id ON customer (github_user_id) WHERE github_user_id IS NOT NULL;
+        </sql>
+        <rollback>
+            DROP INDEX IF EXISTS uq_customer_github_user_id;
+            ALTER TABLE customer DROP COLUMN IF EXISTS github_user_id;
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

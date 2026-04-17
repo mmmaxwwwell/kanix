@@ -13,7 +13,10 @@ import {
   verifySession,
   requireVerifiedEmail,
   getCustomerByAuthSubject,
+  linkGitHubToCustomer,
+  createGitHubUserFetcher,
 } from "./auth/index.js";
+import type { GitHubUserFetcher } from "./auth/index.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,6 +43,7 @@ export interface CreateServerOptions {
   config: Config;
   processRef?: NodeJS.Process;
   database?: DatabaseConnection;
+  githubUserFetcher?: GitHubUserFetcher;
 }
 
 export interface ServerInstance {
@@ -73,7 +77,7 @@ export function isReady(): boolean {
 const APP_VERSION = "0.1.0";
 
 export async function createServer(options: CreateServerOptions): Promise<ServerInstance> {
-  const { config, processRef = process, database } = options;
+  const { config, processRef = process, database, githubUserFetcher } = options;
 
   const logger = createLogger({
     level: config.LOG_LEVEL,
@@ -96,7 +100,20 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     apiDomain: `http://localhost:${config.PORT}`,
     websiteDomain: config.CORS_ALLOWED_ORIGINS[0] ?? "http://localhost:3000",
     db: database?.db,
+    githubOAuth:
+      config.GITHUB_OAUTH_CLIENT_ID && config.GITHUB_OAUTH_CLIENT_SECRET
+        ? {
+            clientId: config.GITHUB_OAUTH_CLIENT_ID,
+            clientSecret: config.GITHUB_OAUTH_CLIENT_SECRET,
+          }
+        : undefined,
   });
+
+  const resolvedGitHubFetcher =
+    githubUserFetcher ??
+    (config.GITHUB_OAUTH_CLIENT_ID && config.GITHUB_OAUTH_CLIENT_SECRET
+      ? createGitHubUserFetcher(config.GITHUB_OAUTH_CLIENT_ID, config.GITHUB_OAUTH_CLIENT_SECRET)
+      : undefined);
 
   await registerAuthMiddleware(app);
 
@@ -192,6 +209,89 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       }
 
       return { customer: cust };
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // Link GitHub Account endpoint — requires verified email
+  // -------------------------------------------------------------------------
+
+  app.post(
+    "/api/customer/link-github",
+    { preHandler: [verifySession, requireVerifiedEmail] },
+    async (request, reply) => {
+      const session = request.session;
+      if (!session) {
+        return reply.status(401).send({
+          error: "ERR_AUTHENTICATION_FAILED",
+          message: "Authentication required",
+        });
+      }
+
+      if (!database) {
+        return reply.status(503).send({
+          error: "ERR_SERVICE_UNAVAILABLE",
+          message: "Database not available",
+        });
+      }
+
+      if (!resolvedGitHubFetcher) {
+        return reply.status(503).send({
+          error: "ERR_SERVICE_UNAVAILABLE",
+          message: "GitHub OAuth not configured",
+        });
+      }
+
+      const body = request.body as { code?: string } | undefined;
+      if (!body?.code || typeof body.code !== "string") {
+        return reply.status(400).send({
+          error: "ERR_VALIDATION",
+          message: "Missing required field: code",
+        });
+      }
+
+      const userId = session.getUserId();
+      const cust = await getCustomerByAuthSubject(database.db, userId);
+      if (!cust) {
+        return reply.status(404).send({
+          error: "ERR_NOT_FOUND",
+          message: "Customer record not found",
+        });
+      }
+
+      if (cust.githubUserId) {
+        return reply.status(409).send({
+          error: "ERR_ALREADY_LINKED",
+          message: "GitHub account already linked to this customer",
+        });
+      }
+
+      let githubUser;
+      try {
+        githubUser = await resolvedGitHubFetcher(body.code);
+      } catch {
+        return reply.status(400).send({
+          error: "ERR_GITHUB_OAUTH",
+          message: "Failed to verify GitHub authorization code",
+        });
+      }
+
+      const githubUserId = String(githubUser.id);
+      const updated = await linkGitHubToCustomer(database.db, cust.id, githubUserId);
+
+      if (!updated) {
+        return reply.status(409).send({
+          error: "ERR_DUPLICATE_LINK",
+          message: "This GitHub account is already linked to another customer",
+        });
+      }
+
+      return {
+        customer: {
+          id: updated.id,
+          github_user_id: updated.githubUserId,
+        },
+      };
     },
   );
 

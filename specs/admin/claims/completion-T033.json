@@ -1,0 +1,27 @@
+{
+  "task_id": "T033",
+  "status": "complete",
+  "summary": "Implemented GitHub OAuth linking: ThirdParty recipe configured, POST /api/customer/link-github endpoint with duplicate prevention, github_user_id migration and schema, integration tests with mock GitHub fetcher",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/migrations/changesets/003-customer-github-user-id.xml",
+    "api/src/auth/github.ts",
+    "api/src/auth/github-link.integration.test.ts",
+    "specs/admin/claims/completion-T033.json"
+  ],
+  "files_modified": [
+    "api/src/auth/supertokens.ts",
+    "api/src/auth/index.ts",
+    "api/src/db/schema/customer.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

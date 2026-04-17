@@ -11,6 +11,7 @@ export const customer = pgTable("customer", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   phone: text(),
+  githubUserId: text("github_user_id"),
   status: text().notNull().default("active"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

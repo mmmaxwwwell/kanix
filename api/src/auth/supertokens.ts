@@ -2,6 +2,7 @@ import supertokens from "supertokens-node";
 import Session from "supertokens-node/recipe/session/index.js";
 import EmailPassword from "supertokens-node/recipe/emailpassword/index.js";
 import EmailVerification from "supertokens-node/recipe/emailverification/index.js";
+import ThirdParty from "supertokens-node/recipe/thirdparty/index.js";
 import type { TypeInput } from "supertokens-node/types";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { eq } from "drizzle-orm";
@@ -18,6 +19,10 @@ export interface SuperTokensConfig {
   apiDomain: string;
   websiteDomain: string;
   db?: PostgresJsDatabase;
+  githubOAuth?: {
+    clientId: string;
+    clientSecret: string;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -72,6 +77,25 @@ export function initSuperTokens(config: SuperTokensConfig): void {
     EmailVerification.init({
       mode: "REQUIRED",
     }),
+    ThirdParty.init({
+      signInAndUpFeature: {
+        providers: config.githubOAuth
+          ? [
+              {
+                config: {
+                  thirdPartyId: "github",
+                  clients: [
+                    {
+                      clientId: config.githubOAuth.clientId,
+                      clientSecret: config.githubOAuth.clientSecret,
+                    },
+                  ],
+                },
+              },
+            ]
+          : [],
+      },
+    }),
     Session.init(),
   ];
 
@@ -110,11 +134,45 @@ export async function isEmailVerified(userId: string): Promise<boolean> {
 export async function getCustomerByAuthSubject(
   db: PostgresJsDatabase,
   authSubject: string,
-): Promise<{ id: string; email: string; status: string } | undefined> {
+): Promise<{ id: string; email: string; status: string; githubUserId: string | null } | undefined> {
   const rows = await db
-    .select({ id: customer.id, email: customer.email, status: customer.status })
+    .select({
+      id: customer.id,
+      email: customer.email,
+      status: customer.status,
+      githubUserId: customer.githubUserId,
+    })
     .from(customer)
     .where(eq(customer.authSubject, authSubject))
     .limit(1);
   return rows[0];
+}
+
+/**
+ * Links a GitHub user ID to a customer record.
+ * Returns the updated customer, or null if the github_user_id is already taken.
+ */
+export async function linkGitHubToCustomer(
+  db: PostgresJsDatabase,
+  customerId: string,
+  githubUserId: string,
+): Promise<{ id: string; githubUserId: string | null } | null> {
+  // Check if this github_user_id is already linked to another customer
+  const existing = await db
+    .select({ id: customer.id })
+    .from(customer)
+    .where(eq(customer.githubUserId, githubUserId))
+    .limit(1);
+
+  if (existing.length > 0 && existing[0].id !== customerId) {
+    return null; // Already linked to a different customer
+  }
+
+  const rows = await db
+    .update(customer)
+    .set({ githubUserId, updatedAt: new Date() })
+    .where(eq(customer.id, customerId))
+    .returning({ id: customer.id, githubUserId: customer.githubUserId });
+
+  return rows[0] ?? null;
 }
