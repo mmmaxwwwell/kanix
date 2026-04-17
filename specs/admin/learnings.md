@@ -13,3 +13,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `inputsFrom` in `mkShell` merges `buildInputs`/`nativeBuildInputs` but does NOT propagate custom env vars (like `OPENSCADPATH`) — must set them explicitly in the consuming shell
 - BOSL2 can be fetched as a non-flake GitHub input (`flake = false`) and packaged via `stdenvNoCC.mkDerivation` — just copy `*.scad` into `$out/BOSL2/`
 - New `.nix` files in a git repo must be `git add`'d before `nix flake check` can see them (untracked files are invisible to Nix)
+
+## T003 — site/ sub-flake
+- Simple sub-flakes (just packages, no custom derivations) need only nixpkgs + flake-utils — no special packaging logic required
+- pnpm from nixpkgs works directly with existing `package.json` that was using npm — `pnpm install` migrates seamlessly (moves npm-installed modules to `.ignored`)

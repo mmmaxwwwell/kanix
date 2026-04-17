@@ -5,13 +5,15 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     scad.url = "path:./scad";
+    site.url = "path:./site";
   };
 
-  outputs = { self, nixpkgs, flake-utils, scad }:
+  outputs = { self, nixpkgs, flake-utils, scad, site }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         scadShell = scad.devShells.${system}.default;
+        siteShell = site.devShells.${system}.default;
       in
       {
         devShells.default = pkgs.mkShell {
@@ -39,7 +41,7 @@
             gitleaks
           ];
 
-          inputsFrom = [ scadShell ];
+          inputsFrom = [ scadShell siteShell ];
           OPENSCADPATH = "${scad.packages.${system}.bosl2}";
         };
       }
