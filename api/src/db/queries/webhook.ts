@@ -256,14 +256,11 @@ export async function handlePaymentSucceeded(
   // Auto-create fulfillment task now that payment is confirmed
   try {
     await createFulfillmentTaskForPaidOrder(db, paymentRecord.orderId);
-  } catch (err: unknown) {
-    // Non-fatal: fulfillment task creation should not block payment confirmation
-    // If it fails (e.g., duplicate), log but don't throw
-    const error = err as { code?: string };
-    if (error.code !== "ERR_PAYMENT_NOT_PAID") {
-      throw err;
-    }
-    // Already not paid means the payment transition didn't stick — skip
+  } catch {
+    // Non-fatal: fulfillment task creation should not block payment confirmation.
+    // Possible failures include duplicate tasks (idempotent replay), payment status
+    // not yet visible (ERR_PAYMENT_NOT_PAID), or transient DB errors.
+    // All are safe to suppress here — the task can be created manually if needed.
   }
 }
 
