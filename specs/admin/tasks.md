@@ -23,7 +23,7 @@
 - [x] T005 Create admin/ and customer/ Flutter project skeletons with flake.nix [FR-098]
   Done when: `admin/flake.nix` and `customer/flake.nix` provide flutter SDK; `flutter create` scaffold exists; `flutter test` runs (empty)
 
-- [ ] T006 Create deploy/ with flake.nix for infrastructure tooling [FR-098]
+- [x] T006 Create deploy/ with flake.nix for infrastructure tooling [FR-098]
   Done when: `deploy/flake.nix` provides opentofu, nginx; `deploy/tofu/` and `deploy/nixos/` directories exist with placeholder files
 
 - [ ] T007 Create process-compose.yml for dev services [FR-099]

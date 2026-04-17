@@ -26,3 +26,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - nixpkgs flutter package ships `flutter_tester` binary without execute permission — `flutter test` fails with "lacked sufficient permissions to execute". Workaround: set `FLUTTER_ROOT` env var to a symlink-farm copy where only `flutter_tester` is a real file with `+x`. The flutter wrapper binary uses `setenv("FLUTTER_ROOT", ..., 0)` (no-overwrite), so a pre-set `FLUTTER_ROOT` takes precedence.
 - When building the symlink-farm, each directory level must be `mkdir -p` then symlink children selectively (excluding the next level down). Don't `mkdir -p` the full path first then symlink siblings — `ln -sf` can't replace a real directory with a symlink.
 - `.flutter-patched/` directories should be gitignored; they're created per-project by the shellHook on first `nix develop`.
+
+## T006 — deploy/ sub-flake
+- `nginx` package is available in nixpkgs unstable — no special overlay needed
+- Simplest sub-flakes (deploy, site, api) all follow the same pattern: nixpkgs + flake-utils, single `mkShell` with `packages`

@@ -9,9 +9,10 @@
     api.url = "path:./api";
     admin.url = "path:./admin";
     customer.url = "path:./customer";
+    deploy.url = "path:./deploy";
   };
 
-  outputs = { self, nixpkgs, flake-utils, scad, site, api, admin, customer }:
+  outputs = { self, nixpkgs, flake-utils, scad, site, api, admin, customer, deploy }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -20,6 +21,7 @@
         apiShell = api.devShells.${system}.default;
         adminShell = admin.devShells.${system}.default;
         customerShell = customer.devShells.${system}.default;
+        deployShell = deploy.devShells.${system}.default;
       in
       {
         devShells.default = pkgs.mkShell {
@@ -47,7 +49,7 @@
             gitleaks
           ];
 
-          inputsFrom = [ scadShell siteShell apiShell adminShell customerShell ];
+          inputsFrom = [ scadShell siteShell apiShell adminShell customerShell deployShell ];
           OPENSCADPATH = "${scad.packages.${system}.bosl2}";
         };
       }
