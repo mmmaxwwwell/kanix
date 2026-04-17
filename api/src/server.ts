@@ -1,5 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Config } from "./config.js";
+import type { DatabaseConnection } from "./db/connection.js";
+import { checkDatabaseConnectivity } from "./db/queries/health.js";
 import { createLogger, generateCorrelationId, withCorrelationId } from "./logger.js";
 import { registerErrorHandler } from "./error-handler.js";
 import { registerSecurityMiddleware, clearRateLimiterState } from "./security.js";
@@ -22,11 +24,15 @@ export interface HealthResponse {
 
 export interface ReadyResponse {
   status: "ready" | "not_ready";
+  dependencies?: {
+    database: "up" | "down";
+  };
 }
 
 export interface CreateServerOptions {
   config: Config;
   processRef?: NodeJS.Process;
+  database?: DatabaseConnection;
 }
 
 export interface ServerInstance {
@@ -60,7 +66,7 @@ export function isReady(): boolean {
 const APP_VERSION = "0.1.0";
 
 export function createServer(options: CreateServerOptions): ServerInstance {
-  const { config, processRef = process } = options;
+  const { config, processRef = process, database } = options;
 
   const logger = createLogger({
     level: config.LOG_LEVEL,
@@ -99,25 +105,36 @@ export function createServer(options: CreateServerOptions): ServerInstance {
   // -------------------------------------------------------------------------
 
   app.get("/health", async () => {
+    const dbConnected = database ? await checkDatabaseConnectivity(database.db) : false;
     const response: HealthResponse = {
       status: "ok",
       uptime: process.uptime(),
       version: APP_VERSION,
       ready: isReady(),
       dependencies: {
-        database: "disconnected", // No DB connection yet
+        database: dbConnected ? "connected" : "disconnected",
       },
     };
     return response;
   });
 
   app.get("/ready", async (_request, reply) => {
-    if (isReady()) {
-      const response: ReadyResponse = { status: "ready" };
-      return reply.status(200).send(response);
+    if (!isReady()) {
+      const response: ReadyResponse = { status: "not_ready" };
+      return reply.status(503).send(response);
     }
-    const response: ReadyResponse = { status: "not_ready" };
-    return reply.status(503).send(response);
+
+    const dbConnected = database ? await checkDatabaseConnectivity(database.db) : false;
+    if (!dbConnected) {
+      const response: ReadyResponse = {
+        status: "not_ready",
+        dependencies: { database: "down" },
+      };
+      return reply.status(503).send(response);
+    }
+
+    const response: ReadyResponse = { status: "ready" };
+    return reply.status(200).send(response);
   });
 
   // -------------------------------------------------------------------------
@@ -128,6 +145,15 @@ export function createServer(options: CreateServerOptions): ServerInstance {
     logger,
     processRef,
   });
+
+  if (database) {
+    shutdownManager.register({
+      name: "close database connection",
+      fn: async () => {
+        await database.close();
+      },
+    });
+  }
 
   shutdownManager.register({
     name: "close Fastify server",

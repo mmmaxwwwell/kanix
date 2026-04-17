@@ -83,3 +83,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T028 — Seed script with dev data
 - The `kanix` role in dev doesn't have CREATEDB privilege — `db:reset` must use the OS superuser via `psql`/`dropdb`/`createdb` CLI tools (trust auth) rather than connecting as `kanix` to the maintenance DB
 - Drizzle's `onConflictDoNothing()` makes seed idempotent, but `returning()` returns empty when the conflict is hit — use a fallback query to fetch the existing row's ID
+
+## T029 — Update /ready to check Postgres connectivity
+- When adding DB connectivity check to `/ready`, existing unit tests that don't provide a database connection will fail — use a fake `DatabaseConnection` with a mock `db.execute` to simulate a healthy DB in unit tests
+- The `checkDatabaseConnectivity` helper from `db/queries/health.ts` is reusable in both `/ready` and `/health` endpoints — no need to duplicate the `SELECT 1` logic

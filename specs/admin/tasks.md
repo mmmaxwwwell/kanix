@@ -100,7 +100,7 @@
 - [x] T028 Create seed script with dev data [FR-101]
   Done when: `pnpm db:seed` populates: 5 products with TPU/PA11/TPC variants, product classes (plates/modules/belts), kit definition (starter kit), inventory balances (50 units each), 1 admin user (super_admin role), 1 inventory location (default warehouse); seed is idempotent (safe to run multiple times); `pnpm db:reset` drops + recreates + migrates + seeds
 
-- [ ] T029 Update /ready to check Postgres connectivity [FR-103]
+- [x] T029 Update /ready to check Postgres connectivity [FR-103]
   Done when: `GET /ready` returns 200 when Postgres is connected; returns 503 with `{dependencies: {database: "down"}}` when Postgres is unreachable; integration test verifies both states
 
 - [ ] T030 Critical path checkpoint (Phase 3) [Critical Path]

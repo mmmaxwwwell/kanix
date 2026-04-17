@@ -8,6 +8,7 @@ import {
   type ReadyResponse,
 } from "./server.js";
 import type { Config } from "./config.js";
+import type { DatabaseConnection } from "./db/connection.js";
 
 /** Minimal config for testing — secrets don't matter for server skeleton. */
 function testConfig(overrides: Partial<Config> = {}): Config {
@@ -36,6 +37,17 @@ function createFakeProcess(): NodeJS.Process {
   return new EventEmitter() as unknown as NodeJS.Process;
 }
 
+/** Creates a fake database connection where SELECT 1 always succeeds. */
+function createFakeDatabase(): DatabaseConnection {
+  return {
+    db: {
+      execute: async () => [{ "?column?": 1 }],
+    } as unknown as DatabaseConnection["db"],
+    sql: {} as unknown as DatabaseConnection["sql"],
+    async close() {},
+  };
+}
+
 describe("server", () => {
   let cleanup: (() => Promise<void>) | undefined;
 
@@ -47,11 +59,12 @@ describe("server", () => {
     markNotReady();
   });
 
-  async function startServer(configOverrides: Partial<Config> = {}) {
+  async function startServer(configOverrides: Partial<Config> = {}, database?: DatabaseConnection) {
     const config = testConfig(configOverrides);
     const { app, shutdownManager } = createServer({
       config,
       processRef: createFakeProcess(),
+      database,
     });
 
     await app.ready();
@@ -126,8 +139,24 @@ describe("server", () => {
       expect(body.status).toBe("not_ready");
     });
 
-    it("returns 200 when marked ready", async () => {
+    it("returns 503 with database down when marked ready but no DB connection", async () => {
       const { app } = await startServer();
+      markReady();
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/ready",
+      });
+
+      expect(response.statusCode).toBe(503);
+
+      const body = response.json<ReadyResponse>();
+      expect(body.status).toBe("not_ready");
+      expect(body.dependencies).toEqual({ database: "down" });
+    });
+
+    it("returns 200 when marked ready and DB is connected", async () => {
+      const { app } = await startServer({}, createFakeDatabase());
       markReady();
 
       const response = await app.inject({

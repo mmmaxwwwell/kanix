@@ -1,0 +1,23 @@
+{
+  "task_id": "T029",
+  "status": "complete",
+  "summary": "Updated /ready to check Postgres connectivity via checkDatabaseConnectivity, returning 200 when DB is reachable and 503 with {dependencies: {database: 'down'}} when unreachable; added integration test and updated unit tests",
+  "commands_run": [
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm typecheck", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/ready.integration.test.ts",
+    "specs/admin/claims/completion-T029.json"
+  ],
+  "files_modified": [
+    "api/src/server.ts",
+    "api/src/server.test.ts",
+    "api/src/index.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

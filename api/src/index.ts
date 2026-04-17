@@ -1,11 +1,11 @@
 import { loadConfig } from "./config.js";
+import { createDatabaseConnection } from "./db/connection.js";
 import { createServer, markReady } from "./server.js";
 
 const config = loadConfig();
-const { start } = createServer({ config });
+const database = createDatabaseConnection(config.DATABASE_URL);
+const { start } = createServer({ config, database });
 
 await start();
 
-// Mark ready once the server is listening
-// In the future, this will wait for DB connection etc.
 markReady();
