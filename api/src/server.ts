@@ -201,6 +201,17 @@ import {
   clawbackRoyaltyByOrderLine,
   clawbackRoyaltiesByOrderId,
   setContributorDonation,
+  recordMilestone,
+  listMilestonesByContributor,
+  createTaxDocument,
+  findTaxDocumentById,
+  listTaxDocumentsByContributor,
+  updateTaxDocumentStatus,
+  createPayout,
+  TAX_DOCUMENT_TYPES,
+  type MilestoneType,
+  type TaxDocumentType,
+  MILESTONE_TYPES,
 } from "./db/queries/contributor.js";
 import Stripe from "stripe";
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -6183,6 +6194,243 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         }
 
         return reply.status(400).send({ error: "Either order_line_id or order_id is required" });
+      },
+    );
+
+    // GET /api/admin/contributors/:id/milestones — list milestones [FR-073]
+    app.get(
+      "/api/admin/contributors/:id/milestones",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.CONTRIBUTORS_READ),
+        ],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const contrib = await findContributorById(db, id);
+        if (!contrib) {
+          return reply.status(404).send({ error: "Contributor not found" });
+        }
+        const milestones = await listMilestonesByContributor(db, id);
+        return { milestones };
+      },
+    );
+
+    // POST /api/admin/contributors/:id/milestones — manually record milestone [FR-073]
+    app.post(
+      "/api/admin/contributors/:id/milestones",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.CONTRIBUTORS_MANAGE),
+        ],
+        schema: {
+          body: {
+            type: "object",
+            required: ["milestone_type"],
+            properties: {
+              milestone_type: { type: "string", enum: [...MILESTONE_TYPES] },
+              notes: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { milestone_type: MilestoneType; notes?: string };
+
+        const contrib = await findContributorById(db, id);
+        if (!contrib) {
+          return reply.status(404).send({ error: "Contributor not found" });
+        }
+
+        const milestone = await recordMilestone(db, id, body.milestone_type, body.notes);
+
+        request.auditContext = {
+          action: "contributor.milestone.record",
+          entityType: "contributor_milestone",
+          entityId: milestone.id,
+          afterJson: { milestoneType: milestone.milestoneType },
+        };
+
+        return { milestone };
+      },
+    );
+
+    // POST /api/contributors/tax-documents — upload tax document [FR-074]
+    app.post(
+      "/api/contributors/tax-documents",
+      {
+        preHandler: [verifySession, requireVerifiedEmail],
+        schema: {
+          body: {
+            type: "object",
+            required: ["contributor_id", "document_type", "file_name", "file_data", "content_type"],
+            properties: {
+              contributor_id: { type: "string" },
+              document_type: { type: "string", enum: [...TAX_DOCUMENT_TYPES] },
+              file_name: { type: "string" },
+              file_data: { type: "string" }, // base64
+              content_type: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const body = request.body as {
+          contributor_id: string;
+          document_type: TaxDocumentType;
+          file_name: string;
+          file_data: string;
+          content_type: string;
+        };
+
+        const contrib = await findContributorById(db, body.contributor_id);
+        if (!contrib) {
+          return reply.status(404).send({ error: "Contributor not found" });
+        }
+
+        const fileBuffer = Buffer.from(body.file_data, "base64");
+        const storageKey = `tax-documents/${body.contributor_id}/${randomUUID()}/${body.file_name}`;
+
+        await storageAdapter.put(storageKey, fileBuffer, body.content_type);
+
+        let taxDoc;
+        try {
+          taxDoc = await createTaxDocument(db, {
+            contributorId: body.contributor_id,
+            documentType: body.document_type,
+            storageKey,
+          });
+        } catch (err) {
+          await storageAdapter.delete(storageKey);
+          throw err;
+        }
+
+        return { tax_document: taxDoc };
+      },
+    );
+
+    // GET /api/admin/contributors/:id/tax-documents — list tax documents [FR-074]
+    app.get(
+      "/api/admin/contributors/:id/tax-documents",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.CONTRIBUTORS_READ),
+        ],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const contrib = await findContributorById(db, id);
+        if (!contrib) {
+          return reply.status(404).send({ error: "Contributor not found" });
+        }
+        const documents = await listTaxDocumentsByContributor(db, id);
+        return { tax_documents: documents };
+      },
+    );
+
+    // PUT /api/admin/contributors/tax-documents/:id/status — approve/reject [FR-074]
+    app.put(
+      "/api/admin/contributors/tax-documents/:id/status",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.CONTRIBUTORS_MANAGE),
+        ],
+        schema: {
+          body: {
+            type: "object",
+            required: ["status"],
+            properties: {
+              status: { type: "string", enum: ["approved", "rejected"] },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { status: "approved" | "rejected" };
+
+        const existing = await findTaxDocumentById(db, id);
+        if (!existing) {
+          return reply.status(404).send({ error: "Tax document not found" });
+        }
+
+        if (existing.status !== "pending_review") {
+          return reply.status(409).send({ error: `Tax document is already ${existing.status}` });
+        }
+
+        const updated = await updateTaxDocumentStatus(db, id, body.status);
+
+        request.auditContext = {
+          action: `contributor.tax_document.${body.status}`,
+          entityType: "contributor_tax_document",
+          entityId: id,
+          afterJson: { status: body.status },
+        };
+
+        return { tax_document: updated };
+      },
+    );
+
+    // POST /api/admin/contributors/:id/payouts — create payout (blocked without tax doc) [FR-074]
+    app.post(
+      "/api/admin/contributors/:id/payouts",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.CONTRIBUTORS_MANAGE),
+        ],
+        schema: {
+          body: {
+            type: "object",
+            required: ["amount_minor", "payout_method"],
+            properties: {
+              amount_minor: { type: "number" },
+              payout_method: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { amount_minor: number; payout_method: string };
+
+        const contrib = await findContributorById(db, id);
+        if (!contrib) {
+          return reply.status(404).send({ error: "Contributor not found" });
+        }
+
+        try {
+          const payout = await createPayout(db, {
+            contributorId: id,
+            amountMinor: body.amount_minor,
+            payoutMethod: body.payout_method,
+          });
+
+          request.auditContext = {
+            action: "contributor.payout.create",
+            entityType: "contributor_payout",
+            entityId: payout.id,
+            afterJson: { amountMinor: payout.amountMinor, payoutMethod: payout.payoutMethod },
+          };
+
+          return { payout };
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_TAX_DOC_REQUIRED") {
+            return reply.status(403).send({ error: error.message });
+          }
+          throw err;
+        }
       },
     );
   }

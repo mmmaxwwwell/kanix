@@ -73,3 +73,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Retroactive royalties must include the current order line (the one that crosses the threshold) since the order is already "completed" when `processOrderCompletionSales` runs — attempting a separate insert for the current line after `createRetroactiveRoyalties` causes a UNIQUE constraint violation on `order_line_id`
 - The 501(c)(3) donation option is stored as `charity_name` + `charity_ein` on the `contributor` table (migration 009); when both are non-null, `getRoyaltyRate()` returns `DONATION_RATE` (20%) instead of `ROYALTY_RATE` (10%)
 - The `contributor_royalty.order_line_id` UNIQUE constraint means royalty entries are strictly 1:1 with order lines — the `clawbackRoyaltyByOrderLine` function is the natural way to handle refunds since each order line maps to exactly one royalty
+
+## T070 — Implement milestone tracking + tax documents
+- Milestone auto-detection is hooked into `processOrderCompletionSales` (not a separate cron) — uses `detectMilestones()` wrapped in try/catch so milestone failures don't block order processing; milestones are idempotent (check-before-insert pattern)
+- The `contributor_milestone`, `contributor_tax_document`, and `contributor_payout` tables already existed in migration 002 and Drizzle schema — only query functions, routes, and tests needed to be created
+- CTR-3 invariant (payout blocked without approved tax document) is enforced in the `createPayout` query function itself, not in routes — throws `ERR_TAX_DOC_REQUIRED` which routes translate to 403

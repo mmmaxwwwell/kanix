@@ -5,6 +5,9 @@ import {
   contributorDesign,
   contributorRoyalty,
   contributorDonation,
+  contributorMilestone,
+  contributorTaxDocument,
+  contributorPayout,
 } from "../schema/contributor.js";
 import { product, productVariant } from "../schema/catalog.js";
 import { order, orderLine } from "../schema/order.js";
@@ -14,8 +17,18 @@ import { order, orderLine } from "../schema/order.js";
 // ---------------------------------------------------------------------------
 
 export const ROYALTY_ACTIVATION_THRESHOLD = 25;
+export const STARTER_KIT_THRESHOLD = 50;
 export const ROYALTY_RATE = 0.1; // 10% of unit_price_minor
 export const DONATION_RATE = 0.2; // 20% of unit_price_minor (2x for 501(c)(3) donation)
+
+export const MILESTONE_TYPES = ["accepted_pr", "royalty_activation", "starter_kit"] as const;
+export type MilestoneType = (typeof MILESTONE_TYPES)[number];
+
+export const TAX_DOCUMENT_TYPES = ["w9", "w8ben"] as const;
+export type TaxDocumentType = (typeof TAX_DOCUMENT_TYPES)[number];
+
+export const TAX_DOCUMENT_STATUSES = ["pending_review", "approved", "rejected"] as const;
+export type TaxDocumentStatus = (typeof TAX_DOCUMENT_STATUSES)[number];
 
 // ---------------------------------------------------------------------------
 // Contributor statuses
@@ -354,6 +367,19 @@ export async function processOrderCompletionSales(
     });
   }
 
+  // Auto-detect milestones for all contributors involved in this order
+  const processedContributors = new Set<string>();
+  for (const result of results) {
+    if (!processedContributors.has(result.contributorId)) {
+      processedContributors.add(result.contributorId);
+      try {
+        await detectMilestones(db, result.contributorId);
+      } catch {
+        // Non-fatal: milestone detection should not block order processing
+      }
+    }
+  }
+
   return results;
 }
 
@@ -543,4 +569,287 @@ export async function setContributorDonation(
     .where(eq(contributor.id, contributorId))
     .returning(contributorColumns);
   return updated;
+}
+
+// ---------------------------------------------------------------------------
+// Milestone tracking
+// ---------------------------------------------------------------------------
+
+export interface MilestoneRow {
+  id: string;
+  contributorId: string;
+  milestoneType: string;
+  reachedAt: Date;
+  fulfilledAt: Date | null;
+  notes: string | null;
+}
+
+const milestoneColumns = {
+  id: contributorMilestone.id,
+  contributorId: contributorMilestone.contributorId,
+  milestoneType: contributorMilestone.milestoneType,
+  reachedAt: contributorMilestone.reachedAt,
+  fulfilledAt: contributorMilestone.fulfilledAt,
+  notes: contributorMilestone.notes,
+};
+
+/**
+ * Record a milestone for a contributor. Idempotent — if the milestone
+ * already exists for this contributor, returns the existing record.
+ */
+export async function recordMilestone(
+  db: PostgresJsDatabase,
+  contributorId: string,
+  milestoneType: MilestoneType,
+  notes?: string,
+): Promise<MilestoneRow> {
+  // Check if milestone already exists
+  const [existing] = await db
+    .select(milestoneColumns)
+    .from(contributorMilestone)
+    .where(
+      and(
+        eq(contributorMilestone.contributorId, contributorId),
+        eq(contributorMilestone.milestoneType, milestoneType),
+      ),
+    );
+
+  if (existing) return existing;
+
+  const [row] = await db
+    .insert(contributorMilestone)
+    .values({
+      contributorId,
+      milestoneType,
+      reachedAt: new Date(),
+      notes: notes ?? null,
+    })
+    .returning(milestoneColumns);
+
+  return row;
+}
+
+/**
+ * List milestones for a contributor.
+ */
+export async function listMilestonesByContributor(
+  db: PostgresJsDatabase,
+  contributorId: string,
+): Promise<MilestoneRow[]> {
+  return db
+    .select(milestoneColumns)
+    .from(contributorMilestone)
+    .where(eq(contributorMilestone.contributorId, contributorId));
+}
+
+/**
+ * Auto-detect milestones based on total sales count for a contributor.
+ * Called after processOrderCompletionSales updates sales counts.
+ */
+export async function detectMilestones(
+  db: PostgresJsDatabase,
+  contributorId: string,
+): Promise<MilestoneRow[]> {
+  // Get total sales across all designs for this contributor
+  const designs = await db
+    .select({ salesCount: contributorDesign.salesCount })
+    .from(contributorDesign)
+    .where(eq(contributorDesign.contributorId, contributorId));
+
+  const totalSales = designs.reduce((sum, d) => sum + d.salesCount, 0);
+  const created: MilestoneRow[] = [];
+
+  if (totalSales >= ROYALTY_ACTIVATION_THRESHOLD) {
+    const milestone = await recordMilestone(
+      db,
+      contributorId,
+      "royalty_activation",
+      `Reached ${ROYALTY_ACTIVATION_THRESHOLD} units sold`,
+    );
+    created.push(milestone);
+  }
+
+  if (totalSales >= STARTER_KIT_THRESHOLD) {
+    const milestone = await recordMilestone(
+      db,
+      contributorId,
+      "starter_kit",
+      `Reached ${STARTER_KIT_THRESHOLD} units sold`,
+    );
+    created.push(milestone);
+  }
+
+  return created;
+}
+
+// ---------------------------------------------------------------------------
+// Tax document management
+// ---------------------------------------------------------------------------
+
+export interface TaxDocumentRow {
+  id: string;
+  contributorId: string;
+  documentType: string;
+  storageKey: string;
+  uploadedAt: Date;
+  status: string;
+}
+
+const taxDocColumns = {
+  id: contributorTaxDocument.id,
+  contributorId: contributorTaxDocument.contributorId,
+  documentType: contributorTaxDocument.documentType,
+  storageKey: contributorTaxDocument.storageKey,
+  uploadedAt: contributorTaxDocument.uploadedAt,
+  status: contributorTaxDocument.status,
+};
+
+export interface UploadTaxDocumentInput {
+  contributorId: string;
+  documentType: TaxDocumentType;
+  storageKey: string;
+}
+
+/**
+ * Create a tax document record (status = pending_review).
+ */
+export async function createTaxDocument(
+  db: PostgresJsDatabase,
+  input: UploadTaxDocumentInput,
+): Promise<TaxDocumentRow> {
+  const [row] = await db
+    .insert(contributorTaxDocument)
+    .values({
+      contributorId: input.contributorId,
+      documentType: input.documentType,
+      storageKey: input.storageKey,
+      uploadedAt: new Date(),
+      status: "pending_review",
+    })
+    .returning(taxDocColumns);
+
+  return row;
+}
+
+/**
+ * Find a tax document by ID.
+ */
+export async function findTaxDocumentById(
+  db: PostgresJsDatabase,
+  id: string,
+): Promise<TaxDocumentRow | null> {
+  const [row] = await db
+    .select(taxDocColumns)
+    .from(contributorTaxDocument)
+    .where(eq(contributorTaxDocument.id, id));
+  return row ?? null;
+}
+
+/**
+ * List tax documents for a contributor.
+ */
+export async function listTaxDocumentsByContributor(
+  db: PostgresJsDatabase,
+  contributorId: string,
+): Promise<TaxDocumentRow[]> {
+  return db
+    .select(taxDocColumns)
+    .from(contributorTaxDocument)
+    .where(eq(contributorTaxDocument.contributorId, contributorId));
+}
+
+/**
+ * Update the status of a tax document (admin review).
+ */
+export async function updateTaxDocumentStatus(
+  db: PostgresJsDatabase,
+  id: string,
+  status: "approved" | "rejected",
+): Promise<TaxDocumentRow | null> {
+  const [row] = await db
+    .update(contributorTaxDocument)
+    .set({ status })
+    .where(eq(contributorTaxDocument.id, id))
+    .returning(taxDocColumns);
+  return row ?? null;
+}
+
+/**
+ * Check if a contributor has an approved tax document.
+ */
+export async function hasApprovedTaxDocument(
+  db: PostgresJsDatabase,
+  contributorId: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: contributorTaxDocument.id })
+    .from(contributorTaxDocument)
+    .where(
+      and(
+        eq(contributorTaxDocument.contributorId, contributorId),
+        eq(contributorTaxDocument.status, "approved"),
+      ),
+    );
+  return !!row;
+}
+
+// ---------------------------------------------------------------------------
+// Payout management (with tax document guard)
+// ---------------------------------------------------------------------------
+
+export interface PayoutRow {
+  id: string;
+  contributorId: string;
+  amountMinor: number;
+  currency: string;
+  payoutMethod: string;
+  status: string;
+  initiatedAt: Date;
+  completedAt: Date | null;
+}
+
+const payoutColumns = {
+  id: contributorPayout.id,
+  contributorId: contributorPayout.contributorId,
+  amountMinor: contributorPayout.amountMinor,
+  currency: contributorPayout.currency,
+  payoutMethod: contributorPayout.payoutMethod,
+  status: contributorPayout.status,
+  initiatedAt: contributorPayout.initiatedAt,
+  completedAt: contributorPayout.completedAt,
+};
+
+export interface CreatePayoutInput {
+  contributorId: string;
+  amountMinor: number;
+  payoutMethod: string;
+}
+
+/**
+ * Create a payout for a contributor.
+ * Enforces CTR-3: payout blocked until contributor has an approved tax document.
+ */
+export async function createPayout(
+  db: PostgresJsDatabase,
+  input: CreatePayoutInput,
+): Promise<PayoutRow> {
+  const hasTaxDoc = await hasApprovedTaxDocument(db, input.contributorId);
+  if (!hasTaxDoc) {
+    throw Object.assign(new Error("Payout blocked: contributor has no approved tax document"), {
+      code: "ERR_TAX_DOC_REQUIRED",
+    });
+  }
+
+  const [row] = await db
+    .insert(contributorPayout)
+    .values({
+      contributorId: input.contributorId,
+      amountMinor: input.amountMinor,
+      payoutMethod: input.payoutMethod,
+      status: "pending",
+      initiatedAt: new Date(),
+    })
+    .returning(payoutColumns);
+
+  return row;
 }

@@ -1,0 +1,22 @@
+{
+  "task_id": "T070",
+  "status": "complete",
+  "summary": "Implemented milestone tracking (accepted_pr, royalty_activation at 25 units, starter_kit at 50 units) with auto-detection on sales, tax document upload/approval workflow, and payout blocking without approved tax document",
+  "commands_run": [
+    {"command": "pnpm test -- --run", "exit_code": 0},
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/contributor-milestones.integration.test.ts",
+    "specs/admin/claims/completion-T070.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/contributor.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
