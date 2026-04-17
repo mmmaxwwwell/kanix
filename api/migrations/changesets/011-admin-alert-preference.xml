@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="011-admin-alert-preference" author="kanix">
+        <comment>
+            Create admin_alert_preference table for per-admin notification channel config.
+            Each admin can choose to receive alerts via email, push, or both.
+        </comment>
+
+        <createTable tableName="admin_alert_preference">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false" />
+            </column>
+            <column name="admin_user_id" type="uuid">
+                <constraints nullable="false"
+                             foreignKeyName="fk_alert_pref_admin_user"
+                             references="admin_user(id)" />
+            </column>
+            <column name="channel" type="text" defaultValue="both">
+                <constraints nullable="false" />
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false" />
+            </column>
+            <column name="updated_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false" />
+            </column>
+        </createTable>
+
+        <addUniqueConstraint tableName="admin_alert_preference"
+                             columnNames="admin_user_id"
+                             constraintName="uq_alert_pref_admin_user" />
+
+        <rollback>
+            <dropTable tableName="admin_alert_preference" />
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

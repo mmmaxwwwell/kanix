@@ -224,6 +224,16 @@ import {
 } from "./db/queries/customer.js";
 import { getShippingSettings, updateShippingSettings } from "./db/queries/setting.js";
 import type { ShippingSettings } from "./db/queries/setting.js";
+import {
+  getAlertPreference,
+  upsertAlertPreference,
+  getAllAdminAlertTargets,
+} from "./db/queries/alert-preference.js";
+import {
+  createNotificationDispatchService,
+  type NotificationDispatchService,
+} from "./services/notification-dispatch.js";
+import type { AlertChannel } from "./services/notification-dispatch.js";
 import { registerWebSocket, type WsManager } from "./ws/manager.js";
 import { createDomainEventPublisher } from "./ws/events.js";
 import Stripe from "stripe";
@@ -271,6 +281,8 @@ export interface CreateServerOptions {
   adminAlertService?: AdminAlertService;
   /** Override the notification service (useful for testing). */
   notificationService?: NotificationService;
+  /** Override the notification dispatch service (useful for testing). */
+  notificationDispatch?: NotificationDispatchService;
   /** Override the storage adapter (useful for testing). */
   storageAdapter?: StorageAdapter;
 }
@@ -284,6 +296,7 @@ export interface ServerInstance {
   shippingAdapter: ShippingAdapter;
   paymentAdapter: PaymentAdapter;
   notificationService: NotificationService;
+  notificationDispatch: NotificationDispatchService;
   storageAdapter: StorageAdapter;
   wsManager?: WsManager;
   domainEvents: import("./ws/events.js").DomainEventPublisher;
@@ -3467,6 +3480,22 @@ export async function createServer(options: CreateServerOptions): Promise<Server
               available: result.balance.available,
               safetyStock: result.balance.safetyStock,
               locationId: body.location_id,
+            });
+
+            // Dispatch notification to admins based on alert preferences
+            const targets = await getAllAdminAlertTargets(database.db);
+            notificationDispatch.dispatchAlert(targets, {
+              subject: `Low stock alert: ${body.variant_id}`,
+              body: `Variant ${body.variant_id} has ${result.balance.available} units available (safety stock: ${result.balance.safetyStock})`,
+              templateId: "low_stock_alert",
+              entity: "inventory",
+              entityId: body.variant_id,
+              eventType: "inventory.low_stock",
+              data: {
+                available: result.balance.available,
+                safetyStock: result.balance.safetyStock,
+                locationId: body.location_id,
+              },
             });
           }
 
@@ -6723,6 +6752,47 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         return updated;
       },
     );
+
+    // -----------------------------------------------------------------------
+    // Admin alert preference routes [T075]
+    // -----------------------------------------------------------------------
+
+    // GET /api/admin/settings/alerts — get current admin's alert preference
+    app.get(
+      "/api/admin/settings/alerts",
+      {
+        preHandler: [verifySession, requireAdmin],
+      },
+      async (request) => {
+        const adminUserId = request.adminContext?.adminUserId ?? "";
+        const pref = await getAlertPreference(db, adminUserId);
+        return { channel: pref?.channel ?? "both" };
+      },
+    );
+
+    // PUT /api/admin/settings/alerts — update current admin's alert preference
+    app.put(
+      "/api/admin/settings/alerts",
+      {
+        preHandler: [verifySession, requireAdmin],
+        schema: {
+          body: {
+            type: "object",
+            required: ["channel"],
+            properties: {
+              channel: { type: "string", enum: ["email", "push", "both"] },
+            },
+            additionalProperties: false,
+          },
+        },
+      },
+      async (request) => {
+        const adminUserId = request.adminContext?.adminUserId ?? "";
+        const { channel } = request.body as { channel: AlertChannel };
+        const pref = await upsertAlertPreference(db, adminUserId, channel);
+        return { channel: pref.channel };
+      },
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -6736,6 +6806,10 @@ export async function createServer(options: CreateServerOptions): Promise<Server
 
   // Domain event publisher — routes reference this via closure; it's set before server.listen()
   const domainEvents = createDomainEventPublisher(wsManager);
+
+  // Notification dispatch service — dispatches alerts via email/push/in-app adapters
+  const notificationDispatch =
+    options.notificationDispatch ?? createNotificationDispatchService({ wsManager });
 
   // -------------------------------------------------------------------------
   // Shutdown manager
@@ -6807,6 +6881,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     shippingAdapter,
     paymentAdapter,
     notificationService,
+    notificationDispatch,
     storageAdapter,
     wsManager,
     domainEvents,

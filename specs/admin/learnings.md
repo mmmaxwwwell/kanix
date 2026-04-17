@@ -58,3 +58,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `wsManager` and `domainEvents` are declared after route definitions in `createServer()` but captured by route closures — JavaScript closures reference bindings not values, so the variables are available when handlers execute (after server.listen())
 - Customer event routing requires publishing to both `entity:entityId` (for admin wildcard) and `customer:customerId` (for customer channel) — the `DomainEventPublisher` wraps this dual-publish pattern
 - For ticket events, `findTicketById` is called after the mutation to get the `customerId` for customer routing — this is an extra DB query but tickets already have the customerId FK on the support_ticket table
+
+## T075 — Implement notification service + email stub
+- The `admin_setting` table's generic key-value pattern could store per-admin prefs, but a dedicated `admin_alert_preference` table with FK to `admin_user` + unique constraint is cleaner for per-admin config with a known schema
+- `NotificationDispatchService` is created after `wsManager` (which requires async `registerWebSocket`) since the in-app adapter depends on it — same closure pattern as `domainEvents`
+- `getAllAdminAlertTargets` uses LEFT JOIN from `admin_user` to `admin_alert_preference` so admins without a preference row default to `"both"` — no seeding needed for existing admins

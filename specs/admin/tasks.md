@@ -322,7 +322,7 @@
 - [x] T074 Implement pub/sub for domain events [FR-081, FR-082]
   Done when: domain events (order.placed, payment.succeeded, shipment.delivered, ticket.updated, inventory.low_stock, dispute.opened) publish to WebSocket subscribers; admin gets all events; customer gets events for their orders/tickets; integration test: admin connected → create order → admin receives order.placed event within 2 seconds
 
-- [ ] T075 Implement notification service + email stub [FR-084, FR-085, FR-086, FR-087]
+- [x] T075 Implement notification service + email stub [FR-084, FR-085, FR-086, FR-087]
   Done when: notification service dispatches via adapters: email (stubbed — logs to file), push (stubbed), in-app (via WebSocket); email adapter interface: `send(to, subject, body, templateId)`; stub writes to `logs/emails.jsonl`; admin alert preferences: per-admin config for push/email/both; integration test: trigger low-stock alert → admin with email preference → email logged to file; admin with push preference → WebSocket message received
 
 ---

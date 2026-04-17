@@ -1,0 +1,24 @@
+{
+  "task_id": "T075",
+  "status": "complete",
+  "summary": "Implemented notification dispatch service with email stub (logs to emails.jsonl), push stub, and in-app (WebSocket) adapters; added admin_alert_preference table for per-admin push/email/both config; wired low-stock alerts to dispatch via admin preferences; added GET/PUT /api/admin/settings/alerts routes; wrote integration tests",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/migrations/changesets/011-admin-alert-preference.xml",
+    "api/src/db/schema/alert-preference.ts",
+    "api/src/db/queries/alert-preference.ts",
+    "api/src/services/notification-dispatch.ts",
+    "api/src/notification-dispatch.integration.test.ts"
+  ],
+  "files_modified": [
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
