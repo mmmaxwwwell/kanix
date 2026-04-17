@@ -101,6 +101,7 @@ import {
   createLowStockAlertService,
   type LowStockAlertService,
 } from "./services/low-stock-alert.js";
+import { createAdminAlertService, type AdminAlertService } from "./services/admin-alert.js";
 import { createTaxAdapter, type TaxAdapter } from "./services/tax-adapter.js";
 import { createShippingAdapter, type ShippingAdapter } from "./services/shipping-adapter.js";
 import { sql } from "drizzle-orm";
@@ -170,12 +171,15 @@ export interface CreateServerOptions {
   shippingAdapter?: ShippingAdapter;
   /** Override the payment adapter (useful for testing). */
   paymentAdapter?: PaymentAdapter;
+  /** Override the admin alert service (useful for testing). */
+  adminAlertService?: AdminAlertService;
 }
 
 export interface ServerInstance {
   app: FastifyInstance;
   shutdownManager: ShutdownManager;
   lowStockAlertService: LowStockAlertService;
+  adminAlertService: AdminAlertService;
   taxAdapter: TaxAdapter;
   shippingAdapter: ShippingAdapter;
   paymentAdapter: PaymentAdapter;
@@ -209,6 +213,7 @@ const APP_VERSION = "0.1.0";
 export async function createServer(options: CreateServerOptions): Promise<ServerInstance> {
   const { config, processRef = process, database, githubUserFetcher } = options;
   const lowStockAlertService = options.lowStockAlertService ?? createLowStockAlertService();
+  const adminAlertService = options.adminAlertService ?? createAdminAlertService();
   const taxAdapter =
     options.taxAdapter ??
     createTaxAdapter({
@@ -3412,7 +3417,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             payloadJson: event.data.object,
           });
 
-          await handlePaymentSucceeded(db, paymentRecord, chargeId ?? undefined);
+          await handlePaymentSucceeded(db, paymentRecord, chargeId ?? undefined, adminAlertService);
         } else if (eventType === "payment_intent.payment_failed") {
           const pi = event.data.object as Stripe.PaymentIntent;
           const paymentRecord = await findPaymentByIntentId(db, pi.id);
@@ -3583,6 +3588,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     app,
     shutdownManager,
     lowStockAlertService,
+    adminAlertService,
     taxAdapter,
     shippingAdapter,
     paymentAdapter,

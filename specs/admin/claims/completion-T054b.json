@@ -1,0 +1,22 @@
+{
+  "task_id": "T054b",
+  "status": "complete",
+  "summary": "Implemented reservation expiry / payment race handler: when payment_intent.succeeded fires and reservations are expired, the system re-reserves if stock available or flags order for manual review with admin alert",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/services/admin-alert.ts",
+    "api/src/reservation-expiry-race.integration.test.ts"
+  ],
+  "files_modified": [
+    "api/src/db/queries/webhook.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

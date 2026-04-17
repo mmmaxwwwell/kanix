@@ -97,3 +97,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Use dynamic `await import("./kit.js")` in `cart.ts`'s `getCartWithItems` to avoid circular dependency — cart.ts imports kit schema types but kit.ts imports cart schema, so runtime dynamic import breaks the cycle
 - `getCurrentKitPriceForCartLine` queries `cart_kit_selection` to detect if a line is a kit — this is cheaper than adding a column and avoids schema migration
 - Checkout must check `kitWarnings` separately from `staleItems` — a kit can have requirement changes without individual variant price/stock issues, so the `ERR_KIT_VALIDATION_FAILED` error is distinct from `ERR_CART_STALE`
+
+## T054b — Implement reservation expiry / payment race handler
+- Move order status confirmation (`pending_payment → confirmed`) AFTER reservation consumption — this allows skipping confirmation when expired reservations can't be re-reserved, keeping the order in `pending_payment` for manual review
+- When re-reserving expired inventory, use `reservationReason: "payment_race_recovery"` so the audit trail distinguishes recovery reservations from checkout ones
+- The `AdminAlertService` follows the same DI pattern as `LowStockAlertService` — in-memory queue exposed via `ServerInstance`, injectable via `CreateServerOptions` for test access

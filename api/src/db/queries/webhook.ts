@@ -3,7 +3,8 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { payment, paymentEvent, dispute } from "../schema/payment.js";
 import { inventoryReservation } from "../schema/inventory.js";
 import { transitionOrderStatus } from "./order-state-machine.js";
-import { consumeReservation, releaseReservation } from "./reservation.js";
+import { consumeReservation, releaseReservation, reserveInventory } from "./reservation.js";
+import type { AdminAlertService } from "../../services/admin-alert.js";
 
 // ---------------------------------------------------------------------------
 // Idempotency check
@@ -107,6 +108,7 @@ export async function handlePaymentSucceeded(
   db: PostgresJsDatabase,
   paymentRecord: { id: string; orderId: string },
   chargeId?: string,
+  adminAlertService?: AdminAlertService,
 ): Promise<void> {
   // Update payment status and charge ID
   const updateSet: Record<string, unknown> = {
@@ -119,7 +121,6 @@ export async function handlePaymentSucceeded(
   await db.update(payment).set(updateSet).where(eq(payment.id, paymentRecord.id));
 
   // Transition order payment_status: unpaid → processing → paid
-  // First try unpaid → processing (may already be there)
   try {
     await transitionOrderStatus(db, {
       orderId: paymentRecord.orderId,
@@ -131,7 +132,6 @@ export async function handlePaymentSucceeded(
     // Already in processing or paid — continue
   }
 
-  // Then processing → paid
   try {
     await transitionOrderStatus(db, {
       orderId: paymentRecord.orderId,
@@ -143,7 +143,95 @@ export async function handlePaymentSucceeded(
     // Already paid — idempotent
   }
 
-  // Transition order status: pending_payment → confirmed
+  // Fetch ALL reservations for this order (active + expired)
+  const allReservations = await db
+    .select({
+      id: inventoryReservation.id,
+      status: inventoryReservation.status,
+      variantId: inventoryReservation.variantId,
+      locationId: inventoryReservation.locationId,
+      quantity: inventoryReservation.quantity,
+    })
+    .from(inventoryReservation)
+    .where(eq(inventoryReservation.orderId, paymentRecord.orderId));
+
+  const activeReservations = allReservations.filter((r) => r.status === "active");
+  const expiredReservations = allReservations.filter((r) => r.status === "expired");
+
+  // Consume active reservations
+  for (const res of activeReservations) {
+    try {
+      await consumeReservation(db, res.id);
+    } catch {
+      // Already consumed — idempotent
+    }
+  }
+
+  // Handle expired reservations (payment race condition — FR-E008)
+  if (expiredReservations.length > 0) {
+    // Try to re-reserve inventory for expired reservations
+    const newReservationIds: string[] = [];
+    let reReserveFailed = false;
+
+    for (const expired of expiredReservations) {
+      try {
+        const result = await reserveInventory(db, {
+          variantId: expired.variantId,
+          locationId: expired.locationId,
+          quantity: expired.quantity,
+          ttlMs: 15 * 60 * 1000, // 15 min TTL
+          reservationReason: "payment_race_recovery",
+          orderId: paymentRecord.orderId,
+        });
+        newReservationIds.push(result.reservation.id);
+      } catch {
+        // Inventory insufficient — cannot re-reserve
+        reReserveFailed = true;
+        break;
+      }
+    }
+
+    if (reReserveFailed) {
+      // Release any partial re-reservations we managed to create
+      for (const rid of newReservationIds) {
+        try {
+          await releaseReservation(db, rid);
+        } catch {
+          // Best-effort cleanup
+        }
+      }
+
+      // Flag order for manual review — keep status as pending_payment
+      if (adminAlertService) {
+        adminAlertService.queue({
+          type: "reservation_expired_payment_received",
+          orderId: paymentRecord.orderId,
+          message:
+            "Payment received but inventory reservations expired and stock is no longer available. Order requires manual review.",
+          details: {
+            expiredReservations: expiredReservations.map((r) => ({
+              variantId: r.variantId,
+              locationId: r.locationId,
+              quantity: r.quantity,
+            })),
+          },
+        });
+      }
+      // Do NOT transition order status to confirmed — stays pending_payment
+      return;
+    }
+
+    // All re-reservations succeeded — consume them
+    for (const rid of newReservationIds) {
+      try {
+        await consumeReservation(db, rid);
+      } catch {
+        // Already consumed — idempotent
+      }
+    }
+  }
+
+  // All reservations consumed (or re-reserved and consumed) — confirm order
   try {
     await transitionOrderStatus(db, {
       orderId: paymentRecord.orderId,
@@ -153,25 +241,6 @@ export async function handlePaymentSucceeded(
     });
   } catch {
     // Already confirmed — idempotent
-  }
-
-  // Consume inventory reservations for this order
-  const reservations = await db
-    .select({ id: inventoryReservation.id, status: inventoryReservation.status })
-    .from(inventoryReservation)
-    .where(
-      and(
-        eq(inventoryReservation.orderId, paymentRecord.orderId),
-        eq(inventoryReservation.status, "active"),
-      ),
-    );
-
-  for (const res of reservations) {
-    try {
-      await consumeReservation(db, res.id);
-    } catch {
-      // Already consumed or expired — idempotent
-    }
   }
 }
 

@@ -196,7 +196,7 @@
 - [x] T054a Implement kit cart re-validation on definition change [FR-E005, FR-E006]
   Done when: when admin updates a kit_definition (class requirements or price), any active carts containing that kit are flagged; on next cart read, kit selections are re-validated against new definition; invalid selections show warning to customer; kit price recalculated at checkout from current kit_definition.price_minor (not cached); integration tests: add kit to cart → admin changes class requirement → cart read shows validation warning; price change reflected at checkout
 
-- [ ] T054b Implement reservation expiry / payment race handler [FR-E008]
+- [x] T054b Implement reservation expiry / payment race handler [FR-E008]
   Done when: when payment_intent.succeeded webhook fires and the order's reservations have been expired by the cleanup cron, the system either (a) re-reserves if stock is still available and confirms the order, or (b) flags the order for manual review with status=`pending_payment` and an admin alert; integration test: create reservation → force-expire it → fire payment success webhook → verify order flagged for review OR re-reserved
 
 - [ ] T054c Implement idempotent inventory adjustments [FR-E009]
