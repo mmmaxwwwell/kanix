@@ -1,0 +1,22 @@
+{
+  "task_id": "T074",
+  "status": "complete",
+  "summary": "Implemented domain event pub/sub: created DomainEventPublisher with typed events (order.placed, payment.succeeded, shipment.delivered, ticket.updated, inventory.low_stock, dispute.opened) that publish to entity channels for admins and customer channels for customers; hooked into 6 route handlers in server.ts; integration tests verify admin receives order.placed on checkout and all 6 event types route correctly",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/ws/events.ts",
+    "api/src/domain-events.integration.test.ts"
+  ],
+  "files_modified": [
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

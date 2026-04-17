@@ -53,3 +53,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - A global buffer (array of all published messages with timestamps) is simpler and more correct than per-subject buffers — on replay, filter by the reconnecting client's channels and `sequenceId > lastSequenceId`
 - The `lastSequenceId` query parameter on the `/ws` endpoint enables reconnect replay — parsed after auth/welcome so the welcome message always arrives first, then replayed messages follow
 - `setInterval(...).unref()` prevents the cleanup timer from keeping the Node process alive during tests or graceful shutdown
+
+## T074 — Implement pub/sub for domain events
+- `wsManager` and `domainEvents` are declared after route definitions in `createServer()` but captured by route closures — JavaScript closures reference bindings not values, so the variables are available when handlers execute (after server.listen())
+- Customer event routing requires publishing to both `entity:entityId` (for admin wildcard) and `customer:customerId` (for customer channel) — the `DomainEventPublisher` wraps this dual-publish pattern
+- For ticket events, `findTicketById` is called after the mutation to get the `customerId` for customer routing — this is an extra DB query but tickets already have the customerId FK on the support_ticket table

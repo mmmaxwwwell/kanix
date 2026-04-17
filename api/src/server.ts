@@ -225,6 +225,7 @@ import {
 import { getShippingSettings, updateShippingSettings } from "./db/queries/setting.js";
 import type { ShippingSettings } from "./db/queries/setting.js";
 import { registerWebSocket, type WsManager } from "./ws/manager.js";
+import { createDomainEventPublisher } from "./ws/events.js";
 import Stripe from "stripe";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { randomUUID } from "node:crypto";
@@ -285,6 +286,7 @@ export interface ServerInstance {
   notificationService: NotificationService;
   storageAdapter: StorageAdapter;
   wsManager?: WsManager;
+  domainEvents: import("./ws/events.js").DomainEventPublisher;
   start(): Promise<string>;
 }
 
@@ -1944,6 +1946,14 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         try {
           const result = await transitionShipmentStatus(database.db, id, body.new_status);
 
+          // Publish shipment.delivered domain event when status transitions to delivered
+          if (result.newStatus === "delivered") {
+            domainEvents.publish("shipment.delivered", "shipment", id, {
+              oldStatus: result.oldStatus,
+              newStatus: result.newStatus,
+            });
+          }
+
           request.auditContext = {
             action: "shipment.transition",
             entityType: "shipment",
@@ -2204,6 +2214,16 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             actorAdminUserId,
           });
 
+          // Publish ticket.updated domain event
+          const ticketForEvent = await findTicketById(database.db, id);
+          domainEvents.publish(
+            "ticket.updated",
+            "ticket",
+            id,
+            { oldStatus: result.oldStatus, newStatus: result.newStatus },
+            ticketForEvent?.customerId ?? undefined,
+          );
+
           request.auditContext = {
             action: "support_ticket.transition",
             entityType: "support_ticket",
@@ -2283,6 +2303,16 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             body: body.body,
             isInternalNote: false,
           });
+
+          // Publish ticket.updated domain event for new message
+          const ticketForMsg = await findTicketById(database.db, id);
+          domainEvents.publish(
+            "ticket.updated",
+            "ticket",
+            id,
+            { reason: "message_added", messageId: message.id },
+            ticketForMsg?.customerId ?? undefined,
+          );
 
           request.auditContext = {
             action: "support_ticket_message.create",
@@ -3431,6 +3461,13 @@ export async function createServer(options: CreateServerOptions): Promise<Server
               result.balance.available,
               result.balance.safetyStock,
             );
+
+            // Publish inventory.low_stock domain event
+            domainEvents.publish("inventory.low_stock", "inventory", body.variant_id, {
+              available: result.balance.available,
+              safetyStock: result.balance.safetyStock,
+              locationId: body.location_id,
+            });
           }
 
           // Set audit context for the audit log middleware
@@ -5529,6 +5566,19 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         stripePaymentIntentId: paymentIntentId,
       });
 
+      // Publish order.placed domain event
+      domainEvents.publish(
+        "order.placed",
+        "order",
+        newOrder.id,
+        {
+          orderNumber: newOrder.orderNumber,
+          email: newOrder.email,
+          totalMinor: newOrder.totalMinor,
+        },
+        customerId,
+      );
+
       // 7. Create policy acknowledgments for current effective policies
       try {
         await createCheckoutAcknowledgments(db, newOrder.id);
@@ -5641,6 +5691,12 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           });
 
           await handlePaymentSucceeded(db, paymentRecord, chargeId ?? undefined, adminAlertService);
+
+          // Publish payment.succeeded domain event
+          domainEvents.publish("payment.succeeded", "payment", paymentRecord.id, {
+            orderId: paymentRecord.orderId,
+            amountMinor: paymentRecord.amountMinor,
+          });
         } else if (eventType === "payment_intent.payment_failed") {
           const pi = event.data.object as Stripe.PaymentIntent;
           const paymentRecord = await findPaymentByIntentId(db, pi.id);
@@ -5735,6 +5791,13 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             dueBy: disputeObj.evidence_details?.due_by
               ? new Date(disputeObj.evidence_details.due_by * 1000)
               : undefined,
+          });
+
+          // Publish dispute.opened domain event
+          domainEvents.publish("dispute.opened", "dispute", disputeObj.id, {
+            reason: disputeObj.reason ?? null,
+            amountMinor: disputeObj.amount,
+            orderId: paymentRecord.orderId,
           });
         } else if (eventType === "charge.dispute.closed") {
           const disputeObj = event.data.object as Stripe.Dispute;
@@ -6671,6 +6734,9 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     wsManager = await registerWebSocket({ app, db: database.db });
   }
 
+  // Domain event publisher — routes reference this via closure; it's set before server.listen()
+  const domainEvents = createDomainEventPublisher(wsManager);
+
   // -------------------------------------------------------------------------
   // Shutdown manager
   // -------------------------------------------------------------------------
@@ -6743,6 +6809,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     notificationService,
     storageAdapter,
     wsManager,
+    domainEvents,
     start,
   };
 }

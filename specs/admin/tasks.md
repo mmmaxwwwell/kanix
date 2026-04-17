@@ -319,7 +319,7 @@
 - [x] T073 Implement server-side message buffering [FR-083]
   Done when: server buffers messages per connection for up to 5 minutes on disconnect; on reconnect, client sends lastSequenceId; server replays missed messages; integration test: connect → receive message (seq 1) → disconnect → new message sent (seq 2) → reconnect with lastSequenceId=1 → receive seq 2
 
-- [ ] T074 Implement pub/sub for domain events [FR-081, FR-082]
+- [x] T074 Implement pub/sub for domain events [FR-081, FR-082]
   Done when: domain events (order.placed, payment.succeeded, shipment.delivered, ticket.updated, inventory.low_stock, dispute.opened) publish to WebSocket subscribers; admin gets all events; customer gets events for their orders/tickets; integration test: admin connected → create order → admin receives order.placed event within 2 seconds
 
 - [ ] T075 Implement notification service + email stub [FR-084, FR-085, FR-086, FR-087]
