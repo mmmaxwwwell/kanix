@@ -344,7 +344,7 @@
 - [x] T080 Implement admin inventory + product screens
   Done when: inventory overview with low-stock highlighting; variant balance detail; adjustment creation; product CRUD with variant/media/classification management; widget tests
 
-- [ ] T081 Implement admin support + dispute screens
+- [x] T081 Implement admin support + dispute screens
   Done when: ticket queue with filters; ticket detail with message thread + internal notes; dispute detail with evidence readiness, bundle generation; widget tests
 
 - [ ] T082 Implement admin settings + contributor management screens

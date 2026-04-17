@@ -1,0 +1,27 @@
+{
+  "task_id": "T081",
+  "status": "complete",
+  "summary": "Implemented admin support ticket queue with filters, ticket detail with message thread and internal notes, dispute list with evidence readiness indicators, and dispute detail with evidence table and bundle generation",
+  "commands_run": [
+    {"command": "flutter pub get", "exit_code": 0},
+    {"command": "flutter analyze", "exit_code": 0},
+    {"command": "FLUTTER_ROOT=.flutter-patched flutter test", "exit_code": 0}
+  ],
+  "files_created": [
+    "admin/lib/models/support.dart",
+    "admin/lib/models/dispute.dart",
+    "admin/lib/providers/support_provider.dart",
+    "admin/lib/providers/dispute_provider.dart",
+    "admin/test/support_screen_test.dart",
+    "admin/test/disputes_screen_test.dart"
+  ],
+  "files_modified": [
+    "admin/lib/config/router.dart",
+    "admin/lib/screens/support_screen.dart",
+    "admin/lib/screens/disputes_screen.dart",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

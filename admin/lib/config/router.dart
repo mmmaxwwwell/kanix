@@ -15,8 +15,10 @@ import '../screens/inventory_screen.dart'
     show InventoryScreen, InventoryDetailScreen;
 import '../screens/products_screen.dart'
     show ProductsScreen, ProductDetailScreen;
-import '../screens/support_screen.dart';
-import '../screens/disputes_screen.dart';
+import '../screens/support_screen.dart'
+    show SupportScreen, SupportDetailScreen;
+import '../screens/disputes_screen.dart'
+    show DisputesScreen, DisputeDetailScreen;
 import '../screens/customers_screen.dart';
 import '../screens/settings_screen.dart';
 import '../widgets/app_shell.dart';
@@ -118,10 +120,26 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/support',
             builder: (context, state) => const SupportScreen(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (context, state) => SupportDetailScreen(
+                  ticketId: state.pathParameters['id']!,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: '/disputes',
             builder: (context, state) => const DisputesScreen(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (context, state) => DisputeDetailScreen(
+                  disputeId: state.pathParameters['id']!,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: '/customers',

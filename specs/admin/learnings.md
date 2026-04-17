@@ -47,3 +47,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `DropdownButtonFormField` `value` parameter is deprecated since Flutter 3.33; use `initialValue` instead to set the initial form field value
 - Private widgets like `_ProductStatusChip` should not declare `super.key` — private classes cannot be subclassed externally, so the `key` parameter triggers `unused_element_parameter` warning
 - `FutureProvider.autoDispose.family` can be chained for detail+adjustments on the same screen — watch both providers and invalidate both on WebSocket updates for consistent state
+
+## T081 — Implement admin support + dispute screens
+- DataTable with 7+ columns overflows on 800x600 test surface — set `tester.view.physicalSize = Size(1920, 1080)` for all tests that render data rows (not just detail screens)
+- Dart 3.x `unnecessary_underscores` lint: use `(_, _)` not `(_, __)` for unused parameters — double underscore is no longer needed for disambiguation
+- `ListView.separated` in a message thread needs an `Expanded` parent to get unbounded height constraints — without it, the ListView will throw "Vertical viewport was given unbounded height"
