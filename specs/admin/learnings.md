@@ -112,3 +112,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The checkout route already had partial Stripe error handling (`StripeConnectionError`, `StripeAPIError`) — expanding it to also catch `StripeTimeoutError` and generic network errors (`ECONNREFUSED`, `ETIMEDOUT`) makes the 502 response more robust
 - The reservation release + no-order-created guarantee is inherent in the existing flow — reservations are created first, PaymentIntent is created before `createCheckoutOrder`, so a Stripe failure naturally prevents order creation
 - For integration tests, simulating Stripe failure only requires a `PaymentAdapter` stub that throws with `type: "StripeConnectionError"` — duck typing on the error's `type` property means no need to import actual Stripe error classes
+
+## T054e — Implement duplicate email verification conflict detection
+- SuperTokens' `verifyEmailPOST` override runs after the email is verified, so duplicate detection must call `EmailVerification.unverifyEmail()` to roll back if a conflict is found — the check-then-reject pattern requires a compensating action
+- The `AdminAlertService` must be passed through `SuperTokensConfig` since `initSuperTokens` is a singleton — it captures `config` in the closure, so the service from the first `createServer` call is the one used for all verification attempts
+- For integration tests, seeding a customer record directly in the DB (with a fake `authSubject`) simulates an existing account owning the email — SuperTokens prevents duplicate email signups, so you can't create two real accounts with the same email via email/password

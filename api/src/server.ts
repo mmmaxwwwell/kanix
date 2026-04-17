@@ -253,6 +253,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     apiDomain: `http://localhost:${config.PORT}`,
     websiteDomain: config.CORS_ALLOWED_ORIGINS[0] ?? "http://localhost:3000",
     db: database?.db,
+    adminAlertService,
     githubOAuth:
       config.GITHUB_OAUTH_CLIENT_ID && config.GITHUB_OAUTH_CLIENT_SECRET
         ? {

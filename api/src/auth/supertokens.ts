@@ -5,9 +5,10 @@ import EmailVerification from "supertokens-node/recipe/emailverification/index.j
 import ThirdParty from "supertokens-node/recipe/thirdparty/index.js";
 import type { TypeInput } from "supertokens-node/types";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { eq } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import { customer } from "../db/schema/customer.js";
 import { linkGuestOrdersByEmail } from "../db/queries/order.js";
+import type { AdminAlertService } from "../services/admin-alert.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,6 +21,7 @@ export interface SuperTokensConfig {
   apiDomain: string;
   websiteDomain: string;
   db?: PostgresJsDatabase;
+  adminAlertService?: AdminAlertService;
   githubOAuth?: {
     clientId: string;
     clientSecret: string;
@@ -89,8 +91,41 @@ export function initSuperTokens(config: SuperTokensConfig): void {
 
             if (response.status === "OK" && config.db) {
               const email = response.user.email;
-              // Look up the customer by auth_subject to get their ID
               const userId = response.user.recipeUserId.getAsString();
+
+              // Check if another customer already has this email verified
+              const existingCustomers = await config.db
+                .select({ id: customer.id, authSubject: customer.authSubject })
+                .from(customer)
+                .where(and(eq(customer.email, email), ne(customer.authSubject, userId)))
+                .limit(1);
+
+              if (existingCustomers.length > 0) {
+                // Another account already owns this email — unverify and reject
+                await EmailVerification.unverifyEmail(supertokens.convertToRecipeUserId(userId));
+
+                // Queue admin alert
+                if (config.adminAlertService) {
+                  config.adminAlertService.queue({
+                    type: "email_conflict",
+                    orderId: "",
+                    message: `Duplicate email verification attempt: ${email} is already claimed by customer ${existingCustomers[0].id}`,
+                    details: {
+                      email,
+                      claimingAuthSubject: userId,
+                      existingCustomerId: existingCustomers[0].id,
+                      existingAuthSubject: existingCustomers[0].authSubject,
+                    },
+                  });
+                }
+
+                return {
+                  status: "GENERAL_ERROR" as const,
+                  message: "ERR_EMAIL_ALREADY_CLAIMED",
+                };
+              }
+
+              // No conflict — link guest orders
               const cust = await getCustomerByAuthSubject(config.db, userId);
               if (cust) {
                 await linkGuestOrdersByEmail(config.db, email, cust.id);

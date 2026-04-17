@@ -205,7 +205,7 @@
 - [x] T054d Implement Stripe unreachable checkout error [FR-E012]
   Done when: when Stripe API is unreachable during PaymentIntent creation, checkout returns 502 with ERR_EXTERNAL_SERVICE_UNAVAILABLE and does NOT create an order; inventory reservations are released; integration test: mock Stripe timeout → verify 502 response + no order + reservations released
 
-- [ ] T054e Implement duplicate email verification conflict detection [FR-E017]
+- [x] T054e Implement duplicate email verification conflict detection [FR-E017]
   Done when: if a second account attempts to verify an email that is already verified by another account, verification is rejected with ERR_EMAIL_ALREADY_CLAIMED; admin alert created; integration test: account A verifies email → account B attempts to verify same email → rejected
 
 - [ ] T055 Critical path checkpoint (Phase 6) [Critical Path]
