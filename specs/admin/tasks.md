@@ -11,7 +11,7 @@
 - [x] T001 Create root flake.nix composing all sub-flakes [FR-098]
   Done when: `nix flake check` passes; `nix develop` enters shell with nodejs_22, pnpm, flutter, opentofu, liquibase, postgresql, process-compose, openscad, trivy, semgrep, gitleaks; `.envrc` auto-activates via direnv
 
-- [ ] T002 Reorganize scad/ with its own flake.nix [FR-098]
+- [x] T002 Reorganize scad/ with its own flake.nix [FR-098]
   Done when: `scad/flake.nix` provides openscad-unstable + BOSL2; existing SCAD files compile; root flake includes scad as input; `scripts/test-scad.sh` still passes
 
 - [ ] T003 Update site/ with its own flake.nix [FR-098]
