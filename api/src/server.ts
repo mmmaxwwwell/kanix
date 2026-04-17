@@ -66,6 +66,7 @@ import {
   releaseReservation,
   findReservationById,
 } from "./db/queries/reservation.js";
+import { startReservationCleanup } from "./cron/reservation-cleanup.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,6 +95,8 @@ export interface CreateServerOptions {
   processRef?: NodeJS.Process;
   database?: DatabaseConnection;
   githubUserFetcher?: GitHubUserFetcher;
+  /** Override the reservation cleanup interval in ms (default 60 000). Set to 0 to disable. */
+  reservationCleanupIntervalMs?: number;
 }
 
 export interface ServerInstance {
@@ -1737,6 +1740,25 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       clearRateLimiterState(rateLimiter);
     },
   });
+
+  // -------------------------------------------------------------------------
+  // Reservation cleanup cron
+  // -------------------------------------------------------------------------
+
+  const cleanupIntervalMs = options.reservationCleanupIntervalMs ?? undefined;
+  if (database && cleanupIntervalMs !== 0) {
+    const cleanup = startReservationCleanup({
+      db: database.db,
+      logger: createLogger({ level: config.LOG_LEVEL, module: "reservation-cleanup" }),
+      intervalMs: cleanupIntervalMs,
+    });
+    shutdownManager.register({
+      name: "stop reservation cleanup cron",
+      fn: async () => {
+        cleanup.stop();
+      },
+    });
+  }
 
   // -------------------------------------------------------------------------
   // Start

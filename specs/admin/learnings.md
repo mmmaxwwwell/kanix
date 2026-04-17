@@ -56,3 +56,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Use raw `tx.execute(sql\`SELECT ... FOR UPDATE\`)` for row-level locking in Drizzle — the ORM's query builder doesn't support `FOR UPDATE` natively, but raw SQL in a transaction works correctly for pessimistic concurrency control
 - When `consume()` and `release()` read from raw SQL results, column names come back as snake_case (`variant_id`, `location_id`) not camelCase — cast them accordingly when accessing fields from `tx.execute()` results
 - The reservation goes directly to `active` status on creation (skipping `pending`) because the balance lock + available check + balance update all happen atomically in the same transaction — no separate "confirm" step is needed
+
+## T042 — Implement reservation cleanup cron
+- `releaseExpiredReservations()` was already implemented in T041's `reservation.ts` — T042 only needed a `setInterval` wrapper with logging and shutdown registration
+- Use `timer.unref()` on the cleanup interval so Node can exit cleanly even if the timer is still active — otherwise the process hangs during tests and graceful shutdown
+- Pass `reservationCleanupIntervalMs: 0` in `CreateServerOptions` to disable the cron in integration tests that call `releaseExpiredReservations()` directly

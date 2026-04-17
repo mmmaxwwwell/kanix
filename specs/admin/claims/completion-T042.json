@@ -1,0 +1,22 @@
+{
+  "task_id": "T042",
+  "status": "complete",
+  "summary": "Implemented reservation cleanup cron with configurable interval (default 1 min), logging expired reservation releases at INFO level, and integration test with 1s TTL verification",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/cron/reservation-cleanup.ts",
+    "api/src/reservation-cleanup.integration.test.ts",
+    "specs/admin/claims/completion-T042.json"
+  ],
+  "files_modified": [
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

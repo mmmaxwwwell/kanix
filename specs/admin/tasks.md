@@ -147,7 +147,7 @@
 - [x] T041 Implement inventory reservation system [FR-034, FR-035, FR-036]
   Done when: `inventoryService.reserve(variantId, locationId, quantity, ttl)` atomically increments reserved and decrements available using `SELECT ... FOR UPDATE`; `inventoryService.consume(reservationId)` decrements on_hand and reserved; `inventoryService.release(reservationId)` decrements reserved and increments available; reservation status machine: pending→active→consumed/released/expired; inventory_movement created for each operation; integration tests: reserve → consume; reserve → release; reserve → expire (TTL); concurrent reserve for last unit (one succeeds, one fails with ERR_INVENTORY_INSUFFICIENT)
 
-- [ ] T042 Implement reservation cleanup cron [FR-034]
+- [x] T042 Implement reservation cleanup cron [FR-034]
   Done when: cron job (configurable interval, default 1 min) finds reservations with status=active and expires_at < now(); releases each back to available; logs at INFO: "Released N expired reservations"; integration test: create reservation with 1s TTL → wait → verify released
 
 - [ ] T043 Implement low-stock alert [FR-038]
