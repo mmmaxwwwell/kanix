@@ -71,3 +71,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T018 — JSON schema validation plugin
 - Fastify 5 accepts `ajv: { customOptions: { removeAdditional: true } }` in the constructor to strip extra fields — no need for a separate Ajv instance or `setValidatorCompiler`
 - Validation errors on `FastifyError` have a `.validation` array with Ajv error objects; for "required" errors, `instancePath` is the parent and `params.missingProperty` contains the missing field name
+
+## T019 — Global error handler
+- Fastify supports only one `setErrorHandler` — the global error handler must unify validation errors, AppError subclasses, and unknown errors in a single handler. Moved `formatFieldPath` from validation.ts into error-handler.ts.
+- Use `"validation" in error` check to detect Fastify validation errors (they have a `.validation` array), then `instanceof AppError` for typed errors, with unknown errors as the fallback.

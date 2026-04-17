@@ -66,7 +66,7 @@
 - [x] T018 Implement JSON schema validation plugin [FR-107]
   Done when: Fastify JSON schema validation rejects invalid request bodies with 400 status; response includes `{error: "validation_failed", details: [{field, message}]}`; extra fields are stripped; integration test covers: missing required field, wrong type, extra fields
 
-- [ ] T019 Implement global error handler [FR-105]
+- [x] T019 Implement global error handler [FR-105]
   Done when: Fastify error handler catches all errors at boundary; AppError subclasses return correct HTTP status + error code; unknown errors return 500 with generic message (no stack leak); all errors logged with correlationId, errorCode, stack; integration test covers: ValidationError→400, NotFoundError→404, unknown Error→500
 
 - [ ] T020 Set up CI workflow: lint, typecheck, test, security scan [FR-111] [P]

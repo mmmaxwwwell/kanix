@@ -1,0 +1,24 @@
+{
+  "task_id": "T019",
+  "status": "complete",
+  "summary": "Implemented global Fastify error handler that catches AppError subclasses with correct HTTP status/error code, unknown errors with generic 500, and Fastify validation errors with structured 400 responses. All errors logged with correlationId, errorCode, and stack.",
+  "commands_run": [
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm format", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/error-handler.ts",
+    "api/src/error-handler.test.ts",
+    "specs/admin/claims/completion-T019.json"
+  ],
+  "files_modified": [
+    "api/src/server.ts",
+    "api/src/validation.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

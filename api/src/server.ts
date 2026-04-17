@@ -1,9 +1,10 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Config } from "./config.js";
 import { createLogger, generateCorrelationId, withCorrelationId } from "./logger.js";
+import { registerErrorHandler } from "./error-handler.js";
 import { registerSecurityMiddleware, clearRateLimiterState } from "./security.js";
 import { createShutdownManager, isShuttingDown, type ShutdownManager } from "./shutdown.js";
-import { ajvOptions, registerValidation } from "./validation.js";
+import { ajvOptions } from "./validation.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -78,10 +79,10 @@ export function createServer(options: CreateServerOptions): ServerInstance {
   const { rateLimiter } = registerSecurityMiddleware(app, config);
 
   // -------------------------------------------------------------------------
-  // JSON schema validation error handler
+  // Global error handler — validation, AppError, and unknown errors
   // -------------------------------------------------------------------------
 
-  registerValidation(app);
+  registerErrorHandler(app);
 
   // -------------------------------------------------------------------------
   // Correlation ID hook — attach to every request
