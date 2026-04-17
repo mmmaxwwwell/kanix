@@ -1,0 +1,23 @@
+{
+  "task_id": "T061",
+  "status": "complete",
+  "summary": "Implemented support ticket system with state machine, admin/customer routes, message threading with internal notes, and integration tests",
+  "commands_run": [
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "npx vitest run", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/support-ticket.ts",
+    "api/src/support-ticket.integration.test.ts",
+    "specs/admin/claims/completion-T061.json"
+  ],
+  "files_modified": [
+    "api/src/server.ts",
+    "api/src/db/queries/index.ts",
+    "specs/admin/learnings.md",
+    "specs/admin/tasks.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

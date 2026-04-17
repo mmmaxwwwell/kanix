@@ -159,6 +159,16 @@ import {
   handleDisputeCreated,
 } from "./db/queries/webhook.js";
 import { processRefund, findRefundsByOrderId } from "./db/queries/refund.js";
+import {
+  createSupportTicket,
+  findTicketById,
+  listSupportTickets,
+  listTicketsByCustomerId,
+  transitionTicketStatus,
+  createTicketMessage,
+  listTicketMessages,
+  findTicketStatusHistory,
+} from "./db/queries/support-ticket.js";
 import Stripe from "stripe";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
@@ -1794,6 +1804,507 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           }
           throw err;
         }
+      },
+    );
+
+    // -----------------------------------------------------------------------
+    // Support Tickets — Admin
+    // -----------------------------------------------------------------------
+
+    // POST /api/admin/support-tickets — admin creates a ticket
+    app.post(
+      "/api/admin/support-tickets",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SUPPORT_MANAGE)],
+        schema: {
+          body: {
+            type: "object",
+            required: ["subject", "category", "source"],
+            properties: {
+              customer_id: { type: "string" },
+              order_id: { type: "string" },
+              shipment_id: { type: "string" },
+              subject: { type: "string" },
+              category: { type: "string" },
+              priority: { type: "string" },
+              source: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request) => {
+        const body = request.body as {
+          customer_id?: string;
+          order_id?: string;
+          shipment_id?: string;
+          subject: string;
+          category: string;
+          priority?: string;
+          source: string;
+        };
+
+        const ticket = await createSupportTicket(database.db, {
+          customerId: body.customer_id,
+          orderId: body.order_id,
+          shipmentId: body.shipment_id,
+          subject: body.subject,
+          category: body.category,
+          priority: body.priority,
+          source: body.source,
+        });
+
+        request.auditContext = {
+          action: "support_ticket.create",
+          entityType: "support_ticket",
+          entityId: ticket.id,
+          afterJson: { ticketNumber: ticket.ticketNumber, status: ticket.status },
+        };
+
+        return { ticket };
+      },
+    );
+
+    // GET /api/admin/support-tickets — list tickets with optional filters
+    app.get(
+      "/api/admin/support-tickets",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SUPPORT_READ)],
+      },
+      async (request) => {
+        const query = request.query as {
+          status?: string;
+          priority?: string;
+          customer_id?: string;
+          order_id?: string;
+        };
+        const tickets = await listSupportTickets(database.db, {
+          status: query.status,
+          priority: query.priority,
+          customerId: query.customer_id,
+          orderId: query.order_id,
+        });
+        return { tickets };
+      },
+    );
+
+    // GET /api/admin/support-tickets/:id — get single ticket
+    app.get(
+      "/api/admin/support-tickets/:id",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SUPPORT_READ)],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const ticket = await findTicketById(database.db, id);
+        if (!ticket) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_TICKET_NOT_FOUND", message: "Support ticket not found" });
+        }
+        return { ticket };
+      },
+    );
+
+    // POST /api/admin/support-tickets/:id/transition — transition ticket status
+    app.post(
+      "/api/admin/support-tickets/:id/transition",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SUPPORT_MANAGE)],
+        schema: {
+          body: {
+            type: "object",
+            required: ["new_status"],
+            properties: {
+              new_status: { type: "string" },
+              reason: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { new_status: string; reason?: string };
+        const actorAdminUserId = request.adminContext?.adminUserId ?? "";
+
+        try {
+          const result = await transitionTicketStatus(database.db, {
+            ticketId: id,
+            newStatus: body.new_status,
+            reason: body.reason,
+            actorAdminUserId,
+          });
+
+          request.auditContext = {
+            action: "support_ticket.transition",
+            entityType: "support_ticket",
+            entityId: id,
+            afterJson: {
+              oldStatus: result.oldStatus,
+              newStatus: result.newStatus,
+            },
+          };
+
+          return result;
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_TICKET_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_TICKET_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_INVALID_TRANSITION") {
+            return reply.status(400).send({
+              error: "ERR_INVALID_TRANSITION",
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // GET /api/admin/support-tickets/:id/messages — list messages (including internal notes)
+    app.get(
+      "/api/admin/support-tickets/:id/messages",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SUPPORT_READ)],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const ticket = await findTicketById(database.db, id);
+        if (!ticket) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_TICKET_NOT_FOUND", message: "Support ticket not found" });
+        }
+        const messages = await listTicketMessages(database.db, id, {
+          includeInternalNotes: true,
+        });
+        return { messages };
+      },
+    );
+
+    // POST /api/admin/support-tickets/:id/messages — admin reply (customer-visible)
+    app.post(
+      "/api/admin/support-tickets/:id/messages",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SUPPORT_MANAGE)],
+        schema: {
+          body: {
+            type: "object",
+            required: ["body"],
+            properties: {
+              body: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { body: string };
+        const actorAdminUserId = request.adminContext?.adminUserId ?? "";
+
+        try {
+          const message = await createTicketMessage(database.db, {
+            ticketId: id,
+            authorType: "admin",
+            adminUserId: actorAdminUserId,
+            body: body.body,
+            isInternalNote: false,
+          });
+
+          request.auditContext = {
+            action: "support_ticket_message.create",
+            entityType: "support_ticket",
+            entityId: id,
+            afterJson: { messageId: message.id, authorType: "admin" },
+          };
+
+          return { message };
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_TICKET_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_TICKET_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_TICKET_CLOSED") {
+            return reply.status(400).send({
+              error: "ERR_TICKET_CLOSED",
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // POST /api/admin/support-tickets/:id/internal-notes — admin internal note
+    app.post(
+      "/api/admin/support-tickets/:id/internal-notes",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SUPPORT_MANAGE)],
+        schema: {
+          body: {
+            type: "object",
+            required: ["body"],
+            properties: {
+              body: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { body: string };
+        const actorAdminUserId = request.adminContext?.adminUserId ?? "";
+
+        try {
+          const message = await createTicketMessage(database.db, {
+            ticketId: id,
+            authorType: "admin",
+            adminUserId: actorAdminUserId,
+            body: body.body,
+            isInternalNote: true,
+          });
+
+          request.auditContext = {
+            action: "support_ticket_internal_note.create",
+            entityType: "support_ticket",
+            entityId: id,
+            afterJson: { messageId: message.id, isInternalNote: true },
+          };
+
+          return { message };
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_TICKET_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_TICKET_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_TICKET_CLOSED") {
+            return reply.status(400).send({
+              error: "ERR_TICKET_CLOSED",
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // GET /api/admin/support-tickets/:id/history — status transition history
+    app.get(
+      "/api/admin/support-tickets/:id/history",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SUPPORT_READ)],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const ticket = await findTicketById(database.db, id);
+        if (!ticket) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_TICKET_NOT_FOUND", message: "Support ticket not found" });
+        }
+        const history = await findTicketStatusHistory(database.db, id);
+        return { history };
+      },
+    );
+
+    // -----------------------------------------------------------------------
+    // Support Tickets — Customer
+    // -----------------------------------------------------------------------
+
+    // POST /api/support/tickets — customer creates a ticket
+    app.post(
+      "/api/support/tickets",
+      {
+        preHandler: [verifySession, requireVerifiedEmail],
+        schema: {
+          body: {
+            type: "object",
+            required: ["subject", "category"],
+            properties: {
+              order_id: { type: "string" },
+              shipment_id: { type: "string" },
+              subject: { type: "string" },
+              category: { type: "string" },
+              priority: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const session = (request as unknown as { session: { getUserId: () => string } }).session;
+        const authSubject = session.getUserId();
+        const customerRow = await getCustomerByAuthSubject(database.db, authSubject);
+        if (!customerRow) {
+          return reply
+            .status(401)
+            .send({ error: "ERR_NOT_CUSTOMER", message: "Customer not found" });
+        }
+
+        const body = request.body as {
+          order_id?: string;
+          shipment_id?: string;
+          subject: string;
+          category: string;
+          priority?: string;
+        };
+
+        const ticket = await createSupportTicket(database.db, {
+          customerId: customerRow.id,
+          orderId: body.order_id,
+          shipmentId: body.shipment_id,
+          subject: body.subject,
+          category: body.category,
+          priority: body.priority,
+          source: "customer_app",
+        });
+
+        return { ticket };
+      },
+    );
+
+    // GET /api/support/tickets — customer lists their tickets
+    app.get(
+      "/api/support/tickets",
+      {
+        preHandler: [verifySession, requireVerifiedEmail],
+      },
+      async (request, reply) => {
+        const session = (request as unknown as { session: { getUserId: () => string } }).session;
+        const authSubject = session.getUserId();
+        const customerRow = await getCustomerByAuthSubject(database.db, authSubject);
+        if (!customerRow) {
+          return reply
+            .status(401)
+            .send({ error: "ERR_NOT_CUSTOMER", message: "Customer not found" });
+        }
+
+        const tickets = await listTicketsByCustomerId(database.db, customerRow.id);
+        return { tickets };
+      },
+    );
+
+    // GET /api/support/tickets/:id — customer gets a single ticket
+    app.get(
+      "/api/support/tickets/:id",
+      {
+        preHandler: [verifySession, requireVerifiedEmail],
+      },
+      async (request, reply) => {
+        const session = (request as unknown as { session: { getUserId: () => string } }).session;
+        const authSubject = session.getUserId();
+        const customerRow = await getCustomerByAuthSubject(database.db, authSubject);
+        if (!customerRow) {
+          return reply
+            .status(401)
+            .send({ error: "ERR_NOT_CUSTOMER", message: "Customer not found" });
+        }
+
+        const { id } = request.params as { id: string };
+        const ticket = await findTicketById(database.db, id);
+        if (!ticket || ticket.customerId !== customerRow.id) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_TICKET_NOT_FOUND", message: "Support ticket not found" });
+        }
+
+        return { ticket };
+      },
+    );
+
+    // POST /api/support/tickets/:id/messages — customer adds a message
+    app.post(
+      "/api/support/tickets/:id/messages",
+      {
+        preHandler: [verifySession, requireVerifiedEmail],
+        schema: {
+          body: {
+            type: "object",
+            required: ["body"],
+            properties: {
+              body: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const session = (request as unknown as { session: { getUserId: () => string } }).session;
+        const authSubject = session.getUserId();
+        const customerRow = await getCustomerByAuthSubject(database.db, authSubject);
+        if (!customerRow) {
+          return reply
+            .status(401)
+            .send({ error: "ERR_NOT_CUSTOMER", message: "Customer not found" });
+        }
+
+        const { id } = request.params as { id: string };
+        const ticket = await findTicketById(database.db, id);
+        if (!ticket || ticket.customerId !== customerRow.id) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_TICKET_NOT_FOUND", message: "Support ticket not found" });
+        }
+
+        try {
+          const message = await createTicketMessage(database.db, {
+            ticketId: id,
+            authorType: "customer",
+            customerId: customerRow.id,
+            body: (request.body as { body: string }).body,
+            isInternalNote: false,
+          });
+
+          return { message };
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_TICKET_CLOSED") {
+            return reply.status(400).send({
+              error: "ERR_TICKET_CLOSED",
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // GET /api/support/tickets/:id/messages — customer views messages (no internal notes)
+    app.get(
+      "/api/support/tickets/:id/messages",
+      {
+        preHandler: [verifySession, requireVerifiedEmail],
+      },
+      async (request, reply) => {
+        const session = (request as unknown as { session: { getUserId: () => string } }).session;
+        const authSubject = session.getUserId();
+        const customerRow = await getCustomerByAuthSubject(database.db, authSubject);
+        if (!customerRow) {
+          return reply
+            .status(401)
+            .send({ error: "ERR_NOT_CUSTOMER", message: "Customer not found" });
+        }
+
+        const { id } = request.params as { id: string };
+        const ticket = await findTicketById(database.db, id);
+        if (!ticket || ticket.customerId !== customerRow.id) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_TICKET_NOT_FOUND", message: "Support ticket not found" });
+        }
+
+        // Customer never sees internal notes
+        const messages = await listTicketMessages(database.db, id, {
+          includeInternalNotes: false,
+        });
+        return { messages };
       },
     );
 

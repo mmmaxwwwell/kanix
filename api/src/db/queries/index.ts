@@ -166,3 +166,29 @@ export {
   createCheckoutAcknowledgments,
 } from "./policy.js";
 export type { NewPolicySnapshot, PolicySnapshot, PolicyAcknowledgment } from "./policy.js";
+export {
+  createSupportTicket,
+  findTicketById,
+  listSupportTickets,
+  listTicketsByCustomerId,
+  transitionTicketStatus,
+  createTicketMessage,
+  listTicketMessages,
+  findTicketStatusHistory,
+  isValidTicketTransition,
+  TICKET_STATUSES,
+  TICKET_PRIORITIES,
+  TICKET_TRANSITIONS,
+  generateTicketNumber,
+} from "./support-ticket.js";
+export type {
+  TicketStatus,
+  TicketPriority,
+  TicketRecord,
+  CreateTicketInput,
+  ListTicketsInput,
+  TransitionTicketInput,
+  MessageRecord,
+  CreateMessageInput,
+  StatusHistoryRecord,
+} from "./support-ticket.js";

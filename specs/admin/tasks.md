@@ -246,7 +246,7 @@
 
 ## Phase 8: Support + Disputes + Evidence [FR-050 through FR-063]
 
-- [ ] T061 Implement support ticket system [FR-050, FR-051, FR-052, FR-054]
+- [x] T061 Implement support ticket system [FR-050, FR-051, FR-052, FR-054]
   Done when: POST /api/support/tickets (customer) and POST /admin/support/tickets (admin); state machine: open→waiting_on_customer/waiting_on_internal→resolved→closed; message threading: POST /support/tickets/:id/messages (customer-visible) and POST /admin/support/tickets/:id/internal-notes (admin-only, is_internal_note=true); tickets linkable to order_id, shipment_id; integration tests: customer creates ticket → admin replies → internal note (not visible to customer) → resolve → close
 
 - [ ] T061a Implement duplicate ticket detection [FR-E028]
