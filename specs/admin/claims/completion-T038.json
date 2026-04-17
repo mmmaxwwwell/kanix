@@ -1,0 +1,23 @@
+{
+  "task_id": "T038",
+  "status": "complete",
+  "summary": "Implemented product CRUD (POST/GET/PATCH), status transitions (draft->active->archived with archived terminal), product media CRUD with sort_order/alt_text and reorder, collection CRUD with product-collection associations, permission checks (products.write/products.read), and integration tests",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/admin-products.integration.test.ts",
+    "specs/admin/claims/completion-T038.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/product.ts",
+    "api/src/db/queries/index.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

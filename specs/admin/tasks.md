@@ -135,7 +135,7 @@
 
 ## Phase 5: Catalog + Inventory [FR-001 through FR-006, FR-032 through FR-038]
 
-- [ ] T038 Implement product CRUD API (admin) [FR-001, FR-004, FR-005] [P]
+- [x] T038 Implement product CRUD API (admin) [FR-001, FR-004, FR-005] [P]
   Done when: POST/GET/PATCH /admin/products; status transitions validated (draft→active→archived, archived is terminal); product media upload with sort_order and alt_text; collection CRUD with product-collection associations; permission check: `products.write` for mutations, `products.read` for reads; integration tests cover: create draft → activate → archive; media reorder; collection management
 
 - [x] T039 Implement product variant + classification API (admin) [FR-002, FR-003] [P]

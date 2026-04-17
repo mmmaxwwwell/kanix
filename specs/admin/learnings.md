@@ -41,3 +41,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Variant status transitions follow a strict state machine (draft→active→inactive→archived, with archived terminal) — use a `VARIANT_STATUS_TRANSITIONS` map and validate before applying, keeping the guard logic (SKU + price required for activation) in the route handler
 - `onConflictDoNothing().returning()` returns an empty array on conflict — when assigning product-to-class membership, fetch the existing row if the insert returns nothing to maintain idempotent behavior
 - Keep variant and product-class queries in separate files (`variant.ts`, `product-class.ts`) rather than adding to the growing `product.ts` — each query module stays focused and the barrel export in `index.ts` unifies them
+
+## T038 — Implement product CRUD API (admin)
+- Product status state machine (`draft→active`, `active→draft`, `draft→archived`, `active→archived`; archived is terminal) is enforced in the route handler via `isValidProductTransition()` — keep the transition map in the query module alongside the data access functions
+- Drizzle's `sql` template tag works well for compound WHERE conditions on composite-key tables like `collection_product` — use `sql\`col1 = ${val1} AND col2 = ${val2}\`` instead of chaining multiple `.where()` calls
+- When T039 runs in parallel and commits server.ts changes, ensure your route additions (media, collections) are present — Fastify route registration order matters for param-based routes (`:id` must come after fixed paths like `/reorder`)
