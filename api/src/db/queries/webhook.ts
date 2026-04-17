@@ -6,6 +6,7 @@ import { transitionOrderStatus } from "./order-state-machine.js";
 import { consumeReservation, releaseReservation, reserveInventory } from "./reservation.js";
 import type { AdminAlertService } from "../../services/admin-alert.js";
 import { createFulfillmentTaskForPaidOrder } from "./fulfillment-task.js";
+import { findDisputeByProviderId, transitionDisputeStatus } from "./dispute.js";
 
 function isTransitionError(err: unknown): boolean {
   return (err as { code?: string })?.code === "ERR_INVALID_TRANSITION";
@@ -391,5 +392,109 @@ export async function handleDisputeCreated(
   } catch (err: unknown) {
     if (!isTransitionError(err)) throw err;
     // Already disputed — idempotent
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Handle: charge.dispute.closed
+// ---------------------------------------------------------------------------
+
+export async function handleDisputeClosed(
+  db: PostgresJsDatabase,
+  disputeData: {
+    providerDisputeId: string;
+    stripeStatus: string;
+    closedAt: Date;
+  },
+): Promise<void> {
+  const disputeRecord = await findDisputeByProviderId(db, disputeData.providerDisputeId);
+  if (!disputeRecord) {
+    throw {
+      code: "ERR_DISPUTE_NOT_FOUND",
+      message: `Dispute not found: ${disputeData.providerDisputeId}`,
+    };
+  }
+
+  // Map Stripe status to our dispute outcome
+  const outcome = disputeData.stripeStatus === "won" ? "won" : "lost";
+
+  // Transition dispute to outcome state, then to closed
+  // The dispute may be in opened, evidence_gathering, ready_to_submit, or submitted
+  // For accepted disputes (admin accepted before Stripe closes), skip outcome transition
+  if (
+    disputeRecord.status !== "accepted" &&
+    disputeRecord.status !== "won" &&
+    disputeRecord.status !== "lost" &&
+    disputeRecord.status !== "closed"
+  ) {
+    // Fast-path: if in opened/evidence_gathering/ready_to_submit, jump to submitted first
+    // For won/lost, Stripe only sends close events for disputes that were submitted or auto-closed
+    // We need to get to submitted state first if not already there
+    if (disputeRecord.status === "opened") {
+      try {
+        await transitionDisputeStatus(db, {
+          disputeId: disputeRecord.id,
+          newStatus: "evidence_gathering",
+        });
+      } catch (err: unknown) {
+        if (!isTransitionError(err)) throw err;
+      }
+    }
+
+    // Re-fetch status after potential transition
+    const afterEG = await findDisputeByProviderId(db, disputeData.providerDisputeId);
+    if (afterEG && afterEG.status === "evidence_gathering") {
+      try {
+        await transitionDisputeStatus(db, {
+          disputeId: disputeRecord.id,
+          newStatus: "ready_to_submit",
+        });
+      } catch (err: unknown) {
+        if (!isTransitionError(err)) throw err;
+      }
+    }
+
+    const afterRTS = await findDisputeByProviderId(db, disputeData.providerDisputeId);
+    if (afterRTS && afterRTS.status === "ready_to_submit") {
+      try {
+        await transitionDisputeStatus(db, { disputeId: disputeRecord.id, newStatus: "submitted" });
+      } catch (err: unknown) {
+        if (!isTransitionError(err)) throw err;
+      }
+    }
+
+    // Now transition to outcome (won/lost)
+    try {
+      await transitionDisputeStatus(db, { disputeId: disputeRecord.id, newStatus: outcome });
+    } catch (err: unknown) {
+      if (!isTransitionError(err)) throw err;
+    }
+  }
+
+  // Transition to closed
+  try {
+    await transitionDisputeStatus(db, {
+      disputeId: disputeRecord.id,
+      newStatus: "closed",
+      closedAt: disputeData.closedAt,
+    });
+  } catch (err: unknown) {
+    if (!isTransitionError(err)) throw err;
+    // Already closed — idempotent
+  }
+
+  // Update order payment_status based on outcome
+  // won → paid (dispute reversed), lost → refunded
+  const newPaymentStatus = outcome === "won" ? "paid" : "refunded";
+  try {
+    await transitionOrderStatus(db, {
+      orderId: disputeRecord.orderId,
+      statusType: "payment_status",
+      newValue: newPaymentStatus,
+      reason: `Dispute ${outcome}: ${disputeData.providerDisputeId} (webhook: charge.dispute.closed)`,
+    });
+  } catch (err: unknown) {
+    if (!isTransitionError(err)) throw err;
+    // Already in target state — idempotent
   }
 }

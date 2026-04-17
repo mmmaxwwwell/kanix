@@ -258,7 +258,7 @@
 - [x] T063 Implement warranty claim flow [FR-055]
   Done when: POST /api/support/warranty-claims with order_id, order_line_id, description; validates: order delivered, within 1-year warranty period (from delivered_at); creates support_ticket with category=warranty_claim, priority=high; if TPU heat deformation described, flags material limitation in response; integration tests: valid claim (11 months) → ticket created; expired claim (13 months) → rejected; TPU heat claim → flagged
 
-- [ ] T064 Implement dispute auto-creation [FR-056, FR-057]
+- [x] T064 Implement dispute auto-creation [FR-056, FR-057]
   Done when: charge.dispute.created webhook creates dispute record; payment_status → disputed; dispute state machine: opened→evidence_gathering→ready_to_submit→submitted→won/lost/accepted→closed; charge.dispute.closed webhook updates dispute outcome and payment_status (won → paid, lost → refunded); integration tests: dispute webhook → record created + payment_status=disputed; close webhook → status updated
 
 - [ ] T065 Implement evidence auto-collection [FR-058, FR-059, FR-062]

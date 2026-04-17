@@ -157,6 +157,7 @@ import {
   handlePaymentFailed,
   handleChargeRefunded,
   handleDisputeCreated,
+  handleDisputeClosed,
 } from "./db/queries/webhook.js";
 import { processRefund, findRefundsByOrderId } from "./db/queries/refund.js";
 import {
@@ -5193,6 +5194,43 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             dueBy: disputeObj.evidence_details?.due_by
               ? new Date(disputeObj.evidence_details.due_by * 1000)
               : undefined,
+          });
+        } else if (eventType === "charge.dispute.closed") {
+          const disputeObj = event.data.object as Stripe.Dispute;
+          const chargeId =
+            typeof disputeObj.charge === "string"
+              ? disputeObj.charge
+              : (disputeObj.charge as Stripe.Charge | null)?.id;
+
+          let paymentRecord: { id: string; orderId: string; amountMinor: number } | null = null;
+          if (chargeId) {
+            paymentRecord = await findPaymentByChargeId(db, chargeId);
+          }
+          if (!paymentRecord) {
+            const piId =
+              typeof disputeObj.payment_intent === "string"
+                ? disputeObj.payment_intent
+                : (disputeObj.payment_intent as Stripe.PaymentIntent | null)?.id;
+            if (piId) {
+              paymentRecord = await findPaymentByIntentId(db, piId);
+            }
+          }
+          if (!paymentRecord) {
+            logger.warn({ disputeId: disputeObj.id }, "No payment found for dispute close");
+            return reply.status(200).send({ received: true, skipped: true });
+          }
+
+          await storePaymentEvent(db, {
+            paymentId: paymentRecord.id,
+            providerEventId: event.id,
+            eventType,
+            payloadJson: event.data.object,
+          });
+
+          await handleDisputeClosed(db, {
+            providerDisputeId: disputeObj.id,
+            stripeStatus: disputeObj.status === "won" ? "won" : "lost",
+            closedAt: new Date(),
           });
         } else {
           // Unhandled event type — acknowledge receipt

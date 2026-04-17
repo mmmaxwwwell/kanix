@@ -1,0 +1,24 @@
+{
+  "task_id": "T064",
+  "status": "complete",
+  "summary": "Implemented dispute auto-creation: dispute state machine (opened→evidence_gathering→ready_to_submit→submitted→won/lost/accepted→closed), charge.dispute.closed webhook handler that updates dispute outcome and payment_status (won→paid, lost→refunded), unit tests for state machine, integration tests for both dispute creation and close webhooks",
+  "commands_run": [
+    {"command": "pnpm test -- --run dispute-state-machine", "exit_code": 0},
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/dispute.ts",
+    "api/src/dispute-state-machine.test.ts",
+    "specs/admin/claims/completion-T064.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/webhook.ts",
+    "api/src/server.ts",
+    "api/src/webhook.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

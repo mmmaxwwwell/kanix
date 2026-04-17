@@ -449,6 +449,299 @@ describeWithDeps("Stripe webhook handler (T051)", () => {
     const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
     expect(orderRow.paymentStatus).toBe("disputed");
   });
+
+  it("should handle charge.dispute.closed (won) and update dispute + payment_status", async () => {
+    if (!superTokensAvailable) return;
+
+    const db = dbConn.db;
+    const disputeId = `dp_test_${ts}`;
+    const chargeId = `ch_test_${ts}`;
+    const closeEventId = `evt_test_dispute_close_won_${ts}`;
+
+    const { body, signature } = generateWebhookPayload(
+      closeEventId,
+      "charge.dispute.closed",
+      {
+        id: disputeId,
+        object: "dispute",
+        charge: chargeId,
+        payment_intent: paymentIntentId,
+        amount: 3599,
+        currency: "usd",
+        reason: "fraudulent",
+        status: "won",
+        created: Math.floor(Date.now() / 1000),
+        evidence_details: {},
+      },
+      WEBHOOK_SECRET,
+    );
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhooks/stripe",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": signature,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+
+    // Verify dispute is now closed
+    const [disputeRow] = await db
+      .select()
+      .from(dispute)
+      .where(eq(dispute.providerDisputeId, disputeId));
+    expect(disputeRow).toBeDefined();
+    expect(disputeRow.status).toBe("closed");
+    expect(disputeRow.closedAt).not.toBeNull();
+
+    // Verify order payment_status reverted to paid (dispute won)
+    const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
+    expect(orderRow.paymentStatus).toBe("paid");
+  });
+});
+
+// Separate describe for dispute close (lost) scenario
+describeWithDeps("Stripe webhook — dispute close lost (T064)", () => {
+  let app: FastifyInstance;
+  let dbConn: DatabaseConnection;
+  let superTokensAvailable = false;
+
+  const ts = Date.now() + 3; // Differentiate from above
+
+  let orderId = "";
+  let paymentIntentId = "";
+  let locationId = "";
+
+  beforeAll(async () => {
+    try {
+      superTokensAvailable = await isSuperTokensUp();
+    } catch {
+      superTokensAvailable = false;
+    }
+    if (!superTokensAvailable) return;
+
+    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    const db = dbConn.db;
+
+    const server = await createServer({
+      config: testConfig(),
+      processRef: createFakeProcess() as unknown as NodeJS.Process,
+      database: dbConn,
+      reservationCleanupIntervalMs: 0,
+      taxAdapter: createStubTaxAdapter(),
+      shippingAdapter: createStubShippingAdapter(),
+      paymentAdapter: createStubPaymentAdapter(),
+    });
+    app = server.app;
+    await server.start();
+    markReady();
+
+    // Seed product + variant + location + inventory
+    const [prod] = await db
+      .insert(product)
+      .values({
+        slug: `whk-dispute-lost-prod-${ts}`,
+        title: `WHK Dispute Lost Product ${ts}`,
+        status: "active",
+      })
+      .returning();
+
+    const [variant] = await db
+      .insert(productVariant)
+      .values({
+        productId: prod.id,
+        sku: `WHK-DLOST-VAR-${ts}`,
+        title: `Dispute Lost Variant ${ts}`,
+        priceMinor: 2500,
+        status: "active",
+        weight: "16",
+      })
+      .returning();
+
+    // Use existing location or create one
+    const existingBalances = await db.select().from(inventoryBalance).limit(1);
+    if (existingBalances.length > 0) {
+      locationId = existingBalances[0].locationId;
+    } else {
+      const [loc] = await db
+        .insert(inventoryLocation)
+        .values({ name: `Dispute Lost Loc ${ts}`, code: `DL-WH-${ts}`, type: "warehouse" })
+        .returning();
+      locationId = loc.id;
+    }
+
+    await db.insert(inventoryBalance).values({
+      variantId: variant.id,
+      locationId,
+      onHand: 10,
+      reserved: 0,
+      available: 10,
+    });
+
+    // Create cart, add items, checkout (matching existing webhook test pattern)
+    const cartRes = await app.inject({
+      method: "POST",
+      url: "/api/cart",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const cartData = JSON.parse(cartRes.body);
+    const cartToken = cartData.cart.token;
+
+    await app.inject({
+      method: "POST",
+      url: "/api/cart/items",
+      headers: {
+        "content-type": "application/json",
+        "x-cart-token": cartToken,
+      },
+      body: JSON.stringify({
+        variant_id: variant.id,
+        quantity: 1,
+      }),
+    });
+
+    const checkoutRes = await app.inject({
+      method: "POST",
+      url: "/api/checkout",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        cart_token: cartToken,
+        email: `dispute-lost-${ts}@example.com`,
+        shipping_address: {
+          full_name: "Dispute Lost Tester",
+          line1: "123 Test St",
+          city: "Austin",
+          state: "TX",
+          postal_code: "78701",
+          country: "US",
+        },
+      }),
+    });
+
+    const checkoutData = JSON.parse(checkoutRes.body);
+    orderId = checkoutData.order.id;
+
+    // Find the payment record and intent ID
+    const [paymentRow] = await db.select().from(payment).where(eq(payment.orderId, orderId));
+    paymentIntentId = paymentRow.providerPaymentIntentId;
+
+    // Simulate payment_intent.succeeded
+    const { body: piBody, signature: piSig } = generateWebhookPayload(
+      `evt_pi_succeeded_dlost_${ts}`,
+      "payment_intent.succeeded",
+      {
+        id: paymentIntentId,
+        object: "payment_intent",
+        amount: 2500,
+        currency: "usd",
+        status: "succeeded",
+        latest_charge: `ch_dlost_${ts}`,
+      },
+      WEBHOOK_SECRET,
+    );
+
+    await app.inject({
+      method: "POST",
+      url: "/webhooks/stripe",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": piSig,
+      },
+      body: piBody,
+    });
+
+    // Create dispute
+    const { body: dpBody, signature: dpSig } = generateWebhookPayload(
+      `evt_dispute_created_dlost_${ts}`,
+      "charge.dispute.created",
+      {
+        id: `dp_dlost_${ts}`,
+        object: "dispute",
+        charge: `ch_dlost_${ts}`,
+        payment_intent: paymentIntentId,
+        amount: 2500,
+        currency: "usd",
+        reason: "product_not_received",
+        status: "needs_response",
+        created: Math.floor(Date.now() / 1000),
+        evidence_details: {
+          due_by: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
+        },
+      },
+      WEBHOOK_SECRET,
+    );
+
+    await app.inject({
+      method: "POST",
+      url: "/webhooks/stripe",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": dpSig,
+      },
+      body: dpBody,
+    });
+  });
+
+  afterAll(async () => {
+    markNotReady();
+    await app?.close();
+    await dbConn?.close();
+  });
+
+  it("should handle charge.dispute.closed (lost) and set payment_status to refunded", async () => {
+    if (!superTokensAvailable) return;
+
+    const db = dbConn.db;
+    const disputeId = `dp_dlost_${ts}`;
+    const closeEventId = `evt_dispute_close_lost_${ts}`;
+
+    const { body, signature } = generateWebhookPayload(
+      closeEventId,
+      "charge.dispute.closed",
+      {
+        id: disputeId,
+        object: "dispute",
+        charge: `ch_dlost_${ts}`,
+        payment_intent: paymentIntentId,
+        amount: 2500,
+        currency: "usd",
+        reason: "product_not_received",
+        status: "lost",
+        created: Math.floor(Date.now() / 1000),
+        evidence_details: {},
+      },
+      WEBHOOK_SECRET,
+    );
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhooks/stripe",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": signature,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+
+    // Verify dispute is now closed
+    const [disputeRow] = await db
+      .select()
+      .from(dispute)
+      .where(eq(dispute.providerDisputeId, disputeId));
+    expect(disputeRow).toBeDefined();
+    expect(disputeRow.status).toBe("closed");
+    expect(disputeRow.closedAt).not.toBeNull();
+
+    // Verify order payment_status changed to refunded (dispute lost)
+    const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
+    expect(orderRow.paymentStatus).toBe("refunded");
+  });
 });
 
 // Separate describe for payment_failed scenario (needs its own checkout)

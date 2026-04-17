@@ -66,3 +66,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Warranty period validation uses `shipment.deliveredAt` (not an order-level field) — must query shipments for the order and find the earliest `deliveredAt`; if no shipment has `deliveredAt`, the order is considered undelivered
 - The `ShipmentRecord` interface does not include `deliveredAt` or `shippedAt` — query `shipment` table columns directly when you need these fields
 - TPU heat deformation detection is keyword-based on the claim description; the material limitation flag is returned in the API response AND stored as an internal system note on the ticket (visible only to admins)
+
+## T064 — Implement dispute auto-creation
+- The `dispute` Drizzle schema, `handleDisputeCreated()`, and `charge.dispute.created` webhook handler already existed — only the dispute state machine, `handleDisputeClosed()`, and `charge.dispute.closed` handler needed to be created
+- When Stripe closes a dispute, the dispute may be in any state (opened through submitted) — `handleDisputeClosed()` walks through intermediate transitions (opened→evidence_gathering→ready_to_submit→submitted→won/lost→closed) to maintain state machine integrity
+- `inventoryLocation` schema uses `name`, `code`, `type` fields (not `locationType`); `inventoryBalance` uses `onHand`/`reserved`/`available` (no `damaged` column) — check actual schema, not data-model.md
