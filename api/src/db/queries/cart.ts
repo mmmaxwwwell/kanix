@@ -3,6 +3,7 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { cart, cartLine } from "../schema/cart.js";
 import { productVariant } from "../schema/catalog.js";
 import { inventoryBalance } from "../schema/inventory.js";
+import type { KitValidationWarning } from "./kit.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,6 +37,7 @@ export interface CartWithItems {
   items: CartLineWithDetails[];
   subtotalMinor: number;
   itemCount: number;
+  kitWarnings: KitValidationWarning[];
 }
 
 // ---------------------------------------------------------------------------
@@ -198,6 +200,10 @@ export async function getCartWithItems(
   const items: CartLineWithDetails[] = [];
 
   for (const line of lines) {
+    // Check if this line is a kit — if so, use current kit price
+    const { getCurrentKitPriceForCartLine } = await import("./kit.js");
+    const kitInfo = await getCurrentKitPriceForCartLine(db, line.id);
+
     // Fetch current variant data
     const [variant] = await db
       .select()
@@ -211,7 +217,10 @@ export async function getCartWithItems(
       .where(eq(inventoryBalance.variantId, line.variantId));
     const totalAvailable = balances.reduce((sum, b) => sum + b.available, 0);
 
-    const currentPriceMinor = variant?.priceMinor ?? line.unitPriceMinor;
+    // For kit lines, use current kit price; for regular items, use variant price
+    const currentPriceMinor = kitInfo
+      ? kitInfo.currentPriceMinor
+      : (variant?.priceMinor ?? line.unitPriceMinor);
     const priceChanged = currentPriceMinor !== line.unitPriceMinor;
     const insufficientStock = totalAvailable < line.quantity;
 
@@ -234,6 +243,10 @@ export async function getCartWithItems(
 
   const subtotalMinor = items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
 
+  // Validate kit selections against current definitions
+  const { validateCartKitSelections } = await import("./kit.js");
+  const kitWarnings = await validateCartKitSelections(db, cartId);
+
   return {
     id: cartRow.id,
     token: cartRow.token,
@@ -243,5 +256,6 @@ export async function getCartWithItems(
     items,
     subtotalMinor,
     itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
+    kitWarnings,
   };
 }

@@ -193,7 +193,7 @@
 - [x] T054 Implement policy acknowledgment [FR-062, FR-063]
   Done when: checkout captures policy_snapshot_id for current warranty/returns/terms policies; order_policy_acknowledgment created linking order to policy version; policy_snapshot table with versioned content_html/content_text; integration test: checkout → acknowledgment record exists with correct policy version
 
-- [ ] T054a Implement kit cart re-validation on definition change [FR-E005, FR-E006]
+- [x] T054a Implement kit cart re-validation on definition change [FR-E005, FR-E006]
   Done when: when admin updates a kit_definition (class requirements or price), any active carts containing that kit are flagged; on next cart read, kit selections are re-validated against new definition; invalid selections show warning to customer; kit price recalculated at checkout from current kit_definition.price_minor (not cached); integration tests: add kit to cart → admin changes class requirement → cart read shows validation warning; price change reflected at checkout
 
 - [ ] T054b Implement reservation expiry / payment race handler [FR-E008]

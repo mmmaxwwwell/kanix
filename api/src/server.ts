@@ -88,6 +88,7 @@ import {
   setKitClassRequirements,
   findKitClassRequirements,
   addKitToCart,
+  flagCartsForKitRevalidation,
 } from "./db/queries/kit.js";
 import {
   reserveInventory,
@@ -2181,6 +2182,9 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           );
         }
 
+        // Flag active carts containing this kit for re-validation
+        await flagCartsForKitRevalidation(database.db, kitId);
+
         request.auditContext = {
           action: "UPDATE",
           entityType: "kit_definition",
@@ -2228,6 +2232,9 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             quantity: r.quantity,
           })),
         );
+
+        // Flag active carts containing this kit for re-validation
+        await flagCartsForKitRevalidation(database.db, kitId);
 
         request.auditContext = {
           action: "UPDATE",
@@ -3110,6 +3117,15 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             price_changed: item.priceChanged,
             insufficient_stock: item.insufficientStock,
           })),
+        });
+      }
+
+      // Check for kit validation warnings
+      if (cartWithItems.kitWarnings && cartWithItems.kitWarnings.length > 0) {
+        return reply.status(400).send({
+          error: "ERR_KIT_VALIDATION_FAILED",
+          message: "Cart contains kits that need to be updated",
+          kit_warnings: cartWithItems.kitWarnings,
         });
       }
 

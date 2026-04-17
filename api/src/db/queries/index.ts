@@ -112,6 +112,9 @@ export {
   setKitClassRequirements,
   findKitClassRequirements,
   addKitToCart,
+  flagCartsForKitRevalidation,
+  validateCartKitSelections,
+  getCurrentKitPriceForCartLine,
 } from "./kit.js";
 export type {
   KitDefinition,
@@ -120,6 +123,7 @@ export type {
   NewKitClassRequirement,
   KitSelection,
   AddKitToCartResult,
+  KitValidationWarning,
 } from "./kit.js";
 export { generateOrderNumber, createCheckoutOrder } from "./checkout.js";
 export type { CheckoutAddress, CreateOrderInput, CheckoutOrder } from "./checkout.js";

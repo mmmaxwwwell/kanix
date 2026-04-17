@@ -1,0 +1,26 @@
+{
+  "task_id": "T054a",
+  "status": "complete",
+  "summary": "Implement kit cart re-validation: flagCartsForKitRevalidation on admin update, validateCartKitSelections on cart read with kitWarnings array, current kit price used at checkout, checkout rejects carts with kit validation warnings",
+  "commands_run": [
+    {"command": "npx tsc --noEmit", "exit_code": 0},
+    {"command": "npx eslint src/db/queries/kit.ts src/db/queries/cart.ts src/server.ts src/kit-revalidation.integration.test.ts", "exit_code": 0},
+    {"command": "npx vitest run src/kit-revalidation.integration.test.ts", "exit_code": 0},
+    {"command": "npx vitest run src/kit-composition.integration.test.ts", "exit_code": 0},
+    {"command": "npx vitest run", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/kit-revalidation.integration.test.ts",
+    "specs/admin/claims/completion-T054a.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/kit.ts",
+    "api/src/db/queries/cart.ts",
+    "api/src/db/queries/index.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

@@ -92,3 +92,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The `policySnapshot` and `orderPolicyAcknowledgment` Drizzle schema tables were already defined in `evidence.ts` — check existing schema files before creating new ones
 - Policy acknowledgment in checkout is non-critical — wrap in try/catch so checkout still works when no policies are seeded yet (e.g., fresh dev environments)
 - No `POLICIES_READ/WRITE` capability exists yet — policy admin routes reuse `PRODUCTS_READ` / `PRODUCTS_WRITE` capabilities since policies are content management
+
+## T054a — Implement kit cart re-validation on definition change
+- Use dynamic `await import("./kit.js")` in `cart.ts`'s `getCartWithItems` to avoid circular dependency — cart.ts imports kit schema types but kit.ts imports cart schema, so runtime dynamic import breaks the cycle
+- `getCurrentKitPriceForCartLine` queries `cart_kit_selection` to detect if a line is a kit — this is cheaper than adding a column and avoids schema migration
+- Checkout must check `kitWarnings` separately from `staleItems` — a kit can have requirement changes without individual variant price/stock issues, so the `ERR_KIT_VALIDATION_FAILED` error is distinct from `ERR_CART_STALE`

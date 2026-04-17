@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import {
   kitDefinition,
@@ -22,6 +22,13 @@ export type NewKitClassRequirement = typeof kitClassRequirement.$inferInsert;
 export interface KitSelection {
   product_class_id: string;
   variant_id: string;
+}
+
+export interface KitValidationWarning {
+  cartLineId: string;
+  kitDefinitionId: string;
+  type: "requirement_changed" | "selection_invalid" | "kit_unavailable" | "price_changed";
+  message: string;
 }
 
 export interface AddKitToCartResult {
@@ -334,5 +341,201 @@ export async function addKitToCart(
     individualTotalMinor,
     savingsMinor,
     selections: selectionDetails,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Flag active carts containing a kit for re-validation
+// ---------------------------------------------------------------------------
+
+export async function flagCartsForKitRevalidation(
+  db: PostgresJsDatabase,
+  kitDefinitionId: string,
+): Promise<number> {
+  // Find all active carts that have cart_kit_selection rows for this kit
+  const result = await db.execute(sql`
+    UPDATE cart
+    SET updated_at = NOW()
+    WHERE id IN (
+      SELECT DISTINCT c.id
+      FROM cart c
+      JOIN cart_line cl ON cl.cart_id = c.id
+      JOIN cart_kit_selection cks ON cks.cart_line_id = cl.id
+      WHERE cks.kit_definition_id = ${kitDefinitionId}
+        AND c.status = 'active'
+    )
+  `);
+  return (result as unknown as { rowCount?: number }).rowCount ?? 0;
+}
+
+// ---------------------------------------------------------------------------
+// Validate kit selections in a cart against current definitions
+// ---------------------------------------------------------------------------
+
+export async function validateCartKitSelections(
+  db: PostgresJsDatabase,
+  cartId: string,
+): Promise<KitValidationWarning[]> {
+  const warnings: KitValidationWarning[] = [];
+
+  // Find all kit selections in this cart
+  const lines = await db.select().from(cartLine).where(eq(cartLine.cartId, cartId));
+
+  for (const line of lines) {
+    // Check if this line has kit selections
+    const selections = await db
+      .select()
+      .from(cartKitSelection)
+      .where(eq(cartKitSelection.cartLineId, line.id));
+
+    if (selections.length === 0) continue;
+
+    const kitDefId = selections[0].kitDefinitionId;
+
+    // Fetch current kit definition
+    const kit = await findKitDefinitionById(db, kitDefId);
+    if (!kit) {
+      warnings.push({
+        cartLineId: line.id,
+        kitDefinitionId: kitDefId,
+        type: "kit_unavailable",
+        message: "Kit definition no longer exists",
+      });
+      continue;
+    }
+
+    if (kit.status !== "active") {
+      warnings.push({
+        cartLineId: line.id,
+        kitDefinitionId: kitDefId,
+        type: "kit_unavailable",
+        message: "Kit is no longer available",
+      });
+      continue;
+    }
+
+    // Check price change
+    if (kit.priceMinor !== line.unitPriceMinor) {
+      warnings.push({
+        cartLineId: line.id,
+        kitDefinitionId: kitDefId,
+        type: "price_changed",
+        message: `Kit price changed from ${line.unitPriceMinor} to ${kit.priceMinor}`,
+      });
+    }
+
+    // Fetch current requirements
+    const requirements = await findKitClassRequirements(db, kitDefId);
+    const reqMap = new Map<string, number>();
+    for (const req of requirements) {
+      reqMap.set(req.productClassId, req.quantity);
+    }
+
+    // Group selections by class
+    const selectionsByClass = new Map<string, typeof selections>();
+    for (const sel of selections) {
+      const existing = selectionsByClass.get(sel.productClassId) ?? [];
+      existing.push(sel);
+      selectionsByClass.set(sel.productClassId, existing);
+    }
+
+    // Check: selections for classes no longer required
+    for (const [classId, classSelections] of selectionsByClass) {
+      if (!reqMap.has(classId)) {
+        warnings.push({
+          cartLineId: line.id,
+          kitDefinitionId: kitDefId,
+          type: "requirement_changed",
+          message: `Class ${classId} is no longer required by this kit`,
+        });
+        continue;
+      }
+
+      const required = reqMap.get(classId) ?? 0;
+      if (classSelections.length !== required) {
+        warnings.push({
+          cartLineId: line.id,
+          kitDefinitionId: kitDefId,
+          type: "requirement_changed",
+          message: `Class requires ${required} selections but cart has ${classSelections.length}`,
+        });
+      }
+    }
+
+    // Check: required classes with no selections
+    for (const [classId, quantity] of reqMap) {
+      if (!selectionsByClass.has(classId)) {
+        warnings.push({
+          cartLineId: line.id,
+          kitDefinitionId: kitDefId,
+          type: "requirement_changed",
+          message: `Class ${classId} now requires ${quantity} selections but has none`,
+        });
+      }
+    }
+
+    // Validate each variant is still valid (active, in class)
+    for (const sel of selections) {
+      const [variant] = await db
+        .select()
+        .from(productVariant)
+        .where(eq(productVariant.id, sel.variantId));
+
+      if (!variant || variant.status !== "active") {
+        warnings.push({
+          cartLineId: line.id,
+          kitDefinitionId: kitDefId,
+          type: "selection_invalid",
+          message: `Variant ${sel.variantId} is no longer available`,
+        });
+        continue;
+      }
+
+      // Check class membership still holds
+      const [membership] = await db
+        .select()
+        .from(productClassMembership)
+        .where(
+          and(
+            eq(productClassMembership.productId, variant.productId),
+            eq(productClassMembership.productClassId, sel.productClassId),
+          ),
+        );
+
+      if (!membership) {
+        warnings.push({
+          cartLineId: line.id,
+          kitDefinitionId: kitDefId,
+          type: "selection_invalid",
+          message: `Variant ${sel.variantId} no longer belongs to required class`,
+        });
+      }
+    }
+  }
+
+  return warnings;
+}
+
+// ---------------------------------------------------------------------------
+// Get current kit price for a cart line (for checkout recalculation)
+// ---------------------------------------------------------------------------
+
+export async function getCurrentKitPriceForCartLine(
+  db: PostgresJsDatabase,
+  cartLineId: string,
+): Promise<{ kitDefinitionId: string; currentPriceMinor: number } | null> {
+  const [selection] = await db
+    .select()
+    .from(cartKitSelection)
+    .where(eq(cartKitSelection.cartLineId, cartLineId));
+
+  if (!selection) return null;
+
+  const kit = await findKitDefinitionById(db, selection.kitDefinitionId);
+  if (!kit) return null;
+
+  return {
+    kitDefinitionId: kit.id,
+    currentPriceMinor: kit.priceMinor,
   };
 }
