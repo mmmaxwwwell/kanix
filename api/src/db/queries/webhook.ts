@@ -5,6 +5,7 @@ import { inventoryReservation } from "../schema/inventory.js";
 import { transitionOrderStatus } from "./order-state-machine.js";
 import { consumeReservation, releaseReservation, reserveInventory } from "./reservation.js";
 import type { AdminAlertService } from "../../services/admin-alert.js";
+import { createFulfillmentTaskForPaidOrder } from "./fulfillment-task.js";
 
 function isTransitionError(err: unknown): boolean {
   return (err as { code?: string })?.code === "ERR_INVALID_TRANSITION";
@@ -250,6 +251,19 @@ export async function handlePaymentSucceeded(
   } catch (err: unknown) {
     if (!isTransitionError(err)) throw err;
     // Already confirmed — idempotent
+  }
+
+  // Auto-create fulfillment task now that payment is confirmed
+  try {
+    await createFulfillmentTaskForPaidOrder(db, paymentRecord.orderId);
+  } catch (err: unknown) {
+    // Non-fatal: fulfillment task creation should not block payment confirmation
+    // If it fails (e.g., duplicate), log but don't throw
+    const error = err as { code?: string };
+    if (error.code !== "ERR_PAYMENT_NOT_PAID") {
+      throw err;
+    }
+    // Already not paid means the payment transition didn't stick — skip
   }
 }
 

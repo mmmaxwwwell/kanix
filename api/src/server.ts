@@ -117,6 +117,13 @@ import {
 import type { OrderStatusType } from "./db/queries/order-state-machine.js";
 import { cancelOrder } from "./db/queries/order-cancel.js";
 import {
+  listFulfillmentTasks,
+  findFulfillmentTaskById,
+  findFulfillmentTasksByOrderId,
+  transitionFulfillmentTaskStatus,
+  assignFulfillmentTask,
+} from "./db/queries/fulfillment-task.js";
+import {
   insertPolicySnapshot,
   findPoliciesByType,
   findCurrentPolicyByType,
@@ -1113,6 +1120,186 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           if (error.code === "ERR_ORDER_ALREADY_SHIPPED") {
             return reply.status(400).send({
               error: "ERR_ORDER_ALREADY_SHIPPED",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_INVALID_TRANSITION") {
+            return reply.status(400).send({
+              error: "ERR_INVALID_TRANSITION",
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // -----------------------------------------------------------------------
+    // Fulfillment Tasks
+    // -----------------------------------------------------------------------
+
+    // List fulfillment tasks with optional filters
+    app.get(
+      "/api/admin/fulfillment-tasks",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.FULFILLMENT_READ)],
+      },
+      async (request) => {
+        const query = request.query as {
+          status?: string;
+          priority?: string;
+          assigned_admin_user_id?: string;
+        };
+        const tasks = await listFulfillmentTasks(database.db, {
+          status: query.status,
+          priority: query.priority,
+          assignedAdminUserId: query.assigned_admin_user_id,
+        });
+        return { tasks };
+      },
+    );
+
+    // Get fulfillment task by ID
+    app.get(
+      "/api/admin/fulfillment-tasks/:id",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.FULFILLMENT_READ)],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const task = await findFulfillmentTaskById(database.db, id);
+        if (!task) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_TASK_NOT_FOUND", message: "Fulfillment task not found" });
+        }
+        return { task };
+      },
+    );
+
+    // Get fulfillment tasks for an order
+    app.get(
+      "/api/admin/orders/:id/fulfillment-tasks",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.FULFILLMENT_READ)],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const found = await findOrderById(database.db, id);
+        if (!found) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_ORDER_NOT_FOUND", message: "Order not found" });
+        }
+        const tasks = await findFulfillmentTasksByOrderId(database.db, id);
+        return { tasks };
+      },
+    );
+
+    // Transition fulfillment task status
+    app.post(
+      "/api/admin/fulfillment-tasks/:id/transition",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.FULFILLMENT_MANAGE),
+        ],
+        schema: {
+          body: {
+            type: "object",
+            required: ["new_status"],
+            properties: {
+              new_status: { type: "string" },
+              reason: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { new_status: string; reason?: string };
+        const actorAdminUserId = request.adminContext?.adminUserId ?? "";
+
+        try {
+          const result = await transitionFulfillmentTaskStatus(database.db, {
+            taskId: id,
+            newStatus: body.new_status,
+            reason: body.reason,
+            actorAdminUserId,
+          });
+
+          request.auditContext = {
+            action: "fulfillment_task.transition",
+            entityType: "fulfillment_task",
+            entityId: id,
+            afterJson: {
+              oldStatus: result.oldStatus,
+              newStatus: result.newStatus,
+            },
+          };
+
+          return result;
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_INVALID_TRANSITION") {
+            return reply.status(400).send({
+              error: "ERR_INVALID_TRANSITION",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_TASK_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_TASK_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // Assign fulfillment task to admin user
+    app.post(
+      "/api/admin/fulfillment-tasks/:id/assign",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.FULFILLMENT_MANAGE),
+        ],
+        schema: {
+          body: {
+            type: "object",
+            required: ["admin_user_id"],
+            properties: {
+              admin_user_id: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { admin_user_id: string };
+
+        try {
+          const result = await assignFulfillmentTask(database.db, id, body.admin_user_id);
+
+          request.auditContext = {
+            action: "fulfillment_task.assign",
+            entityType: "fulfillment_task",
+            entityId: id,
+            afterJson: {
+              assignedAdminUserId: body.admin_user_id,
+            },
+          };
+
+          return { task: result };
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_TASK_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_TASK_NOT_FOUND",
               message: error.message,
             });
           }
