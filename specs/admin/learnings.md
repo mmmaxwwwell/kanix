@@ -63,3 +63,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The contributor Drizzle schema (7 tables), DB migration, and CAPABILITIES (CONTRIBUTORS_READ, CONTRIBUTORS_MANAGE) all already existed in contributor.ts, 002-core-entities.xml, and admin.ts — only the query layer, routes, and integration tests needed to be created
 - The `requireAdmin` middleware is scoped inside the main `if (database)` block starting at line ~892 — contributor routes added in a separate `if (database)` block must create their own `const requireAdmin = createRequireAdmin(db)` since it's not in scope
 - The `createContributor` function sets status to "active" if `claAcceptedAt` is provided, "pending" otherwise — this auto-activation matches the CLA bot workflow where acceptance implies activation
+
+## T068 — Implement per-design sales tracking
+- The `contributor_design` table needed a `sales_count` column (migration 008) — the data-model.md doesn't specify it, but the task requires "increment sales count" which implies a mutable counter
+- `processOrderCompletionSales` resolves product_id via `order_line.variant_id → product_variant.product_id → contributor_design.product_id`; the `order_line` table doesn't store product_id directly
+- The contributor.ts query file was pre-populated with imports for `order`, `orderLine`, `productVariant`, `sql`, `sum` from T067 — these were set up in anticipation of T068's sales tracking needs

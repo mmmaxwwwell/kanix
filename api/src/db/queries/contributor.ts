@@ -1,7 +1,15 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { contributor, contributorDesign } from "../schema/contributor.js";
-import { product } from "../schema/catalog.js";
+import { contributor, contributorDesign, contributorRoyalty } from "../schema/contributor.js";
+import { product, productVariant } from "../schema/catalog.js";
+import { orderLine } from "../schema/order.js";
+
+// ---------------------------------------------------------------------------
+// Royalty constants
+// ---------------------------------------------------------------------------
+
+export const ROYALTY_ACTIVATION_THRESHOLD = 25;
+export const ROYALTY_RATE = 0.1; // 10% of unit_price_minor
 
 // ---------------------------------------------------------------------------
 // Contributor statuses
@@ -141,4 +149,144 @@ export async function listDesignsByContributor(
     .from(contributorDesign)
     .leftJoin(product, eq(contributorDesign.productId, product.id))
     .where(eq(contributorDesign.contributorId, contributorId));
+}
+
+// ---------------------------------------------------------------------------
+// Per-design sales tracking types
+// ---------------------------------------------------------------------------
+
+export interface SalesTrackingResult {
+  designId: string;
+  contributorId: string;
+  productId: string;
+  previousSalesCount: number;
+  newSalesCount: number;
+  royaltyCreated: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Get sales count for a contributor design
+// ---------------------------------------------------------------------------
+
+export async function getDesignSalesCount(
+  db: PostgresJsDatabase,
+  designId: string,
+): Promise<number> {
+  const [row] = await db
+    .select({ salesCount: contributorDesign.salesCount })
+    .from(contributorDesign)
+    .where(eq(contributorDesign.id, designId));
+  return row?.salesCount ?? 0;
+}
+
+// ---------------------------------------------------------------------------
+// Process order completion sales — called when order.status → completed
+// ---------------------------------------------------------------------------
+
+/**
+ * On order completion, for each order_line:
+ *   1. Resolve product_id via variant → product
+ *   2. Find contributor_design by product_id
+ *   3. Increment sales_count by quantity
+ *   4. If sales_count crossed the 25-unit threshold, create contributor_royalty
+ */
+export async function processOrderCompletionSales(
+  db: PostgresJsDatabase,
+  orderId: string,
+): Promise<SalesTrackingResult[]> {
+  const results: SalesTrackingResult[] = [];
+
+  // 1. Get all order lines for this order
+  const lines = await db
+    .select({
+      id: orderLine.id,
+      variantId: orderLine.variantId,
+      quantity: orderLine.quantity,
+      unitPriceMinor: orderLine.unitPriceMinor,
+    })
+    .from(orderLine)
+    .where(eq(orderLine.orderId, orderId));
+
+  if (lines.length === 0) return results;
+
+  // 2. Get product IDs for all variants in one query
+  const variantIds = lines.map((l) => l.variantId);
+  const variants = await db
+    .select({
+      id: productVariant.id,
+      productId: productVariant.productId,
+    })
+    .from(productVariant)
+    .where(inArray(productVariant.id, variantIds));
+
+  const variantToProduct = new Map(variants.map((v) => [v.id, v.productId]));
+
+  // 3. Get all unique product IDs and find contributor designs
+  const productIds = [...new Set(variants.map((v) => v.productId))];
+  if (productIds.length === 0) return results;
+
+  const designs = await db
+    .select({
+      id: contributorDesign.id,
+      contributorId: contributorDesign.contributorId,
+      productId: contributorDesign.productId,
+      salesCount: contributorDesign.salesCount,
+    })
+    .from(contributorDesign)
+    .where(inArray(contributorDesign.productId, productIds));
+
+  if (designs.length === 0) return results;
+
+  const productToDesign = new Map(designs.map((d) => [d.productId, d]));
+
+  // 4. Process each order line
+  for (const line of lines) {
+    const productId = variantToProduct.get(line.variantId);
+    if (!productId) continue;
+
+    const design = productToDesign.get(productId);
+    if (!design) continue;
+
+    const previousSalesCount = design.salesCount;
+    const newSalesCount = previousSalesCount + line.quantity;
+
+    // Increment sales_count
+    await db
+      .update(contributorDesign)
+      .set({ salesCount: newSalesCount })
+      .where(eq(contributorDesign.id, design.id));
+
+    // Update in-memory for subsequent lines referencing the same design
+    design.salesCount = newSalesCount;
+
+    // Create royalty entry if threshold crossed (sales >= 25)
+    let royaltyCreated = false;
+    if (newSalesCount >= ROYALTY_ACTIVATION_THRESHOLD) {
+      const royaltyAmount = Math.floor(line.unitPriceMinor * ROYALTY_RATE) * line.quantity;
+      try {
+        await db.insert(contributorRoyalty).values({
+          contributorId: design.contributorId,
+          orderLineId: line.id,
+          amountMinor: royaltyAmount,
+          status: "accrued",
+        });
+        royaltyCreated = true;
+      } catch (err: unknown) {
+        // UNIQUE constraint on order_line_id — skip if royalty already exists
+        const error = err as { code?: string };
+        if (error.code !== "23505") throw err;
+      }
+    }
+
+    results.push({
+      designId: design.id,
+      contributorId: design.contributorId,
+      productId,
+      previousSalesCount,
+      newSalesCount,
+      royaltyCreated,
+    });
+  }
+
+  return results;
 }

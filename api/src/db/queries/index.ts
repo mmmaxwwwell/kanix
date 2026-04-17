@@ -192,3 +192,21 @@ export type {
   CreateMessageInput,
   StatusHistoryRecord,
 } from "./support-ticket.js";
+export {
+  createContributor,
+  findContributorById,
+  listContributors,
+  linkContributorDesign,
+  listDesignsByContributor,
+  getDesignSalesCount,
+  processOrderCompletionSales,
+  ROYALTY_ACTIVATION_THRESHOLD,
+  ROYALTY_RATE,
+} from "./contributor.js";
+export type {
+  CreateContributorInput,
+  ContributorRow,
+  ContributorDesignRow,
+  LinkDesignInput,
+  SalesTrackingResult,
+} from "./contributor.js";

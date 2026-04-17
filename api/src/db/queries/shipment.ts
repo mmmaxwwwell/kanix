@@ -8,6 +8,7 @@ import {
   shippingLabelPurchase,
 } from "../schema/fulfillment.js";
 import { order, orderLine } from "../schema/order.js";
+import { processOrderCompletionSales } from "./contributor.js";
 import type {
   ShippingAdapter,
   BuyLabelResult,
@@ -1159,6 +1160,12 @@ export async function tryAutoCompleteOrder(
         newValue: "completed",
         reason: "Auto-completed: all items fulfilled and delivered",
       });
+      // Track per-design sales for contributor royalties
+      try {
+        await processOrderCompletionSales(db, orderId);
+      } catch {
+        // Non-fatal: sales tracking failure should not block order completion
+      }
       return true;
     } catch (err: unknown) {
       if (!isTransitionError(err)) throw err;

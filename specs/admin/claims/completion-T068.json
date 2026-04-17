@@ -1,0 +1,26 @@
+{
+  "task_id": "T068",
+  "status": "complete",
+  "summary": "Implemented per-design sales tracking on order completion with sales_count increment on contributor_design, royalty entry creation at 25-unit threshold, and integration tests",
+  "commands_run": [
+    {"command": "npx tsc --noEmit", "exit_code": 0},
+    {"command": "pnpm test -- --run", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/migrations/changesets/008-contributor-design-sales-count.xml",
+    "api/src/contributor-sales.integration.test.ts",
+    "specs/admin/claims/completion-T068.json"
+  ],
+  "files_modified": [
+    "api/src/db/schema/contributor.ts",
+    "api/src/db/queries/contributor.ts",
+    "api/src/db/queries/index.ts",
+    "api/src/db/queries/shipment.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="008-contributor-design-sales-count" author="kanix">
+        <comment>
+            Add sales_count column to contributor_design for per-design sales tracking.
+            Incremented on order completion for contributor-designed products.
+        </comment>
+
+        <addColumn tableName="contributor_design">
+            <column name="sales_count" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false" />
+            </column>
+        </addColumn>
+
+        <rollback>
+            <dropColumn tableName="contributor_design" columnName="sales_count" />
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

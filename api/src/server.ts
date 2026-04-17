@@ -197,6 +197,7 @@ import {
   listContributors,
   linkContributorDesign,
   listDesignsByContributor,
+  processOrderCompletionSales,
 } from "./db/queries/contributor.js";
 import Stripe from "stripe";
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -985,6 +986,14 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             reason: body.reason,
             actorAdminUserId,
           });
+          // Track per-design sales on order completion
+          if (body.status_type === "status" && body.new_value === "completed") {
+            try {
+              await processOrderCompletionSales(database.db, id);
+            } catch {
+              // Non-fatal: sales tracking failure should not block status transition
+            }
+          }
           return result;
         } catch (err: unknown) {
           const error = err as { code?: string; message?: string };

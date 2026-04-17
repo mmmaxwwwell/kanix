@@ -288,7 +288,7 @@
 - [x] T067 Implement contributor registry + design linking [FR-069, FR-070]
   Done when: contributor entity with github_username, github_user_id, customer_id (nullable), cla_accepted_at; contributor_design links contributor to product; POST /admin/contributors (create from CLA bot data); GET /admin/contributors/:id/designs; integration test: create contributor → link to product → verify association
 
-- [ ] T068 Implement per-design sales tracking [FR-070]
+- [x] T068 Implement per-design sales tracking [FR-070]
   Done when: on order completion (order.status → completed), for each order_line, find contributor_design by product_id; increment sales count; create contributor_royalty entry with status=accrued if contributor has crossed 25-unit threshold; integration test: complete order with contributor-designed product → sales count incremented
 
 - [ ] T069 Implement royalty calculation engine [FR-071, FR-072, FR-076]

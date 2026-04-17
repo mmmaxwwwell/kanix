@@ -28,6 +28,7 @@ export const contributorDesign = pgTable("contributor_design", {
   productId: uuid("product_id")
     .notNull()
     .references(() => product.id),
+  salesCount: integer("sales_count").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
