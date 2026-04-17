@@ -35,6 +35,12 @@ processes:
 
   postgres-createdb:
     command: |
+      # Create the kanix application database and user
+      psql -h 127.0.0.1 -p 5432 -d postgres -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'kanix') THEN CREATE ROLE kanix WITH LOGIN PASSWORD 'kanix'; END IF; END \$\$;" 2>/dev/null || true
+      createdb -h 127.0.0.1 -p 5432 -O kanix kanix 2>/dev/null || true
+      psql -h 127.0.0.1 -p 5432 -d kanix -c "GRANT ALL PRIVILEGES ON DATABASE kanix TO kanix;" 2>/dev/null || true
+      psql -h 127.0.0.1 -p 5432 -d kanix -c "GRANT ALL ON SCHEMA public TO kanix;" 2>/dev/null || true
+      # Create the supertokens database
       createdb -h 127.0.0.1 -p 5432 supertokens 2>/dev/null || true
     depends_on:
       postgres:

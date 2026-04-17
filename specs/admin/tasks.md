@@ -85,7 +85,7 @@
 
 ## Phase 3: Database + Migrations [FR-032, FR-033, FR-101] [consumes: IC-001]
 
-- [ ] T024 Configure Postgres in process-compose and deploy/nixos [FR-101]
+- [x] T024 Configure Postgres in process-compose and deploy/nixos [FR-101]
   Done when: `process-compose up` starts Postgres; `pg_isready` confirms connectivity; `deploy/nixos/postgres.nix` module configures Postgres 16 with auth, logging, backup settings
 
 - [ ] T025 Set up Liquibase with changelog structure [FR-101] [produces: IC-001]
