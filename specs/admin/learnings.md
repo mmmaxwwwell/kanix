@@ -49,3 +49,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - SuperTokens `ThirdParty.init()` accepts providers via `signInAndUpFeature.providers` array — pass an empty array when GitHub OAuth creds are not configured to avoid errors
 - For integration testing GitHub OAuth without real GitHub API, inject a mock `GitHubUserFetcher` via `CreateServerOptions.githubUserFetcher` — the server falls back to the real fetcher when none is provided
 - The `github_user_id` column uses a partial unique index (`WHERE github_user_id IS NOT NULL`) since it's nullable — Drizzle's `eq()` filter works correctly for the duplicate-link check
+
+## T034 — Implement admin auth + capability-based permissions
+- The data model's `admin_role` table doesn't include a capabilities column — add `capabilities_json` (JSONB, NOT NULL, default `[]`) via a new migration to store capability string arrays per role
+- Admin auth reuses the same SuperTokens EmailPassword recipe as customer auth — differentiation happens at the API layer by checking if the `auth_subject` maps to an `admin_user` record, not via a separate SuperTokens recipe
+- `createRequireAdmin(db)` returns a closure that captures the DB connection — this pattern avoids passing the DB into every route handler and works cleanly as a Fastify `preHandler`

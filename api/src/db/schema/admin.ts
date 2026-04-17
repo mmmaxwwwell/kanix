@@ -1,4 +1,5 @@
 import { pgTable, uuid, text, timestamp, inet, jsonb, primaryKey } from "drizzle-orm/pg-core";
+import type { InferSelectModel } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
 // admin_user
@@ -22,7 +23,10 @@ export const adminRole = pgTable("admin_role", {
   id: uuid().defaultRandom().primaryKey(),
   name: text().notNull(),
   description: text(),
+  capabilitiesJson: jsonb("capabilities_json").notNull().$type<string[]>().default([]),
 });
+
+export type AdminRole = InferSelectModel<typeof adminRole>;
 
 // ---------------------------------------------------------------------------
 // admin_user_role

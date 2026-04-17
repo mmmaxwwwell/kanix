@@ -119,7 +119,7 @@
 - [x] T033 Implement GitHub OAuth: link GitHub account [FR-068] [produces: IC-002]
   Done when: SuperTokens social login recipe configured for GitHub; "Link GitHub Account" endpoint associates GitHub user_id with customer record; integration test: create customer → link GitHub → verify github_user_id stored; duplicate link prevented
 
-- [ ] T034 Implement admin auth + capability-based permissions [FR-077, FR-078, FR-080] [produces: IC-003]
+- [x] T034 Implement admin auth + capability-based permissions [FR-077, FR-078, FR-080] [produces: IC-003]
   Done when: admin auth via separate SuperTokens recipe; admin_role and admin_user_role tables populated from seed; `requireCapability('orders.read')` middleware checks admin's role capabilities; 403 returned for insufficient permissions; integration tests: admin login → has permission → allowed; admin without permission → 403; permission matrix matches spec (orders.read, orders.refund, orders.cancel, inventory.read, inventory.adjust, etc.)
 
 - [ ] T035 Implement admin_audit_log middleware [FR-079]

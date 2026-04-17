@@ -22,6 +22,7 @@ import {
   inventoryLocation,
   inventoryBalance,
 } from "../schema/index.js";
+import { ROLE_CAPABILITIES } from "../../auth/admin.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -239,12 +240,34 @@ async function seed() {
   console.log(`  Inventory balances: ${balances.length}`);
 
   // -----------------------------------------------------------------------
-  // 6. Admin user with super_admin role
+  // 6. Admin roles with capability-based permissions
   // -----------------------------------------------------------------------
-  await db
-    .insert(adminRole)
-    .values({ name: "super_admin", description: "Full system access" })
-    .onConflictDoNothing();
+  const roleDefinitions = [
+    {
+      name: "super_admin",
+      description: "Full system access",
+      capabilitiesJson: ROLE_CAPABILITIES.super_admin,
+    },
+    {
+      name: "support",
+      description: "Customer support agent",
+      capabilitiesJson: ROLE_CAPABILITIES.support,
+    },
+    {
+      name: "fulfillment",
+      description: "Fulfillment and shipping",
+      capabilitiesJson: ROLE_CAPABILITIES.fulfillment,
+    },
+    {
+      name: "finance",
+      description: "Financial operations",
+      capabilitiesJson: ROLE_CAPABILITIES.finance,
+    },
+  ];
+
+  for (const roleDef of roleDefinitions) {
+    await db.insert(adminRole).values(roleDef).onConflictDoNothing();
+  }
 
   const roles = await db.select().from(adminRole);
   const superAdminRole = required(
@@ -252,6 +275,9 @@ async function seed() {
     "super_admin role",
   );
 
+  // -----------------------------------------------------------------------
+  // 7. Admin user with super_admin role
+  // -----------------------------------------------------------------------
   await db
     .insert(adminUser)
     .values({

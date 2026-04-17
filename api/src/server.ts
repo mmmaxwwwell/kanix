@@ -15,6 +15,9 @@ import {
   getCustomerByAuthSubject,
   linkGitHubToCustomer,
   createGitHubUserFetcher,
+  createRequireAdmin,
+  requireCapability,
+  CAPABILITIES,
 } from "./auth/index.js";
 import type { GitHubUserFetcher } from "./auth/index.js";
 
@@ -294,6 +297,60 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       };
     },
   );
+
+  // -------------------------------------------------------------------------
+  // Admin endpoints — require admin auth + capability checks
+  // -------------------------------------------------------------------------
+
+  if (database) {
+    const requireAdmin = createRequireAdmin(database.db);
+
+    // Admin profile — requires any admin auth (no specific capability)
+    app.get(
+      "/api/admin/me",
+      { preHandler: [verifySession, requireAdmin] },
+      async (request, reply) => {
+        if (!request.adminContext) {
+          return reply.status(403).send({
+            error: "ERR_FORBIDDEN",
+            message: "Admin access required",
+          });
+        }
+        return {
+          admin: {
+            id: request.adminContext.adminUserId,
+            email: request.adminContext.email,
+            name: request.adminContext.name,
+            capabilities: request.adminContext.capabilities,
+          },
+        };
+      },
+    );
+
+    // Admin orders list — requires orders.read capability
+    app.get(
+      "/api/admin/orders",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.ORDERS_READ)],
+      },
+      async () => {
+        // Placeholder — will be implemented in Phase 6
+        return { orders: [] };
+      },
+    );
+
+    // Admin inventory — requires inventory.read capability
+    app.get(
+      "/api/admin/inventory",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.INVENTORY_READ)],
+      },
+      async () => {
+        // Placeholder — will be implemented in Phase 5
+        return { inventory: [] };
+      },
+    );
+  }
 
   // -------------------------------------------------------------------------
   // Shutdown manager
