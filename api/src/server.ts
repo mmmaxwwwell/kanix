@@ -6295,6 +6295,19 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           return reply.status(404).send({ error: "Contributor not found" });
         }
 
+        // Verify the authenticated user owns this contributor account
+        const session = request.session;
+        if (!session) {
+          return reply.status(401).send({ error: "Authentication required" });
+        }
+        const userId = session.getUserId();
+        const cust = await getCustomerByAuthSubject(db, userId);
+        if (!cust || cust.id !== contrib.customerId) {
+          return reply
+            .status(403)
+            .send({ error: "Not authorized to upload documents for this contributor" });
+        }
+
         const fileBuffer = Buffer.from(body.file_data, "base64");
         const storageKey = `tax-documents/${body.contributor_id}/${randomUUID()}/${body.file_name}`;
 
