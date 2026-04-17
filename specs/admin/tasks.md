@@ -329,7 +329,7 @@
 
 ## Phase 11: Flutter Admin App Shell [Admin route map]
 
-- [ ] T076 Initialize Flutter admin app with Riverpod + Dio + GoRouter [P]
+- [x] T076 Initialize Flutter admin app with Riverpod + Dio + GoRouter [P]
   Done when: `flutter run` launches admin app; GoRouter configured with route groups from spec (dashboard, orders, fulfillment, shipments, inventory, products, support, disputes, customers, settings); Riverpod providers for auth state; Dio configured with base URL + auth interceptor; admin login screen works against SuperTokens
 
 - [ ] T077 Implement admin dashboard screen

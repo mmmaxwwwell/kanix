@@ -1,0 +1,39 @@
+{
+  "task_id": "T076",
+  "status": "complete",
+  "summary": "Initialized Flutter admin app with Riverpod state management, Dio HTTP client with auth interceptor, GoRouter with 10 route groups (dashboard, orders, fulfillment, shipments, inventory, products, support, disputes, customers, settings), admin login screen against SuperTokens, and app shell with NavigationRail",
+  "commands_run": [
+    {"command": "flutter pub get", "exit_code": 0},
+    {"command": "flutter analyze", "exit_code": 0},
+    {"command": "FLUTTER_ROOT=.flutter-patched flutter test", "exit_code": 0}
+  ],
+  "files_created": [
+    "admin/lib/config/api_client.dart",
+    "admin/lib/config/router.dart",
+    "admin/lib/providers/auth_provider.dart",
+    "admin/lib/screens/login_screen.dart",
+    "admin/lib/screens/dashboard_screen.dart",
+    "admin/lib/screens/orders_screen.dart",
+    "admin/lib/screens/fulfillment_screen.dart",
+    "admin/lib/screens/shipments_screen.dart",
+    "admin/lib/screens/inventory_screen.dart",
+    "admin/lib/screens/products_screen.dart",
+    "admin/lib/screens/support_screen.dart",
+    "admin/lib/screens/disputes_screen.dart",
+    "admin/lib/screens/customers_screen.dart",
+    "admin/lib/screens/settings_screen.dart",
+    "admin/lib/widgets/app_shell.dart",
+    "specs/admin/claims/completion-T076.json"
+  ],
+  "files_modified": [
+    "admin/lib/main.dart",
+    "admin/pubspec.yaml",
+    "admin/pubspec.lock",
+    "admin/test/smoke_test.dart",
+    "admin/macos/Flutter/GeneratedPluginRegistrant.swift",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
