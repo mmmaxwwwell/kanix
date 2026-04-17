@@ -227,13 +227,13 @@
 - [x] T059 Implement tracking webhook handler [FR-045, FR-046] [consumes: IC-006]
   Done when: POST /webhooks/easypost processes tracking events; creates shipment_event records with status/description/occurred_at/raw_payload; updates shipment.status based on event; propagates to order.shipping_status; integration test: simulate tracking events → shipment status updates → order shipping_status updates
 
-- [ ] T059a Implement shipment void-label API [FR-E027] [P]
+- [x] T059a Implement shipment void-label API [FR-E027] [P]
   Done when: POST /admin/shipments/:id/void-label voids the label via EasyPost adapter; shipment.status → `voided`; refunds label cost if applicable; only valid for pre-ship statuses (draft, label_pending, label_purchased, ready); integration test: buy label → void → verify status=voided; attempt void on shipped → rejected
 
-- [ ] T059b Implement shipment refresh-tracking API [P]
+- [x] T059b Implement shipment refresh-tracking API [P]
   Done when: POST /admin/shipments/:id/refresh-tracking fetches latest tracking from EasyPost adapter; creates any new shipment_event records not already stored; updates shipment.status if changed; integration test: shipped shipment → refresh → new events stored
 
-- [ ] T059c Implement shipment mark-shipped API [P]
+- [x] T059c Implement shipment mark-shipped API [P]
   Done when: POST /admin/shipments/:id/mark-shipped transitions shipment.status → `shipped`; records shipped_at timestamp; only valid from `ready` status; integration test: ready shipment → mark-shipped → status=shipped + shipped_at set
 
 - [ ] T059d Implement order resend-confirmation API [P]

@@ -1,0 +1,22 @@
+{
+  "task_id": "T059b",
+  "status": "complete",
+  "summary": "Implemented POST /admin/shipments/:id/refresh-tracking endpoint that fetches latest tracking from EasyPost adapter, stores new shipment_event records idempotently, and updates shipment/order status",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test -- --run", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "specs/admin/claims/completion-T059b.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/shipment.ts",
+    "api/src/server.ts",
+    "api/src/shipment.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

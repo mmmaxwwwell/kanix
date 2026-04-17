@@ -98,3 +98,13 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Adding a new required Config key (`EASYPOST_WEBHOOK_SECRET`) requires updating ALL test config objects across ~30 test files — use sed/batch replace to add the field consistently, but verify the easypost webhook test's config isn't duplicated
 - EasyPost webhook events are routed by `tracking_code` (→ `shipment.trackingNumber`) rather than a separate `trackerId` column — avoids schema migration since tracking number is already stored on shipment from label purchase
 - Shipment status doesn't have `out_for_delivery` but order `shipping_status` does — map EasyPost `out_for_delivery` to shipment `in_transit` while propagating the more granular `out_for_delivery` to the order level
+
+## T059a — Implement shipment void-label API
+- The `voidLabel` method and `voided` status transitions were already defined in the adapter interface and state machine from T057/T058 — only the query function, route, and tests needed to be created
+- Void only calls the adapter when a label was actually purchased (status `label_purchased` or `ready`) — for `draft`/`label_pending` it just transitions to `voided` without adapter interaction
+- The refund cost is calculated by summing all `shippingLabelPurchase` records for the shipment — supports future multi-label scenarios
+
+## T059b — Implement shipment refresh-tracking API
+- The `trackerId` needed for `adapter.getTracking()` is stored in `shippingLabelPurchase.rawPayloadJson` (the full `BuyLabelResult` object) — extract via `rawPayload.trackerId` rather than adding a new column
+- Use deterministic provider event IDs (`refresh-${occurredAt}-${status}`) for idempotency on refresh — this prevents duplicate events when refresh is called multiple times with the same tracking data
+- The refresh endpoint reuses `handleTrackingUpdate()` from the webhook handler to propagate status changes to both shipment and order — avoids duplicating the transition logic

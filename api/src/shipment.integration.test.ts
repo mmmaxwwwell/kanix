@@ -5,6 +5,7 @@ import {
   shipment,
   shipmentPackage,
   shipmentLine,
+  shipmentEvent,
   shippingLabelPurchase,
 } from "./db/schema/fulfillment.js";
 import { eq } from "drizzle-orm";
@@ -18,6 +19,9 @@ import {
   transitionShipmentStatus,
   isValidShipmentTransition,
   findLabelPurchasesByShipmentId,
+  refreshShipmentTracking,
+  findShipmentEventsByShipmentId,
+  markShipmentShipped,
 } from "./db/queries/shipment.js";
 import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 
@@ -91,6 +95,7 @@ describeWithDeps("shipment integration (T058)", () => {
       const db = dbConn.db;
       // Clean up in reverse dependency order
       for (const sid of createdShipmentIds) {
+        await db.delete(shipmentEvent).where(eq(shipmentEvent.shipmentId, sid));
         await db.delete(shippingLabelPurchase).where(eq(shippingLabelPurchase.shipmentId, sid));
         await db.delete(shipmentLine).where(eq(shipmentLine.shipmentId, sid));
         await db.delete(shipmentPackage).where(eq(shipmentPackage.shipmentId, sid));
@@ -373,5 +378,207 @@ describeWithDeps("shipment integration (T058)", () => {
     await expect(transitionShipmentStatus(db, result.shipment.id, "shipped")).rejects.toMatchObject(
       { code: "ERR_INVALID_TRANSITION" },
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // Refresh tracking (T059b)
+  // -------------------------------------------------------------------------
+
+  it("refreshes tracking on a shipped shipment and stores new events", async () => {
+    const db = dbConn.db;
+    const adapter = createStubShippingAdapter();
+
+    // Create a shipment and walk it to shipped status
+    const created = await createShipment(db, {
+      orderId: testOrderId,
+      packages: [{ weight: 12 }],
+      lines: [{ orderLineId: testOrderLineId1, quantity: 1 }],
+    });
+    createdShipmentIds.push(created.shipment.id);
+    const sid = created.shipment.id;
+
+    // Buy label (stores trackerId in rawPayloadJson)
+    await buyShipmentLabel(
+      db,
+      { shipmentId: sid, providerShipmentId: "shp_stub_refresh", rateId: "rate_stub_refresh" },
+      adapter,
+    );
+
+    // Transition to ready → shipped
+    await transitionShipmentStatus(db, sid, "ready");
+    await transitionShipmentStatus(db, sid, "shipped");
+
+    // Refresh tracking
+    const result = await refreshShipmentTracking(db, sid, adapter);
+
+    // Stub adapter returns 1 event with status "in_transit"
+    expect(result.tracking.status).toBe("in_transit");
+    expect(result.tracking.events).toHaveLength(1);
+    expect(result.newEventsStored).toBe(1);
+    expect(result.shipmentTransitioned).toBe(true);
+    expect(result.shipment.status).toBe("in_transit");
+
+    // Verify events are persisted
+    const events = await findShipmentEventsByShipmentId(db, sid);
+    expect(events.length).toBeGreaterThanOrEqual(1);
+    const inTransitEvent = events.find((e) => e.status === "in_transit");
+    expect(inTransitEvent).toBeDefined();
+    expect(inTransitEvent?.description).toBe("Package in transit");
+  });
+
+  it("refresh-tracking is idempotent — no duplicate events on second call", async () => {
+    const db = dbConn.db;
+    const adapter = createStubShippingAdapter();
+
+    // Create a shipment and walk it to shipped status
+    const created = await createShipment(db, {
+      orderId: testOrderId,
+      packages: [{ weight: 10 }],
+      lines: [{ orderLineId: testOrderLineId2, quantity: 1 }],
+    });
+    createdShipmentIds.push(created.shipment.id);
+    const sid = created.shipment.id;
+
+    await buyShipmentLabel(
+      db,
+      {
+        shipmentId: sid,
+        providerShipmentId: "shp_stub_idempotent",
+        rateId: "rate_stub_idempotent",
+      },
+      adapter,
+    );
+    await transitionShipmentStatus(db, sid, "ready");
+    await transitionShipmentStatus(db, sid, "shipped");
+
+    // First refresh
+    const first = await refreshShipmentTracking(db, sid, adapter);
+    expect(first.newEventsStored).toBe(1);
+
+    // Second refresh — same events should not be duplicated
+    const second = await refreshShipmentTracking(db, sid, adapter);
+    expect(second.newEventsStored).toBe(0);
+
+    // Total events should still be 1
+    const events = await findShipmentEventsByShipmentId(db, sid);
+    const refreshEvents = events.filter((e) => e.providerEventId?.startsWith("refresh-"));
+    expect(refreshEvents).toHaveLength(1);
+  });
+
+  it("rejects refresh-tracking for draft shipment", async () => {
+    const db = dbConn.db;
+    const adapter = createStubShippingAdapter();
+
+    // Create a draft shipment (no label)
+    const created = await createShipment(db, {
+      orderId: testOrderId,
+      packages: [{ weight: 5 }],
+      lines: [{ orderLineId: testOrderLineId1, quantity: 1 }],
+    });
+    createdShipmentIds.push(created.shipment.id);
+
+    await expect(refreshShipmentTracking(db, created.shipment.id, adapter)).rejects.toMatchObject({
+      code: "ERR_INVALID_STATE",
+    });
+  });
+
+  it("rejects refresh-tracking for non-existent shipment", async () => {
+    const db = dbConn.db;
+    const adapter = createStubShippingAdapter();
+
+    await expect(
+      refreshShipmentTracking(db, "00000000-0000-0000-0000-000000000099", adapter),
+    ).rejects.toMatchObject({ code: "ERR_SHIPMENT_NOT_FOUND" });
+  });
+
+  // -------------------------------------------------------------------------
+  // Mark shipped (T059c)
+  // -------------------------------------------------------------------------
+
+  it("marks a ready shipment as shipped with shipped_at timestamp", async () => {
+    const db = dbConn.db;
+    const adapter = createStubShippingAdapter();
+
+    // Create a shipment and walk it to ready
+    const created = await createShipment(db, {
+      orderId: testOrderId,
+      packages: [{ weight: 14 }],
+      lines: [{ orderLineId: testOrderLineId1, quantity: 1 }],
+    });
+    createdShipmentIds.push(created.shipment.id);
+    const sid = created.shipment.id;
+
+    await buyShipmentLabel(
+      db,
+      { shipmentId: sid, providerShipmentId: "shp_stub_mark", rateId: "rate_stub_mark" },
+      adapter,
+    );
+    await transitionShipmentStatus(db, sid, "ready");
+
+    // Mark as shipped
+    const before = new Date();
+    const result = await markShipmentShipped(db, sid);
+    const after = new Date();
+
+    expect(result.id).toBe(sid);
+    expect(result.status).toBe("shipped");
+    expect(result.shippedAt).toBeInstanceOf(Date);
+    expect(result.shippedAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
+    expect(result.shippedAt.getTime()).toBeLessThanOrEqual(after.getTime());
+
+    // Verify persisted state
+    const fetched = await findShipmentById(db, sid);
+    expect(fetched?.status).toBe("shipped");
+  });
+
+  it("rejects mark-shipped from non-ready status (draft)", async () => {
+    const db = dbConn.db;
+
+    // Create a draft shipment
+    const created = await createShipment(db, {
+      orderId: testOrderId,
+      packages: [{ weight: 6 }],
+      lines: [{ orderLineId: testOrderLineId2, quantity: 1 }],
+    });
+    createdShipmentIds.push(created.shipment.id);
+
+    await expect(markShipmentShipped(db, created.shipment.id)).rejects.toMatchObject({
+      code: "ERR_INVALID_TRANSITION",
+    });
+  });
+
+  it("rejects mark-shipped from label_purchased status", async () => {
+    const db = dbConn.db;
+    const adapter = createStubShippingAdapter();
+
+    const created = await createShipment(db, {
+      orderId: testOrderId,
+      packages: [{ weight: 7 }],
+      lines: [{ orderLineId: testOrderLineId1, quantity: 1 }],
+    });
+    createdShipmentIds.push(created.shipment.id);
+
+    await buyShipmentLabel(
+      db,
+      {
+        shipmentId: created.shipment.id,
+        providerShipmentId: "shp_stub_lp",
+        rateId: "rate_stub_lp",
+      },
+      adapter,
+    );
+
+    // label_purchased, not ready — should reject
+    await expect(markShipmentShipped(db, created.shipment.id)).rejects.toMatchObject({
+      code: "ERR_INVALID_TRANSITION",
+    });
+  });
+
+  it("rejects mark-shipped for non-existent shipment", async () => {
+    const db = dbConn.db;
+
+    await expect(
+      markShipmentShipped(db, "00000000-0000-0000-0000-000000000099"),
+    ).rejects.toMatchObject({ code: "ERR_SHIPMENT_NOT_FOUND" });
   });
 });

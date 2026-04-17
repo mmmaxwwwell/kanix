@@ -1,0 +1,22 @@
+{
+  "task_id": "T059a",
+  "status": "complete",
+  "summary": "Implemented POST /admin/shipments/:id/void-label API with voidShipmentLabel query function, route handler, and 7 integration tests covering void from all pre-ship statuses plus rejection from post-ship statuses",
+  "commands_run": [
+    {"command": "pnpm test -- --reporter=verbose src/void-label.integration.test.ts", "exit_code": 0},
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/void-label.integration.test.ts",
+    "specs/admin/claims/completion-T059a.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/shipment.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

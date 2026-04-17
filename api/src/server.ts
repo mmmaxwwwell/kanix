@@ -130,12 +130,15 @@ import {
   findShipmentLinesByShipmentId,
   findShipmentPackagesByShipmentId,
   buyShipmentLabel,
+  voidShipmentLabel,
   transitionShipmentStatus,
   findLabelPurchasesByShipmentId,
   findShipmentByTrackingNumber,
   hasShipmentEventBeenProcessed,
   storeShipmentEvent,
   handleTrackingUpdate,
+  refreshShipmentTracking,
+  markShipmentShipped,
 } from "./db/queries/shipment.js";
 import {
   insertPolicySnapshot,
@@ -1548,6 +1551,53 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       },
     );
 
+    // Void label for a shipment
+    app.post(
+      "/api/admin/shipments/:id/void-label",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.FULFILLMENT_MANAGE),
+        ],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+
+        try {
+          const result = await voidShipmentLabel(database.db, id, shippingAdapter);
+
+          request.auditContext = {
+            action: "shipment.void_label",
+            entityType: "shipment",
+            entityId: id,
+            afterJson: {
+              status: result.shipment.status,
+              refunded: result.refunded,
+              refundedCostMinor: result.refundedCostMinor,
+            },
+          };
+
+          return result;
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_SHIPMENT_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_SHIPMENT_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_INVALID_STATE" || error.code === "ERR_INVALID_TRANSITION") {
+            return reply.status(400).send({
+              error: error.code,
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
     // Transition shipment status
     app.post(
       "/api/admin/shipments/:id/transition",
@@ -1581,6 +1631,104 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             afterJson: {
               oldStatus: result.oldStatus,
               newStatus: result.newStatus,
+            },
+          };
+
+          return result;
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_SHIPMENT_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_SHIPMENT_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_INVALID_TRANSITION") {
+            return reply.status(400).send({
+              error: "ERR_INVALID_TRANSITION",
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // Refresh tracking for a shipment
+    app.post(
+      "/api/admin/shipments/:id/refresh-tracking",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.FULFILLMENT_MANAGE),
+        ],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+
+        try {
+          const result = await refreshShipmentTracking(database.db, id, shippingAdapter);
+
+          request.auditContext = {
+            action: "shipment.refresh_tracking",
+            entityType: "shipment",
+            entityId: id,
+            afterJson: {
+              newEventsStored: result.newEventsStored,
+              shipmentTransitioned: result.shipmentTransitioned,
+              orderTransitioned: result.orderTransitioned,
+              trackingStatus: result.tracking.status,
+            },
+          };
+
+          return result;
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_SHIPMENT_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_SHIPMENT_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          if (
+            error.code === "ERR_INVALID_STATE" ||
+            error.code === "ERR_NO_LABEL" ||
+            error.code === "ERR_NO_TRACKER"
+          ) {
+            return reply.status(400).send({
+              error: error.code,
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // Mark shipment as shipped
+    app.post(
+      "/api/admin/shipments/:id/mark-shipped",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.FULFILLMENT_MANAGE),
+        ],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+
+        try {
+          const result = await markShipmentShipped(database.db, id);
+
+          request.auditContext = {
+            action: "shipment.mark_shipped",
+            entityType: "shipment",
+            entityId: id,
+            afterJson: {
+              status: result.status,
+              shippedAt: result.shippedAt.toISOString(),
             },
           };
 

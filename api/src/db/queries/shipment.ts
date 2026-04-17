@@ -8,7 +8,11 @@ import {
   shippingLabelPurchase,
 } from "../schema/fulfillment.js";
 import { order, orderLine } from "../schema/order.js";
-import type { ShippingAdapter, BuyLabelResult } from "../../services/shipping-adapter.js";
+import type {
+  ShippingAdapter,
+  BuyLabelResult,
+  TrackingResult,
+} from "../../services/shipping-adapter.js";
 import { transitionOrderStatus } from "./order-state-machine.js";
 
 // ---------------------------------------------------------------------------
@@ -363,6 +367,141 @@ export async function buyShipmentLabel(
 }
 
 // ---------------------------------------------------------------------------
+// Void label for a shipment
+// ---------------------------------------------------------------------------
+
+const VOIDABLE_STATUSES = ["draft", "label_pending", "label_purchased", "ready"];
+
+export async function voidShipmentLabel(
+  db: PostgresJsDatabase,
+  shipmentId: string,
+  adapter: ShippingAdapter,
+): Promise<{
+  shipment: ShipmentRecord;
+  refunded: boolean;
+  refundedCostMinor: number | null;
+}> {
+  // Look up the shipment
+  const [current] = await db
+    .select({
+      id: shipment.id,
+      status: shipment.status,
+      orderId: shipment.orderId,
+      trackingNumber: shipment.trackingNumber,
+    })
+    .from(shipment)
+    .where(eq(shipment.id, shipmentId));
+
+  if (!current) {
+    throw { code: "ERR_SHIPMENT_NOT_FOUND", message: `Shipment ${shipmentId} not found` };
+  }
+
+  if (!VOIDABLE_STATUSES.includes(current.status)) {
+    throw {
+      code: "ERR_INVALID_STATE",
+      message: `Cannot void label for shipment in ${current.status} status`,
+    };
+  }
+
+  // If a label was purchased, void it via the adapter
+  let refunded = false;
+  let refundedCostMinor: number | null = null;
+
+  if (current.status === "label_purchased" || current.status === "ready") {
+    // Find the label purchase to get cost
+    const purchases = await db
+      .select({
+        id: shippingLabelPurchase.id,
+        providerLabelId: shippingLabelPurchase.providerLabelId,
+        costMinor: shippingLabelPurchase.costMinor,
+      })
+      .from(shippingLabelPurchase)
+      .where(eq(shippingLabelPurchase.shipmentId, shipmentId));
+
+    if (purchases.length > 0) {
+      // Call the adapter to void/refund the label
+      const voidResult = await adapter.voidLabel(shipmentId);
+      refunded = voidResult.refunded;
+      if (refunded) {
+        refundedCostMinor = purchases.reduce((sum, p) => sum + p.costMinor, 0);
+      }
+    }
+  }
+
+  // Transition to voided
+  await transitionShipmentStatus(db, shipmentId, "voided");
+
+  // Fetch the updated shipment
+  const [updated] = await db
+    .select({
+      id: shipment.id,
+      orderId: shipment.orderId,
+      shipmentNumber: shipment.shipmentNumber,
+      status: shipment.status,
+      carrier: shipment.carrier,
+      serviceLevel: shipment.serviceLevel,
+      trackingNumber: shipment.trackingNumber,
+      trackingUrl: shipment.trackingUrl,
+      labelUrl: shipment.labelUrl,
+      createdAt: shipment.createdAt,
+      updatedAt: shipment.updatedAt,
+    })
+    .from(shipment)
+    .where(eq(shipment.id, shipmentId));
+
+  return {
+    shipment: updated,
+    refunded,
+    refundedCostMinor,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Mark shipment as shipped (only from "ready")
+// ---------------------------------------------------------------------------
+
+export async function markShipmentShipped(
+  db: PostgresJsDatabase,
+  shipmentId: string,
+): Promise<{
+  id: string;
+  status: string;
+  shippedAt: Date;
+}> {
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ id: shipment.id, status: shipment.status })
+      .from(shipment)
+      .where(eq(shipment.id, shipmentId));
+
+    if (!current) {
+      throw { code: "ERR_SHIPMENT_NOT_FOUND", message: `Shipment ${shipmentId} not found` };
+    }
+
+    if (current.status !== "ready") {
+      throw {
+        code: "ERR_INVALID_TRANSITION",
+        message: `Cannot mark shipment as shipped from ${current.status} status (must be ready)`,
+        from: current.status,
+        to: "shipped",
+      };
+    }
+
+    const now = new Date();
+    await tx
+      .update(shipment)
+      .set({
+        status: "shipped",
+        shippedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(shipment.id, shipmentId));
+
+    return { id: current.id, status: "shipped", shippedAt: now };
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Find shipment by ID
 // ---------------------------------------------------------------------------
 
@@ -680,4 +819,126 @@ export async function handleTrackingUpdate(
   }
 
   return { shipmentTransitioned, orderTransitioned };
+}
+
+// ---------------------------------------------------------------------------
+// Refresh tracking: poll adapter for latest events, store new ones
+// ---------------------------------------------------------------------------
+
+export async function refreshShipmentTracking(
+  db: PostgresJsDatabase,
+  shipmentId: string,
+  adapter: ShippingAdapter,
+): Promise<{
+  shipment: ShipmentRecord;
+  tracking: TrackingResult;
+  newEventsStored: number;
+  shipmentTransitioned: boolean;
+  orderTransitioned: boolean;
+}> {
+  // 1. Find shipment
+  const shipmentRecord = await findShipmentById(db, shipmentId);
+  if (!shipmentRecord) {
+    throw { code: "ERR_SHIPMENT_NOT_FOUND", message: `Shipment ${shipmentId} not found` };
+  }
+
+  // 2. Must have a label purchased (tracking requires a trackerId)
+  if (
+    shipmentRecord.status === "draft" ||
+    shipmentRecord.status === "label_pending" ||
+    shipmentRecord.status === "voided"
+  ) {
+    throw {
+      code: "ERR_INVALID_STATE",
+      message: `Cannot refresh tracking for shipment in ${shipmentRecord.status} status`,
+    };
+  }
+
+  // 3. Get trackerId from label purchase rawPayloadJson
+  const purchases = await db
+    .select({
+      id: shippingLabelPurchase.id,
+      rawPayloadJson: shippingLabelPurchase.rawPayloadJson,
+    })
+    .from(shippingLabelPurchase)
+    .where(eq(shippingLabelPurchase.shipmentId, shipmentId));
+
+  if (purchases.length === 0) {
+    throw {
+      code: "ERR_NO_LABEL",
+      message: `No label purchase found for shipment ${shipmentId}`,
+    };
+  }
+
+  const rawPayload = purchases[0].rawPayloadJson as Record<string, unknown> | null;
+  const trackerId = rawPayload?.trackerId as string | undefined;
+  if (!trackerId) {
+    throw {
+      code: "ERR_NO_TRACKER",
+      message: `No tracker ID found for shipment ${shipmentId}`,
+    };
+  }
+
+  // 4. Fetch latest tracking from adapter
+  const tracking = await adapter.getTracking(trackerId);
+
+  // 5. Get existing events to avoid duplicates
+  const existingEvents = await findShipmentEventsByShipmentId(db, shipmentId);
+  const existingEventIds = new Set(
+    existingEvents.filter((e) => e.providerEventId != null).map((e) => e.providerEventId),
+  );
+
+  // 6. Store new events
+  let newEventsStored = 0;
+  for (const event of tracking.events) {
+    // Generate a deterministic provider event ID from the event data
+    const providerEventId = `refresh-${event.occurredAt}-${event.status}`;
+
+    if (existingEventIds.has(providerEventId)) {
+      continue;
+    }
+
+    // Also check if we already have this event by checking for duplicates
+    const alreadyProcessed = await hasShipmentEventBeenProcessed(db, providerEventId);
+    if (alreadyProcessed) {
+      continue;
+    }
+
+    await storeShipmentEvent(db, {
+      shipmentId,
+      providerEventId,
+      status: event.status,
+      description: event.description,
+      occurredAt: new Date(event.occurredAt),
+      rawPayloadJson: event,
+    });
+    newEventsStored++;
+  }
+
+  // 7. Update shipment + order status if changed
+  let shipmentTransitioned = false;
+  let orderTransitioned = false;
+
+  if (tracking.status && tracking.status !== "unknown") {
+    const result = await handleTrackingUpdate(db, shipmentRecord, tracking.status);
+    shipmentTransitioned = result.shipmentTransitioned;
+    orderTransitioned = result.orderTransitioned;
+  }
+
+  // 8. Re-fetch the shipment to get updated state
+  const updatedShipment = await findShipmentById(db, shipmentId);
+  if (!updatedShipment) {
+    throw {
+      code: "ERR_SHIPMENT_NOT_FOUND",
+      message: `Shipment ${shipmentId} not found after update`,
+    };
+  }
+
+  return {
+    shipment: updatedShipment,
+    tracking,
+    newEventsStored,
+    shipmentTransitioned,
+    orderTransitioned,
+  };
 }
