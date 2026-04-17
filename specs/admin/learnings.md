@@ -30,3 +30,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T006 — deploy/ sub-flake
 - `nginx` package is available in nixpkgs unstable — no special overlay needed
 - Simplest sub-flakes (deploy, site, api) all follow the same pattern: nixpkgs + flake-utils, single `mkShell` with `packages`
+
+## T007 — process-compose.yml
+- SuperTokens Main class resolves `config.yaml` relative to the install dir argument, NOT CWD — if you `cd` into the install dir and pass a relative path like `./.dev/...`, it becomes a double-nested path. Fix: resolve to absolute path with `$(cd ... && pwd)` before passing to Main.
+- SuperTokens ignores CLI args like `postgresql_connection_uri=...` in DEV mode — must write settings to `config.yaml` instead.
+- `pg_isready` without `-d` defaults to connecting to a database named after the current OS user — add `-d postgres` to avoid noisy "database does not exist" errors in readiness probes.

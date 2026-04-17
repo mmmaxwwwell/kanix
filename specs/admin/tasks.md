@@ -26,7 +26,7 @@
 - [x] T006 Create deploy/ with flake.nix for infrastructure tooling [FR-098]
   Done when: `deploy/flake.nix` provides opentofu, nginx; `deploy/tofu/` and `deploy/nixos/` directories exist with placeholder files
 
-- [ ] T007 Create process-compose.yml for dev services [FR-099]
+- [x] T007 Create process-compose.yml for dev services [FR-099]
   Done when: `process-compose up` starts Postgres on port 5432 and SuperTokens on port 3567; `pg_isready` confirms Postgres is up; health check confirms SuperTokens is up
 
 - [ ] T008 Create .env.example with all environment variables [FR-112]

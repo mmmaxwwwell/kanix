@@ -1,0 +1,79 @@
+version: "0.5"
+
+environment:
+  - "PROJECT_ROOT=${PC_PROJECT_DIR:-.}"
+
+processes:
+  postgres-init:
+    command: |
+      if [ ! -d "$PROJECT_ROOT/.dev/pgdata" ]; then
+        echo "Initializing PostgreSQL data directory..."
+        initdb -D "$PROJECT_ROOT/.dev/pgdata" --no-locale --encoding=UTF8 --auth=trust
+        echo "listen_addresses = '127.0.0.1'" >> "$PROJECT_ROOT/.dev/pgdata/postgresql.conf"
+        echo "port = 5432" >> "$PROJECT_ROOT/.dev/pgdata/postgresql.conf"
+        echo "unix_socket_directories = '$PROJECT_ROOT/.dev/pgsock'" >> "$PROJECT_ROOT/.dev/pgdata/postgresql.conf"
+      fi
+      mkdir -p "$PROJECT_ROOT/.dev/pgsock"
+    availability:
+      restart: "no"
+
+  postgres:
+    command: "postgres -D $PROJECT_ROOT/.dev/pgdata"
+    depends_on:
+      postgres-init:
+        condition: process_completed_successfully
+    readiness_probe:
+      exec:
+        command: "pg_isready -h 127.0.0.1 -p 5432 -d postgres"
+      initial_delay_seconds: 1
+      period_seconds: 2
+      timeout_seconds: 2
+      failure_threshold: 10
+    availability:
+      restart: on_failure
+      max_restarts: 3
+
+  postgres-createdb:
+    command: |
+      createdb -h 127.0.0.1 -p 5432 supertokens 2>/dev/null || true
+    depends_on:
+      postgres:
+        condition: process_healthy
+    availability:
+      restart: "no"
+
+  supertokens-setup:
+    command: "bash $PROJECT_ROOT/scripts/setup-supertokens.sh"
+    environment:
+      - "PROJECT_ROOT=${PC_PROJECT_DIR:-.}"
+    availability:
+      restart: "no"
+
+  supertokens:
+    command: |
+      ST_DIR="$(cd "$PROJECT_ROOT/.dev/supertokens/supertokens" && pwd)"
+      cd "$ST_DIR"
+      # Ensure config.yaml has the PostgreSQL connection URI
+      if ! grep -q '^postgresql_connection_uri:' config.yaml; then
+        cp config.yaml.original config.yaml 2>/dev/null || true
+        printf '\nport: 3567\nhost: 0.0.0.0\npostgresql_connection_uri: "postgresql://127.0.0.1:5432/supertokens"\n' >> config.yaml
+      fi
+      exec java -classpath "core/*:plugin-interface/*:plugin/*:ee/*" \
+        io.supertokens.Main "$ST_DIR" DEV
+    depends_on:
+      supertokens-setup:
+        condition: process_completed_successfully
+      postgres-createdb:
+        condition: process_completed_successfully
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: 3567
+        path: /hello
+      initial_delay_seconds: 3
+      period_seconds: 3
+      timeout_seconds: 2
+      failure_threshold: 10
+    availability:
+      restart: on_failure
+      max_restarts: 3

@@ -45,6 +45,9 @@ dist/
 *.sqlite3
 *.db
 
+# Dev services (process-compose data)
+.dev/
+
 # Coverage
 coverage/
 .nyc_output/
