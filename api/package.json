@@ -15,7 +15,9 @@
     "format": "prettier --write src/",
     "typecheck": "tsc --noEmit",
     "db:migrate": "liquibase update",
-    "db:rollback": "liquibase rollback-count 1"
+    "db:rollback": "liquibase rollback-count 1",
+    "db:seed": "tsx src/db/scripts/seed.ts",
+    "db:reset": "tsx src/db/scripts/reset.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

@@ -97,7 +97,7 @@
 - [x] T027 Set up Drizzle ORM with schema introspection [FR-032] [consumes: IC-001]
   Done when: Drizzle schema files in `api/src/db/schema/` reflect all tables from migration; typed queries in `api/src/db/queries/`; `SELECT 1` query succeeds via Drizzle; integration test: insert and read a product row with type safety
 
-- [ ] T028 Create seed script with dev data [FR-101]
+- [x] T028 Create seed script with dev data [FR-101]
   Done when: `pnpm db:seed` populates: 5 products with TPU/PA11/TPC variants, product classes (plates/modules/belts), kit definition (starter kit), inventory balances (50 units each), 1 admin user (super_admin role), 1 inventory location (default warehouse); seed is idempotent (safe to run multiple times); `pnpm db:reset` drops + recreates + migrates + seeds
 
 - [ ] T029 Update /ready to check Postgres connectivity [FR-103]

@@ -1,0 +1,25 @@
+{
+  "task_id": "T028",
+  "status": "complete",
+  "summary": "Created idempotent seed script (pnpm db:seed) with 5 products, TPU/PA11/TPC variants, 3 product classes, starter kit, inventory balances (50 each), admin user with super_admin role, and default warehouse; created db:reset script that drops/recreates/migrates/seeds",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm db:seed", "exit_code": 0},
+    {"command": "pnpm db:seed (second run, idempotency)", "exit_code": 0},
+    {"command": "pnpm db:reset", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/scripts/seed.ts",
+    "api/src/db/scripts/reset.ts",
+    "specs/admin/claims/completion-T028.json"
+  ],
+  "files_modified": [
+    "api/package.json",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

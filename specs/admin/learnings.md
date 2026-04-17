@@ -79,3 +79,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Drizzle ORM's `pg-core` exports `timestamp` not `timestamptz` — use `timestamp("col", { withTimezone: true })` for timestamptz columns
 - Drizzle's `postgres.js` driver (`postgres` package) works well with `drizzle-orm/postgres-js` — create connection with `postgres(url)` then `drizzle(sql)`
 - Integration tests with real DB should use `describe.skip` when `DATABASE_URL` is not set — `const describeWithDb = DATABASE_URL ? describe : describe.skip` pattern works cleanly
+
+## T028 — Seed script with dev data
+- The `kanix` role in dev doesn't have CREATEDB privilege — `db:reset` must use the OS superuser via `psql`/`dropdb`/`createdb` CLI tools (trust auth) rather than connecting as `kanix` to the maintenance DB
+- Drizzle's `onConflictDoNothing()` makes seed idempotent, but `returning()` returns empty when the conflict is hit — use a fallback query to fetch the existing row's ID
