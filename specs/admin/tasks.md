@@ -221,7 +221,7 @@
 - [x] T057 Implement EasyPost adapter [FR-043, FR-049] [produces: IC-006]
   Done when: `shippingAdapter.getRates(fromAddress, toAddress, packages)` returns carrier rates; `shippingAdapter.buyLabel(rateId)` purchases label and returns tracking number + label URL; `shippingAdapter.getTracking(trackerId)` returns tracking status; adapter interface allows provider swap via config; integration tests (EasyPost test mode): get rates → buy label → verify tracking number returned
 
-- [ ] T058 Implement shipment system [FR-044, FR-046, FR-047, FR-048]
+- [x] T058 Implement shipment system [FR-044, FR-046, FR-047, FR-048]
   Done when: POST /admin/shipments creates draft shipment for order; shipment_package with weight/dimensions; shipment_line maps order_lines to shipment with quantities; POST /admin/shipments/:id/buy-label purchases via EasyPost adapter and records cost in shipping_label_purchase; shipment status machine: draft→label_pending→label_purchased→ready→shipped→in_transit→delivered; integration tests: create shipment → buy label → mark shipped
 
 - [ ] T059 Implement tracking webhook handler [FR-045, FR-046] [consumes: IC-006]

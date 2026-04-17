@@ -124,6 +124,16 @@ import {
   assignFulfillmentTask,
 } from "./db/queries/fulfillment-task.js";
 import {
+  createShipment,
+  findShipmentById,
+  findShipmentsByOrderId,
+  findShipmentLinesByShipmentId,
+  findShipmentPackagesByShipmentId,
+  buyShipmentLabel,
+  transitionShipmentStatus,
+  findLabelPurchasesByShipmentId,
+} from "./db/queries/shipment.js";
+import {
   insertPolicySnapshot,
   findPoliciesByType,
   findCurrentPolicyByType,
@@ -1300,6 +1310,281 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           if (error.code === "ERR_TASK_NOT_FOUND") {
             return reply.status(404).send({
               error: "ERR_TASK_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_INVALID_TRANSITION") {
+            return reply.status(400).send({
+              error: "ERR_INVALID_TRANSITION",
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // -----------------------------------------------------------------------
+    // Shipments
+    // -----------------------------------------------------------------------
+
+    // Create a draft shipment for an order
+    app.post(
+      "/api/admin/shipments",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.FULFILLMENT_MANAGE),
+        ],
+        schema: {
+          body: {
+            type: "object",
+            required: ["order_id", "packages", "lines"],
+            properties: {
+              order_id: { type: "string" },
+              packages: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    weight: { type: "number" },
+                    dimensions: {
+                      type: "object",
+                      properties: {
+                        length: { type: "number" },
+                        width: { type: "number" },
+                        height: { type: "number" },
+                      },
+                    },
+                    package_type: { type: "string" },
+                  },
+                },
+              },
+              lines: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["order_line_id", "quantity"],
+                  properties: {
+                    order_line_id: { type: "string" },
+                    quantity: { type: "integer", minimum: 1 },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const body = request.body as {
+          order_id: string;
+          packages: {
+            weight?: number;
+            dimensions?: { length?: number; width?: number; height?: number };
+            package_type?: string;
+          }[];
+          lines: { order_line_id: string; quantity: number }[];
+        };
+
+        try {
+          const result = await createShipment(database.db, {
+            orderId: body.order_id,
+            packages: body.packages.map((p) => ({
+              weight: p.weight,
+              dimensions: p.dimensions,
+              packageType: p.package_type,
+            })),
+            lines: body.lines.map((l) => ({
+              orderLineId: l.order_line_id,
+              quantity: l.quantity,
+            })),
+          });
+
+          request.auditContext = {
+            action: "shipment.create",
+            entityType: "shipment",
+            entityId: result.shipment.id,
+            afterJson: {
+              orderId: body.order_id,
+              shipmentNumber: result.shipment.shipmentNumber,
+              packageCount: result.packages.length,
+              lineCount: result.lines.length,
+            },
+          };
+
+          return reply.status(201).send(result);
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_ORDER_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_ORDER_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          if (
+            error.code === "ERR_ORDER_LINE_NOT_FOUND" ||
+            error.code === "ERR_ORDER_LINE_MISMATCH"
+          ) {
+            return reply.status(400).send({
+              error: error.code,
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // Get shipment by ID
+    app.get(
+      "/api/admin/shipments/:id",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.FULFILLMENT_READ)],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const found = await findShipmentById(database.db, id);
+        if (!found) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_SHIPMENT_NOT_FOUND", message: "Shipment not found" });
+        }
+        const packages = await findShipmentPackagesByShipmentId(database.db, id);
+        const lines = await findShipmentLinesByShipmentId(database.db, id);
+        const purchases = await findLabelPurchasesByShipmentId(database.db, id);
+        return { shipment: found, packages, lines, purchases };
+      },
+    );
+
+    // Get shipments for an order
+    app.get(
+      "/api/admin/orders/:id/shipments",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.FULFILLMENT_READ)],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const found = await findOrderById(database.db, id);
+        if (!found) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_ORDER_NOT_FOUND", message: "Order not found" });
+        }
+        const shipments = await findShipmentsByOrderId(database.db, id);
+        return { shipments };
+      },
+    );
+
+    // Buy label for a shipment
+    app.post(
+      "/api/admin/shipments/:id/buy-label",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.FULFILLMENT_MANAGE),
+        ],
+        schema: {
+          body: {
+            type: "object",
+            required: ["provider_shipment_id", "rate_id"],
+            properties: {
+              provider_shipment_id: { type: "string" },
+              rate_id: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { provider_shipment_id: string; rate_id: string };
+
+        try {
+          const result = await buyShipmentLabel(
+            database.db,
+            {
+              shipmentId: id,
+              providerShipmentId: body.provider_shipment_id,
+              rateId: body.rate_id,
+            },
+            shippingAdapter,
+          );
+
+          request.auditContext = {
+            action: "shipment.buy_label",
+            entityType: "shipment",
+            entityId: id,
+            afterJson: {
+              trackingNumber: result.label.trackingNumber,
+              carrier: result.label.carrier,
+              service: result.label.service,
+              costMinor: result.purchase.costMinor,
+            },
+          };
+
+          return result;
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_SHIPMENT_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_SHIPMENT_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_INVALID_STATE" || error.code === "ERR_INVALID_TRANSITION") {
+            return reply.status(400).send({
+              error: error.code,
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // Transition shipment status
+    app.post(
+      "/api/admin/shipments/:id/transition",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.FULFILLMENT_MANAGE),
+        ],
+        schema: {
+          body: {
+            type: "object",
+            required: ["new_status"],
+            properties: {
+              new_status: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { new_status: string };
+
+        try {
+          const result = await transitionShipmentStatus(database.db, id, body.new_status);
+
+          request.auditContext = {
+            action: "shipment.transition",
+            entityType: "shipment",
+            entityId: id,
+            afterJson: {
+              oldStatus: result.oldStatus,
+              newStatus: result.newStatus,
+            },
+          };
+
+          return result;
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_SHIPMENT_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_SHIPMENT_NOT_FOUND",
               message: error.message,
             });
           }

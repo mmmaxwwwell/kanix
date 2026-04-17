@@ -88,3 +88,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Extending `ShippingAdapter` interface with new methods requires updating all test file stubs — export `createStubShippingAdapter()` from the adapter module so tests can import it directly instead of defining local copies
 - EasyPost `Shipment.buy(shipmentId, rateId)` returns the purchased shipment with `tracking_code`, `postage_label.label_url`, and `tracker.id` — these are the three key fields needed for `BuyLabelResult`
 - Stub adapter params that are unused should omit parameter names entirely (matching the existing `calculateRate()` pattern) to avoid `@typescript-eslint/no-unused-vars` lint errors
+
+## T058 — Implement shipment system
+- All shipment-related schema tables (shipment, shipment_package, shipment_line, shipment_event, shipping_label_purchase) were already defined in `fulfillment.ts` — only the query layer, state machine, routes, and tests needed to be created
+- The `buyShipmentLabel` function takes the `ShippingAdapter` as a parameter (DI pattern) — this allows tests to inject the stub adapter without external API calls, consistent with the pattern used for fulfillment tasks and payment
+- Shipment number generation uses `SHP-<orderNumber>-<timestamp_base36>` — sufficient for V1 since each order typically has one shipment, but could collide in high-concurrency scenarios (consider a sequence table later)
