@@ -1,0 +1,22 @@
+{
+  "task_id": "T043",
+  "status": "complete",
+  "summary": "Implemented low-stock alert service that queues notifications when inventory adjustments or reservations cause available < safety_stock, with variant SKU, product title, available count, and safety_stock threshold",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/services/low-stock-alert.ts",
+    "api/src/low-stock-alert.integration.test.ts",
+    "specs/admin/claims/completion-T043.json"
+  ],
+  "files_modified": [
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

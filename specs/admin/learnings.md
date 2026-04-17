@@ -61,3 +61,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `releaseExpiredReservations()` was already implemented in T041's `reservation.ts` — T042 only needed a `setInterval` wrapper with logging and shutdown registration
 - Use `timer.unref()` on the cleanup interval so Node can exit cleanly even if the timer is still active — otherwise the process hangs during tests and graceful shutdown
 - Pass `reservationCleanupIntervalMs: 0` in `CreateServerOptions` to disable the cron in integration tests that call `releaseExpiredReservations()` directly
+
+## T043 — Implement low-stock alert
+- The adjustment flow already returns a `lowStock` boolean from `createInventoryAdjustment()`, so the alert trigger piggybacks on that flag — no extra DB query needed for adjustments
+- For reservations, `reserveInventory()` doesn't return the updated balance — call `findBalanceByVariantAndLocation()` after to check `available < safetyStock` and trigger the alert
+- The `LowStockAlertService` uses an in-memory queue exposed via `ServerInstance.lowStockAlertService` — tests access it directly to verify alerts were queued without needing a notification backend

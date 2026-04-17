@@ -59,7 +59,11 @@ import {
   assignProductToClass,
   removeProductFromClass,
 } from "./db/queries/product-class.js";
-import { findInventoryBalances, createInventoryAdjustment } from "./db/queries/inventory.js";
+import {
+  findInventoryBalances,
+  findBalanceByVariantAndLocation,
+  createInventoryAdjustment,
+} from "./db/queries/inventory.js";
 import {
   reserveInventory,
   consumeReservation,
@@ -67,6 +71,10 @@ import {
   findReservationById,
 } from "./db/queries/reservation.js";
 import { startReservationCleanup } from "./cron/reservation-cleanup.js";
+import {
+  createLowStockAlertService,
+  type LowStockAlertService,
+} from "./services/low-stock-alert.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -97,11 +105,14 @@ export interface CreateServerOptions {
   githubUserFetcher?: GitHubUserFetcher;
   /** Override the reservation cleanup interval in ms (default 60 000). Set to 0 to disable. */
   reservationCleanupIntervalMs?: number;
+  /** Override the low-stock alert service (useful for testing). */
+  lowStockAlertService?: LowStockAlertService;
 }
 
 export interface ServerInstance {
   app: FastifyInstance;
   shutdownManager: ShutdownManager;
+  lowStockAlertService: LowStockAlertService;
   start(): Promise<string>;
 }
 
@@ -131,6 +142,7 @@ const APP_VERSION = "0.1.0";
 
 export async function createServer(options: CreateServerOptions): Promise<ServerInstance> {
   const { config, processRef = process, database, githubUserFetcher } = options;
+  const lowStockAlertService = options.lowStockAlertService ?? createLowStockAlertService();
 
   const logger = createLogger({
     level: config.LOG_LEVEL,
@@ -525,6 +537,16 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             idempotencyKey: body.idempotency_key,
           });
 
+          // Queue low-stock alert if applicable
+          if (result.lowStock) {
+            await lowStockAlertService.checkAndQueue(
+              database.db,
+              body.variant_id,
+              result.balance.available,
+              result.balance.safetyStock,
+            );
+          }
+
           // Set audit context for the audit log middleware
           request.auditContext = {
             action: "CREATE",
@@ -610,6 +632,21 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             orderId: body.order_id,
             cartId: body.cart_id,
           });
+
+          // Check for low-stock after reservation decremented available
+          const balanceAfter = await findBalanceByVariantAndLocation(
+            database.db,
+            body.variant_id,
+            body.location_id,
+          );
+          if (balanceAfter && balanceAfter.available < balanceAfter.safetyStock) {
+            await lowStockAlertService.checkAndQueue(
+              database.db,
+              body.variant_id,
+              balanceAfter.available,
+              balanceAfter.safetyStock,
+            );
+          }
 
           request.auditContext = {
             action: "CREATE",
@@ -1770,5 +1807,5 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     return address;
   }
 
-  return { app, shutdownManager, start };
+  return { app, shutdownManager, lowStockAlertService, start };
 }

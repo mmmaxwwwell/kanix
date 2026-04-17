@@ -150,7 +150,7 @@
 - [x] T042 Implement reservation cleanup cron [FR-034]
   Done when: cron job (configurable interval, default 1 min) finds reservations with status=active and expires_at < now(); releases each back to available; logs at INFO: "Released N expired reservations"; integration test: create reservation with 1s TTL → wait → verify released
 
-- [ ] T043 Implement low-stock alert [FR-038]
+- [x] T043 Implement low-stock alert [FR-038]
   Done when: when inventory adjustment or reservation causes available < safety_stock, notification queued; alert includes variant SKU, product title, available count, safety_stock threshold; integration test: set safety_stock=10 → adjust available to 5 → verify alert queued
 
 - [ ] T044 Implement public catalog API (no auth) [FR-001, FR-002] [produces: IC-009]
