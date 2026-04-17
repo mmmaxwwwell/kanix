@@ -61,3 +61,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Customer app needs its own `WebSocketNotifier` + `webSocketProvider` (mirroring admin's) since customer and admin are separate packages — can't import admin providers
 - `ref.listen(orderUpdatesProvider, (_, _) {...})` inside a `ConsumerWidget.build()` is the clean way to invalidate providers on WebSocket updates without rebuilding the entire widget tree
 - `ListView.separated` separator callback uses `(_, _)` not `(_, __)` in Dart 3.x — double underscore triggers `unnecessary_underscores` lint
+
+## T088 — Implement support + warranty screens
+- Customer support models need separate `MessageAttachment` and `WarrantyClaim` classes not present in admin — admin support model only has `SupportTicket` + `TicketMessage`, customer adds attachment metadata and warranty claim lifecycle
+- `WarrantyClaim.isWithinWarranty` computed from `warrantyExpiresAt` keeps warranty validation display-ready without recalculating from order date + material warranty period each time
+- `DraggableScrollableSheet` inside `showModalBottomSheet(useSafeArea: true)` works well for multi-step forms (warranty claim: select order → select product → describe defect → upload photos) that need more vertical space than a simple bottom sheet

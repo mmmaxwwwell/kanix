@@ -369,7 +369,7 @@
 - [x] T087 Implement order history + tracking screens
   Done when: order list with status badges; order detail with timeline (status changes); shipment tracking with carrier events; real-time updates via WebSocket; widget tests
 
-- [ ] T088 Implement support + warranty screens
+- [x] T088 Implement support + warranty screens
   Done when: create ticket; message thread with attachments; file warranty claim (select order → describe defect → upload photos); warranty period validation shown to user; widget tests
 
 - [ ] T089 Implement contributor dashboard screen
