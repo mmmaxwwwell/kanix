@@ -66,6 +66,13 @@ import {
 } from "./db/queries/inventory.js";
 import { findActiveProductsWithDetails, findActiveProductBySlug } from "./db/queries/catalog.js";
 import {
+  insertAddress,
+  findAddressesByCustomerId,
+  updateAddress,
+  deleteAddress,
+  validateAddressFields,
+} from "./db/queries/address.js";
+import {
   reserveInventory,
   consumeReservation,
   releaseReservation,
@@ -402,6 +409,323 @@ export async function createServer(options: CreateServerOptions): Promise<Server
 
       const orders = await findOrdersByCustomerId(database.db, cust.id);
       return { orders };
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // Customer address CRUD — requires verified email
+  // -------------------------------------------------------------------------
+
+  // GET /api/customer/addresses — list addresses for the authenticated customer
+  app.get(
+    "/api/customer/addresses",
+    { preHandler: [verifySession, requireVerifiedEmail] },
+    async (request, reply) => {
+      const session = request.session;
+      if (!session) {
+        return reply.status(401).send({
+          error: "ERR_AUTHENTICATION_FAILED",
+          message: "Authentication required",
+        });
+      }
+
+      if (!database) {
+        return reply.status(503).send({
+          error: "ERR_SERVICE_UNAVAILABLE",
+          message: "Database not available",
+        });
+      }
+
+      const userId = session.getUserId();
+      const cust = await getCustomerByAuthSubject(database.db, userId);
+      if (!cust) {
+        return reply.status(404).send({
+          error: "ERR_NOT_FOUND",
+          message: "Customer record not found",
+        });
+      }
+
+      const addresses = await findAddressesByCustomerId(database.db, cust.id);
+      return { addresses };
+    },
+  );
+
+  // POST /api/customer/addresses — create a new address
+  app.post(
+    "/api/customer/addresses",
+    { preHandler: [verifySession, requireVerifiedEmail] },
+    async (request, reply) => {
+      const session = request.session;
+      if (!session) {
+        return reply.status(401).send({
+          error: "ERR_AUTHENTICATION_FAILED",
+          message: "Authentication required",
+        });
+      }
+
+      if (!database) {
+        return reply.status(503).send({
+          error: "ERR_SERVICE_UNAVAILABLE",
+          message: "Database not available",
+        });
+      }
+
+      const userId = session.getUserId();
+      const cust = await getCustomerByAuthSubject(database.db, userId);
+      if (!cust) {
+        return reply.status(404).send({
+          error: "ERR_NOT_FOUND",
+          message: "Customer record not found",
+        });
+      }
+
+      const body = request.body as
+        | {
+            type?: string;
+            full_name?: string;
+            phone?: string;
+            line1?: string;
+            line2?: string;
+            city?: string;
+            state?: string;
+            postal_code?: string;
+            country?: string;
+            is_default?: boolean;
+          }
+        | undefined;
+
+      if (!body) {
+        return reply.status(400).send({
+          error: "ERR_VALIDATION",
+          message: "Request body is required",
+        });
+      }
+
+      const input = {
+        customerId: cust.id,
+        type: body.type ?? "",
+        fullName: body.full_name ?? "",
+        phone: body.phone,
+        line1: body.line1 ?? "",
+        line2: body.line2,
+        city: body.city ?? "",
+        state: body.state ?? "",
+        postalCode: body.postal_code ?? "",
+        country: body.country,
+        isDefault: body.is_default,
+      };
+
+      const validationError = validateAddressFields(input);
+      if (validationError) {
+        return reply.status(400).send({
+          error: "ERR_VALIDATION",
+          message: validationError,
+        });
+      }
+
+      const created = await insertAddress(database.db, input);
+      return reply.status(201).send({ address: created });
+    },
+  );
+
+  // PATCH /api/customer/addresses/:id — update an address
+  app.patch(
+    "/api/customer/addresses/:id",
+    { preHandler: [verifySession, requireVerifiedEmail] },
+    async (request, reply) => {
+      const session = request.session;
+      if (!session) {
+        return reply.status(401).send({
+          error: "ERR_AUTHENTICATION_FAILED",
+          message: "Authentication required",
+        });
+      }
+
+      if (!database) {
+        return reply.status(503).send({
+          error: "ERR_SERVICE_UNAVAILABLE",
+          message: "Database not available",
+        });
+      }
+
+      const userId = session.getUserId();
+      const cust = await getCustomerByAuthSubject(database.db, userId);
+      if (!cust) {
+        return reply.status(404).send({
+          error: "ERR_NOT_FOUND",
+          message: "Customer record not found",
+        });
+      }
+
+      const { id } = request.params as { id: string };
+      const body = request.body as
+        | {
+            type?: string;
+            full_name?: string;
+            phone?: string | null;
+            line1?: string;
+            line2?: string | null;
+            city?: string;
+            state?: string;
+            postal_code?: string;
+            is_default?: boolean;
+          }
+        | undefined;
+
+      if (!body || Object.keys(body).length === 0) {
+        return reply.status(400).send({
+          error: "ERR_VALIDATION",
+          message: "Request body must contain at least one field to update",
+        });
+      }
+
+      // Validate type if provided
+      if (body.type !== undefined && !["shipping", "billing"].includes(body.type)) {
+        return reply.status(400).send({
+          error: "ERR_VALIDATION",
+          message: "type must be 'shipping' or 'billing'",
+        });
+      }
+
+      // Validate state if provided
+      if (body.state !== undefined) {
+        const stateUpper = body.state.toUpperCase();
+        const US_STATE_CODES = new Set([
+          "AL",
+          "AK",
+          "AZ",
+          "AR",
+          "CA",
+          "CO",
+          "CT",
+          "DE",
+          "FL",
+          "GA",
+          "HI",
+          "ID",
+          "IL",
+          "IN",
+          "IA",
+          "KS",
+          "KY",
+          "LA",
+          "ME",
+          "MD",
+          "MA",
+          "MI",
+          "MN",
+          "MS",
+          "MO",
+          "MT",
+          "NE",
+          "NV",
+          "NH",
+          "NJ",
+          "NM",
+          "NY",
+          "NC",
+          "ND",
+          "OH",
+          "OK",
+          "OR",
+          "PA",
+          "RI",
+          "SC",
+          "SD",
+          "TN",
+          "TX",
+          "UT",
+          "VT",
+          "VA",
+          "WA",
+          "WV",
+          "WI",
+          "WY",
+          "DC",
+          "PR",
+          "VI",
+          "GU",
+          "AS",
+          "MP",
+        ]);
+        if (!US_STATE_CODES.has(stateUpper)) {
+          return reply.status(400).send({
+            error: "ERR_VALIDATION",
+            message: `Invalid US state code: ${body.state}`,
+          });
+        }
+      }
+
+      // Validate postal code if provided
+      if (body.postal_code !== undefined && !/^\d{5}(-\d{4})?$/.test(body.postal_code)) {
+        return reply.status(400).send({
+          error: "ERR_VALIDATION",
+          message: "Invalid US postal code format",
+        });
+      }
+
+      const updates: Record<string, unknown> = {};
+      if (body.type !== undefined) updates.type = body.type;
+      if (body.full_name !== undefined) updates.fullName = body.full_name;
+      if (body.phone !== undefined) updates.phone = body.phone;
+      if (body.line1 !== undefined) updates.line1 = body.line1;
+      if (body.line2 !== undefined) updates.line2 = body.line2;
+      if (body.city !== undefined) updates.city = body.city;
+      if (body.state !== undefined) updates.state = body.state;
+      if (body.postal_code !== undefined) updates.postalCode = body.postal_code;
+      if (body.is_default !== undefined) updates.isDefault = body.is_default;
+
+      const updated = await updateAddress(database.db, id, cust.id, updates);
+      if (!updated) {
+        return reply.status(404).send({
+          error: "ERR_NOT_FOUND",
+          message: "Address not found",
+        });
+      }
+
+      return { address: updated };
+    },
+  );
+
+  // DELETE /api/customer/addresses/:id — delete an address
+  app.delete(
+    "/api/customer/addresses/:id",
+    { preHandler: [verifySession, requireVerifiedEmail] },
+    async (request, reply) => {
+      const session = request.session;
+      if (!session) {
+        return reply.status(401).send({
+          error: "ERR_AUTHENTICATION_FAILED",
+          message: "Authentication required",
+        });
+      }
+
+      if (!database) {
+        return reply.status(503).send({
+          error: "ERR_SERVICE_UNAVAILABLE",
+          message: "Database not available",
+        });
+      }
+
+      const userId = session.getUserId();
+      const cust = await getCustomerByAuthSubject(database.db, userId);
+      if (!cust) {
+        return reply.status(404).send({
+          error: "ERR_NOT_FOUND",
+          message: "Customer record not found",
+        });
+      }
+
+      const { id } = request.params as { id: string };
+      const deleted = await deleteAddress(database.db, id, cust.id);
+      if (!deleted) {
+        return reply.status(404).send({
+          error: "ERR_NOT_FOUND",
+          message: "Address not found",
+        });
+      }
+
+      return reply.status(204).send();
     },
   );
 

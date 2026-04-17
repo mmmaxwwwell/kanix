@@ -1,0 +1,23 @@
+{
+  "task_id": "T045",
+  "status": "complete",
+  "summary": "Implemented customer address CRUD API with POST/GET/PATCH/DELETE /api/customer/addresses, US-only validation, is_default constraint, and integration tests",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test -- --run customer-address", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/address.ts",
+    "api/src/customer-address.integration.test.ts",
+    "specs/admin/claims/completion-T045.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/index.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

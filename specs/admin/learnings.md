@@ -71,3 +71,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Public catalog routes go in server.ts without any auth middleware — they're just `app.get("/api/products", ...)` inside the `if (database)` guard, placed before the shutdown manager section
 - Inventory availability for the public API is computed by summing `inventoryBalance.available` across all locations per variant — for V1 there's only one location, but the query handles multiple
 - The `adminUser` schema uses `name` (not `displayName`) — check the actual Drizzle schema column names before writing test setup code
+
+## T045 — Implement customer address CRUD API
+- Customer address routes use the same auth pattern as `/api/customer/me` — `verifySession` + `requireVerifiedEmail` preHandlers, then resolve customer via `getCustomerByAuthSubject`
+- The `is_default` only-one-default constraint is enforced in application code (not DB) — `insertAddress` and `updateAddress` unset existing defaults of the same `type` before setting the new one
+- Address API uses snake_case in request body (`full_name`, `postal_code`, `is_default`) but camelCase in DB/Drizzle schema — the route handler maps between them

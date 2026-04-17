@@ -156,7 +156,7 @@
 - [x] T044 Implement public catalog API (no auth) [FR-001, FR-002] [produces: IC-009]
   Done when: GET /api/products returns active products with variants, media, pricing, availability; GET /api/products/:slug returns product detail with variant availability; response shape matches spec section 4; no auth required; products with status != active are excluded; integration tests: list products (only active), product detail with variants, out-of-stock variant flagged
 
-- [ ] T045 Implement customer address CRUD API [FR-067]
+- [x] T045 Implement customer address CRUD API [FR-067]
   Done when: POST/GET/PATCH/DELETE /api/customer/addresses; addresses linked to customer_id; `is_default` flag with only-one-default constraint; US-only validation on address fields; integration tests: create address → set as default → update → delete; non-US address rejected
 
 - [ ] T045a Critical path checkpoint (Phase 5) [Critical Path]

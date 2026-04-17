@@ -85,3 +85,12 @@ export type {
 } from "./reservation.js";
 export { findActiveProductsWithDetails, findActiveProductBySlug } from "./catalog.js";
 export type { CatalogProduct, CatalogVariant, CatalogMedia } from "./catalog.js";
+export {
+  insertAddress,
+  findAddressesByCustomerId,
+  findAddressById,
+  updateAddress,
+  deleteAddress,
+  validateAddressFields,
+} from "./address.js";
+export type { NewCustomerAddress, CustomerAddress } from "./address.js";
