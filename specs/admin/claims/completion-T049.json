@@ -1,0 +1,25 @@
+{
+  "task_id": "T049",
+  "status": "complete",
+  "summary": "Implemented POST /api/checkout with cart validation, US-only address validation, inventory reservation (15 min TTL), shipping calculation via ShippingAdapter, tax calculation via TaxAdapter, Stripe PaymentIntent creation via PaymentAdapter, order creation with KNX-XXXXXX number, address/product snapshots, and integration tests",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm test -- --run", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/services/shipping-adapter.ts",
+    "api/src/services/payment-adapter.ts",
+    "api/src/db/queries/checkout.ts",
+    "api/src/checkout.integration.test.ts"
+  ],
+  "files_modified": [
+    "api/src/server.ts",
+    "api/src/db/queries/index.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

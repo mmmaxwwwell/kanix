@@ -121,3 +121,5 @@ export type {
   KitSelection,
   AddKitToCartResult,
 } from "./kit.js";
+export { generateOrderNumber, createCheckoutOrder } from "./checkout.js";
+export type { CheckoutAddress, CreateOrderInput, CheckoutOrder } from "./checkout.js";

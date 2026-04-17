@@ -100,10 +100,12 @@ import {
   createLowStockAlertService,
   type LowStockAlertService,
 } from "./services/low-stock-alert.js";
-import {
-  createTaxAdapter,
-  type TaxAdapter,
-} from "./services/tax-adapter.js";
+import { createTaxAdapter, type TaxAdapter } from "./services/tax-adapter.js";
+import { createShippingAdapter, type ShippingAdapter } from "./services/shipping-adapter.js";
+import { sql } from "drizzle-orm";
+import { createPaymentAdapter, type PaymentAdapter } from "./services/payment-adapter.js";
+import { generateOrderNumber, createCheckoutOrder } from "./db/queries/checkout.js";
+import type { CheckoutAddress } from "./db/queries/checkout.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -138,6 +140,10 @@ export interface CreateServerOptions {
   lowStockAlertService?: LowStockAlertService;
   /** Override the tax adapter (useful for testing). */
   taxAdapter?: TaxAdapter;
+  /** Override the shipping adapter (useful for testing). */
+  shippingAdapter?: ShippingAdapter;
+  /** Override the payment adapter (useful for testing). */
+  paymentAdapter?: PaymentAdapter;
 }
 
 export interface ServerInstance {
@@ -145,6 +151,8 @@ export interface ServerInstance {
   shutdownManager: ShutdownManager;
   lowStockAlertService: LowStockAlertService;
   taxAdapter: TaxAdapter;
+  shippingAdapter: ShippingAdapter;
+  paymentAdapter: PaymentAdapter;
   start(): Promise<string>;
 }
 
@@ -175,10 +183,22 @@ const APP_VERSION = "0.1.0";
 export async function createServer(options: CreateServerOptions): Promise<ServerInstance> {
   const { config, processRef = process, database, githubUserFetcher } = options;
   const lowStockAlertService = options.lowStockAlertService ?? createLowStockAlertService();
-  const taxAdapter = options.taxAdapter ?? createTaxAdapter({
-    stripeTaxEnabled: config.STRIPE_TAX_ENABLED,
-    stripeSecretKey: config.STRIPE_SECRET_KEY,
-  });
+  const taxAdapter =
+    options.taxAdapter ??
+    createTaxAdapter({
+      stripeTaxEnabled: config.STRIPE_TAX_ENABLED,
+      stripeSecretKey: config.STRIPE_SECRET_KEY,
+    });
+  const shippingAdapter =
+    options.shippingAdapter ??
+    createShippingAdapter({
+      easyPostApiKey: config.EASYPOST_API_KEY,
+    });
+  const paymentAdapter =
+    options.paymentAdapter ??
+    createPaymentAdapter({
+      stripeSecretKey: config.STRIPE_SECRET_KEY,
+    });
 
   const logger = createLogger({
     level: config.LOG_LEVEL,
@@ -2556,6 +2576,322 @@ export async function createServer(options: CreateServerOptions): Promise<Server
   }
 
   // -------------------------------------------------------------------------
+  // Checkout API
+  // -------------------------------------------------------------------------
+
+  if (database) {
+    const db = database.db;
+
+    // Warehouse origin address for shipping calculations
+    const warehouseAddress = {
+      line1: "1234 Warehouse Way",
+      city: "Austin",
+      state: "TX",
+      postalCode: "78701",
+      country: "US",
+    };
+
+    app.post("/api/checkout", async (request, reply) => {
+      const body = request.body as {
+        cart_token?: string;
+        email?: string;
+        shipping_address?: CheckoutAddress;
+        billing_address?: CheckoutAddress;
+      };
+
+      // Validate required fields
+      if (!body.cart_token) {
+        return reply.status(400).send({
+          error: "ERR_VALIDATION",
+          message: "cart_token is required",
+        });
+      }
+      if (!body.email) {
+        return reply.status(400).send({
+          error: "ERR_VALIDATION",
+          message: "email is required",
+        });
+      }
+      if (!body.shipping_address) {
+        return reply.status(400).send({
+          error: "ERR_VALIDATION",
+          message: "shipping_address is required",
+        });
+      }
+
+      const shippingAddr = body.shipping_address;
+
+      // US-only address validation
+      const country = shippingAddr.country ?? "US";
+      if (country !== "US") {
+        return reply.status(400).send({
+          error: "ERR_NON_US_ADDRESS",
+          message: "Only US addresses are supported",
+        });
+      }
+
+      // Validate address fields
+      if (!shippingAddr.full_name?.trim()) {
+        return reply
+          .status(400)
+          .send({ error: "ERR_VALIDATION", message: "shipping_address.full_name is required" });
+      }
+      if (!shippingAddr.line1?.trim()) {
+        return reply
+          .status(400)
+          .send({ error: "ERR_VALIDATION", message: "shipping_address.line1 is required" });
+      }
+      if (!shippingAddr.city?.trim()) {
+        return reply
+          .status(400)
+          .send({ error: "ERR_VALIDATION", message: "shipping_address.city is required" });
+      }
+      if (!shippingAddr.state?.trim()) {
+        return reply
+          .status(400)
+          .send({ error: "ERR_VALIDATION", message: "shipping_address.state is required" });
+      }
+      if (!shippingAddr.postal_code?.trim()) {
+        return reply
+          .status(400)
+          .send({ error: "ERR_VALIDATION", message: "shipping_address.postal_code is required" });
+      }
+
+      // Resolve and validate cart
+      const cartRow = await findCartByToken(db, body.cart_token);
+      if (!cartRow) {
+        return reply.status(404).send({
+          error: "ERR_CART_NOT_FOUND",
+          message: "Cart not found",
+        });
+      }
+
+      const cartWithItems = await getCartWithItems(db, cartRow.id);
+      if (!cartWithItems || cartWithItems.items.length === 0) {
+        return reply.status(400).send({
+          error: "ERR_CART_EMPTY",
+          message: "Cart is empty",
+        });
+      }
+
+      // Check for stale items (price changes or insufficient stock)
+      const staleItems = cartWithItems.items.filter(
+        (item) => item.priceChanged || item.insufficientStock,
+      );
+      if (staleItems.length > 0) {
+        return reply.status(400).send({
+          error: "ERR_CART_STALE",
+          message: "Cart contains items with price changes or insufficient stock",
+          stale_items: staleItems.map((item) => ({
+            variant_id: item.variantId,
+            sku: item.sku,
+            price_changed: item.priceChanged,
+            insufficient_stock: item.insufficientStock,
+          })),
+        });
+      }
+
+      // Resolve customer if authenticated
+      let customerId: string | undefined;
+      const session = request.session;
+      if (session) {
+        try {
+          const authSubject = session.getUserId();
+          const customer = await getCustomerByAuthSubject(db, authSubject);
+          if (customer) customerId = customer.id;
+        } catch {
+          // Guest checkout
+        }
+      }
+
+      // 1. Create inventory reservations (15 min TTL)
+      const reservationIds: string[] = [];
+      try {
+        // Find the default location (first available)
+        const balances = await findInventoryBalances(db, {});
+        const defaultLocationId = balances[0]?.locationId;
+        if (!defaultLocationId) {
+          return reply.status(500).send({
+            error: "ERR_NO_INVENTORY_LOCATION",
+            message: "No inventory location configured",
+          });
+        }
+
+        for (const item of cartWithItems.items) {
+          const result = await reserveInventory(db, {
+            variantId: item.variantId,
+            locationId: defaultLocationId,
+            quantity: item.quantity,
+            ttlMs: 15 * 60 * 1000, // 15 minutes
+            reservationReason: "checkout",
+            cartId: cartWithItems.id,
+          });
+          reservationIds.push(result.reservation.id);
+        }
+      } catch (err: unknown) {
+        // Release any reservations already made
+        for (const rid of reservationIds) {
+          try {
+            await releaseReservation(db, rid);
+          } catch {
+            // Best-effort cleanup
+          }
+        }
+        const appErr = err as { code?: string; message?: string };
+        if (appErr.code === "ERR_INVENTORY_INSUFFICIENT") {
+          return reply.status(400).send({
+            error: "ERR_INVENTORY_INSUFFICIENT",
+            message: appErr.message ?? "Insufficient inventory",
+          });
+        }
+        throw err;
+      }
+
+      // 2. Calculate shipping via shipping adapter
+      let shippingAmountMinor: number;
+      try {
+        const shippingResult = await shippingAdapter.calculateRate(
+          warehouseAddress,
+          {
+            line1: shippingAddr.line1,
+            city: shippingAddr.city,
+            state: shippingAddr.state,
+            postalCode: shippingAddr.postal_code,
+            country: country,
+          },
+          cartWithItems.items.map((item) => ({
+            weightOz: 16, // Default 1 lb per item
+            quantity: item.quantity,
+          })),
+        );
+        shippingAmountMinor = shippingResult.shippingAmountMinor;
+      } catch (err) {
+        // Release reservations on failure
+        for (const rid of reservationIds) {
+          try {
+            await releaseReservation(db, rid);
+          } catch {
+            /* best-effort */
+          }
+        }
+        throw err;
+      }
+
+      // 3. Calculate tax via tax adapter
+      let taxAmountMinor: number;
+      let taxCalculationId: string | null;
+      try {
+        const taxResult = await taxAdapter.calculate(
+          cartWithItems.items.map((item) => ({
+            amount: item.lineTotalMinor,
+            reference: item.sku,
+            quantity: item.quantity,
+          })),
+          {
+            line1: shippingAddr.line1,
+            line2: shippingAddr.line2,
+            city: shippingAddr.city,
+            state: shippingAddr.state,
+            postalCode: shippingAddr.postal_code,
+            country: country,
+          },
+        );
+        taxAmountMinor = taxResult.taxAmountMinor;
+        taxCalculationId = taxResult.calculationId;
+      } catch (err) {
+        // Release reservations on failure
+        for (const rid of reservationIds) {
+          try {
+            await releaseReservation(db, rid);
+          } catch {
+            /* best-effort */
+          }
+        }
+        throw err;
+      }
+
+      // 4. Compute totals
+      const subtotalMinor = cartWithItems.subtotalMinor;
+      const totalMinor = subtotalMinor + taxAmountMinor + shippingAmountMinor;
+
+      // 5. Create Stripe PaymentIntent via payment adapter
+      let paymentIntentId: string;
+      let clientSecret: string;
+      try {
+        const piResult = await paymentAdapter.createPaymentIntent({
+          amountMinor: totalMinor,
+          currency: "usd",
+          metadata: {
+            cart_id: cartWithItems.id,
+            ...(taxCalculationId ? { tax_calculation_id: taxCalculationId } : {}),
+          },
+        });
+        paymentIntentId = piResult.id;
+        clientSecret = piResult.clientSecret;
+      } catch (err) {
+        // Release reservations on failure
+        for (const rid of reservationIds) {
+          try {
+            await releaseReservation(db, rid);
+          } catch {
+            /* best-effort */
+          }
+        }
+        const stripeErr = err as { type?: string; code?: string };
+        if (stripeErr.type === "StripeConnectionError" || stripeErr.type === "StripeAPIError") {
+          return reply.status(502).send({
+            error: "ERR_EXTERNAL_SERVICE_UNAVAILABLE",
+            message: "Payment service is temporarily unavailable",
+          });
+        }
+        throw err;
+      }
+
+      // 6. Generate order number and create order
+      const orderNumber = await generateOrderNumber(db);
+      const newOrder = await createCheckoutOrder(db, {
+        orderNumber,
+        email: body.email,
+        customerId,
+        cartWithItems,
+        shippingAddress: shippingAddr,
+        billingAddress: body.billing_address,
+        subtotalMinor,
+        taxMinor: taxAmountMinor,
+        shippingMinor: shippingAmountMinor,
+        totalMinor,
+        stripePaymentIntentId: paymentIntentId,
+      });
+
+      // 7. Update reservations with order ID
+      for (const rid of reservationIds) {
+        try {
+          await db.execute(
+            sql`UPDATE inventory_reservation SET order_id = ${newOrder.id} WHERE id = ${rid}`,
+          );
+        } catch {
+          // Non-critical — reservations still protect inventory
+        }
+      }
+
+      return reply.status(201).send({
+        order: {
+          id: newOrder.id,
+          order_number: newOrder.orderNumber,
+          email: newOrder.email,
+          status: newOrder.status,
+          payment_status: newOrder.paymentStatus,
+          subtotal_minor: newOrder.subtotalMinor,
+          tax_minor: newOrder.taxMinor,
+          shipping_minor: newOrder.shippingMinor,
+          total_minor: newOrder.totalMinor,
+        },
+        client_secret: clientSecret,
+      });
+    });
+  }
+
+  // -------------------------------------------------------------------------
   // Shutdown manager
   // -------------------------------------------------------------------------
 
@@ -2616,5 +2952,13 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     return address;
   }
 
-  return { app, shutdownManager, lowStockAlertService, taxAdapter, start };
+  return {
+    app,
+    shutdownManager,
+    lowStockAlertService,
+    taxAdapter,
+    shippingAdapter,
+    paymentAdapter,
+    start,
+  };
 }

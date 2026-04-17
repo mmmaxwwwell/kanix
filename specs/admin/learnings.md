@@ -62,3 +62,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The `stripe` package (v22) has a clean `stripe.tax.calculations.create()` API — pass `customer_details.address_source: "shipping"` to calculate tax based on the shipping address
 - Use the same factory + DI pattern as `LowStockAlertService` — expose `taxAdapter` on `ServerInstance` and accept an override in `CreateServerOptions` so tests can inject a stub without calling the real Stripe API
 - Stripe Tax integration tests should be conditionally skipped (`STRIPE_TAX_ENABLED=true` + `sk_test_` prefix) so the test suite passes in environments without Stripe test keys
+
+## T049 — Implement checkout flow
+- Extend the adapter DI pattern to shipping and payment — `ShippingAdapter` and `PaymentAdapter` follow the same factory + `CreateServerOptions` override pattern as `TaxAdapter`, enabling stub injection in tests without external API calls
+- The `@easypost/api` package isn't installed yet — use `await import("@easypost/api" as string)` dynamic import with type erasure so TypeScript compiles without the package; the stub adapter handles all test and dev scenarios
+- Order number generation with `KNX-` prefix uses `COUNT(*)` on the order table — sufficient for V1 but should migrate to a PostgreSQL SEQUENCE for concurrent-safe numbering at scale
