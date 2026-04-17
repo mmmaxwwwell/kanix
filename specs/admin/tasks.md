@@ -261,7 +261,7 @@
 - [x] T064 Implement dispute auto-creation [FR-056, FR-057]
   Done when: charge.dispute.created webhook creates dispute record; payment_status → disputed; dispute state machine: opened→evidence_gathering→ready_to_submit→submitted→won/lost/accepted→closed; charge.dispute.closed webhook updates dispute outcome and payment_status (won → paid, lost → refunded); integration tests: dispute webhook → record created + payment_status=disputed; close webhook → status updated
 
-- [ ] T065 Implement evidence auto-collection [FR-058, FR-059, FR-062]
+- [x] T065 Implement evidence auto-collection [FR-058, FR-059, FR-062]
   Done when: on shipment tracking event → evidence_record (type=`tracking_history`); on shipment delivery confirmation → evidence_record (type=`delivery_proof`); on support_ticket_message creation → evidence_record (type=`customer_communication`); on payment_event creation → evidence_record (type=`payment_receipt`); on order_policy_acknowledgment creation → evidence_record (type=`policy_acceptance`); evidence_record table: no UPDATE/DELETE grants for app user (immutability enforced at DB level); integration test: complete order lifecycle → verify all 5 evidence types created; attempt UPDATE on evidence_record → fails
 
 - [ ] T066 Implement evidence bundle generation [FR-060, FR-061]

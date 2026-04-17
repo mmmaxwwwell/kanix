@@ -14,6 +14,7 @@ import type {
   TrackingResult,
 } from "../../services/shipping-adapter.js";
 import { transitionOrderStatus, findOrderById } from "./order-state-machine.js";
+import { createEvidenceRecord } from "./evidence.js";
 
 // ---------------------------------------------------------------------------
 // Shipment status values and state machine (6.E)
@@ -692,6 +693,52 @@ export async function storeShipmentEvent(
       rawPayloadJson: input.rawPayloadJson,
     })
     .returning({ id: shipmentEvent.id });
+
+  // Auto-collect evidence: tracking_history for every tracking event
+  // Look up the shipment to get orderId for evidence linking
+  const [shipmentRow] = await db
+    .select({ orderId: shipment.orderId })
+    .from(shipment)
+    .where(eq(shipment.id, input.shipmentId));
+
+  if (shipmentRow) {
+    try {
+      await createEvidenceRecord(db, {
+        orderId: shipmentRow.orderId,
+        shipmentId: input.shipmentId,
+        type: "tracking_history",
+        textContent: JSON.stringify({
+          providerEventId: input.providerEventId,
+          status: input.status,
+          description: input.description,
+          occurredAt: input.occurredAt,
+        }),
+        metadataJson: { shipmentEventId: row.id },
+      });
+    } catch {
+      // Non-fatal: evidence collection should not block event storage
+    }
+
+    // Auto-collect evidence: delivery_proof when status is "delivered"
+    if (input.status === "delivered") {
+      try {
+        await createEvidenceRecord(db, {
+          orderId: shipmentRow.orderId,
+          shipmentId: input.shipmentId,
+          type: "delivery_proof",
+          textContent: JSON.stringify({
+            deliveredAt: input.occurredAt,
+            providerEventId: input.providerEventId,
+            description: input.description,
+          }),
+          metadataJson: { shipmentEventId: row.id },
+        });
+      } catch {
+        // Non-fatal
+      }
+    }
+  }
+
   return row;
 }
 

@@ -7,6 +7,7 @@ import { consumeReservation, releaseReservation, reserveInventory } from "./rese
 import type { AdminAlertService } from "../../services/admin-alert.js";
 import { createFulfillmentTaskForPaidOrder } from "./fulfillment-task.js";
 import { findDisputeByProviderId, transitionDisputeStatus } from "./dispute.js";
+import { createEvidenceRecord } from "./evidence.js";
 
 function isTransitionError(err: unknown): boolean {
   return (err as { code?: string })?.code === "ERR_INVALID_TRANSITION";
@@ -103,6 +104,31 @@ export async function storePaymentEvent(
       payloadJson: input.payloadJson,
     })
     .returning({ id: paymentEvent.id });
+
+  // Auto-collect evidence: payment_receipt for every payment event
+  const [paymentRow] = await db
+    .select({ orderId: payment.orderId })
+    .from(payment)
+    .where(eq(payment.id, input.paymentId));
+
+  if (paymentRow) {
+    try {
+      await createEvidenceRecord(db, {
+        orderId: paymentRow.orderId,
+        paymentId: input.paymentId,
+        type: "payment_receipt",
+        textContent: JSON.stringify({
+          paymentEventId: row.id,
+          eventType: input.eventType,
+          providerEventId: input.providerEventId,
+        }),
+        metadataJson: { paymentEventId: row.id },
+      });
+    } catch {
+      // Non-fatal: evidence collection should not block event storage
+    }
+  }
+
   return row;
 }
 

@@ -1,6 +1,7 @@
 import { eq, and, desc, lte } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { policySnapshot, orderPolicyAcknowledgment } from "../schema/evidence.js";
+import { createEvidenceRecord } from "./evidence.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -111,7 +112,26 @@ export async function createPolicyAcknowledgment(
       contextJson: input.contextJson ?? null,
     })
     .returning();
-  return row as PolicyAcknowledgment;
+
+  const ack = row as PolicyAcknowledgment;
+
+  // Auto-collect evidence: policy_acceptance for every policy acknowledgment
+  try {
+    await createEvidenceRecord(db, {
+      orderId: input.orderId,
+      type: "policy_acceptance",
+      textContent: JSON.stringify({
+        acknowledgmentId: ack.id,
+        policySnapshotId: input.policySnapshotId,
+        acknowledgedAt: ack.acknowledgedAt,
+      }),
+      metadataJson: { acknowledgmentId: ack.id, policySnapshotId: input.policySnapshotId },
+    });
+  } catch {
+    // Non-fatal: evidence collection should not block acknowledgment creation
+  }
+
+  return ack;
 }
 
 export async function findAcknowledgmentsByOrderId(

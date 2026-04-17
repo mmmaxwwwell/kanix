@@ -8,6 +8,7 @@ import {
 } from "../schema/support.js";
 import { order, orderLine } from "../schema/order.js";
 import { shipment } from "../schema/fulfillment.js";
+import { createEvidenceRecord } from "./evidence.js";
 
 // ---------------------------------------------------------------------------
 // Ticket status values and state machine (6.C)
@@ -376,6 +377,34 @@ export async function createTicketMessage(
     .update(supportTicket)
     .set({ updatedAt: new Date() })
     .where(eq(supportTicket.id, input.ticketId));
+
+  // Auto-collect evidence: customer_communication for non-internal messages
+  if (!(input.isInternalNote ?? false)) {
+    // Look up the ticket to get orderId for evidence linking
+    const [ticketRow] = await db
+      .select({ orderId: supportTicket.orderId })
+      .from(supportTicket)
+      .where(eq(supportTicket.id, input.ticketId));
+
+    if (ticketRow?.orderId) {
+      try {
+        await createEvidenceRecord(db, {
+          orderId: ticketRow.orderId,
+          supportTicketId: input.ticketId,
+          type: "customer_communication",
+          textContent: JSON.stringify({
+            messageId: row.id,
+            authorType: input.authorType,
+            body: input.body,
+            createdAt: row.createdAt,
+          }),
+          metadataJson: { messageId: row.id },
+        });
+      } catch {
+        // Non-fatal: evidence collection should not block message creation
+      }
+    }
+  }
 
   return row;
 }

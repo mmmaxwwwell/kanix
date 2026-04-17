@@ -1,0 +1,27 @@
+{
+  "task_id": "T065",
+  "status": "complete",
+  "summary": "Implemented evidence auto-collection: tracking_history on shipment events, delivery_proof on delivery, customer_communication on ticket messages, payment_receipt on payment events, policy_acceptance on policy acknowledgments; DB immutability via triggers; 8 integration tests pass",
+  "commands_run": [
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm db:migrate", "exit_code": 0},
+    {"command": "npx vitest run src/evidence-auto-collection.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/evidence.ts",
+    "api/src/evidence-auto-collection.integration.test.ts",
+    "api/migrations/changesets/006-evidence-immutability.xml"
+  ],
+  "files_modified": [
+    "api/src/db/queries/shipment.ts",
+    "api/src/db/queries/support-ticket.ts",
+    "api/src/db/queries/webhook.ts",
+    "api/src/db/queries/policy.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

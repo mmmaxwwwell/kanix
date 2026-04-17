@@ -71,3 +71,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The `dispute` Drizzle schema, `handleDisputeCreated()`, and `charge.dispute.created` webhook handler already existed — only the dispute state machine, `handleDisputeClosed()`, and `charge.dispute.closed` handler needed to be created
 - When Stripe closes a dispute, the dispute may be in any state (opened through submitted) — `handleDisputeClosed()` walks through intermediate transitions (opened→evidence_gathering→ready_to_submit→submitted→won/lost→closed) to maintain state machine integrity
 - `inventoryLocation` schema uses `name`, `code`, `type` fields (not `locationType`); `inventoryBalance` uses `onHand`/`reserved`/`available` (no `damaged` column) — check actual schema, not data-model.md
+
+## T065 — Implement evidence auto-collection
+- Liquibase `splitStatements="true"` chokes on PL/pgSQL `$$` delimiters — use `splitStatements="false" stripComments="false"` for each `CREATE FUNCTION` block, then a separate `<sql>` block with `splitStatements="true"` for `CREATE TRIGGER` statements
+- Evidence auto-collection hooks are best placed inside existing query functions (e.g. `storeShipmentEvent`, `createTicketMessage`, `storePaymentEvent`, `createPolicyAcknowledgment`) wrapped in try/catch so they're non-fatal — this ensures all code paths that create these records automatically generate evidence without requiring callers to remember
+- The `evidenceRecord` table's `textContent` stores a JSON string (not raw text) for structured evidence data; `metadataJson` stores cross-reference IDs (e.g. `shipmentEventId`, `messageId`) for linking back to source records
