@@ -59,6 +59,7 @@ import {
   assignProductToClass,
   removeProductFromClass,
 } from "./db/queries/product-class.js";
+import { findInventoryBalances, createInventoryAdjustment } from "./db/queries/inventory.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -426,15 +427,125 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       },
     );
 
-    // Admin inventory — requires inventory.read capability
+    // -----------------------------------------------------------------------
+    // Inventory Balances + Adjustments
+    // -----------------------------------------------------------------------
+
+    // List inventory balances with optional filters
     app.get(
-      "/api/admin/inventory",
+      "/api/admin/inventory/balances",
       {
         preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.INVENTORY_READ)],
       },
-      async () => {
-        // Placeholder — will be implemented in Phase 5
-        return { inventory: [] };
+      async (request) => {
+        const query = request.query as {
+          variant_id?: string;
+          location_id?: string;
+          low_stock_only?: string;
+        };
+        const balances = await findInventoryBalances(database.db, {
+          variantId: query.variant_id,
+          locationId: query.location_id,
+          lowStockOnly: query.low_stock_only === "true",
+        });
+        return { balances };
+      },
+    );
+
+    // Create inventory adjustment
+    app.post(
+      "/api/admin/inventory/adjustments",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.INVENTORY_ADJUST)],
+      },
+      async (request, reply) => {
+        const body = request.body as {
+          variant_id: string;
+          location_id: string;
+          adjustment_type: string;
+          quantity_delta: number;
+          reason: string;
+          notes?: string;
+          idempotency_key?: string;
+        };
+
+        // Validate required fields
+        if (
+          !body.variant_id ||
+          !body.location_id ||
+          !body.adjustment_type ||
+          body.quantity_delta == null ||
+          !body.reason
+        ) {
+          return reply.status(400).send({
+            error: "ERR_VALIDATION",
+            message:
+              "Missing required fields: variant_id, location_id, adjustment_type, quantity_delta, reason",
+          });
+        }
+
+        const validTypes = ["restock", "shrinkage", "correction", "damage", "return"];
+        if (!validTypes.includes(body.adjustment_type)) {
+          return reply.status(400).send({
+            error: "ERR_VALIDATION",
+            message: `Invalid adjustment_type. Must be one of: ${validTypes.join(", ")}`,
+          });
+        }
+
+        if (!Number.isInteger(body.quantity_delta) || body.quantity_delta === 0) {
+          return reply.status(400).send({
+            error: "ERR_VALIDATION",
+            message: "quantity_delta must be a non-zero integer",
+          });
+        }
+
+        try {
+          const result = await createInventoryAdjustment(database.db, {
+            variantId: body.variant_id,
+            locationId: body.location_id,
+            adjustmentType: body.adjustment_type as
+              | "restock"
+              | "shrinkage"
+              | "correction"
+              | "damage"
+              | "return",
+            quantityDelta: body.quantity_delta,
+            reason: body.reason,
+            notes: body.notes,
+            actorAdminUserId: request.adminContext?.adminUserId ?? "",
+            idempotencyKey: body.idempotency_key,
+          });
+
+          // Set audit context for the audit log middleware
+          request.auditContext = {
+            action: "CREATE",
+            entityType: "inventory_adjustment",
+            entityId: result.adjustment.id,
+            afterJson: {
+              adjustmentType: body.adjustment_type,
+              quantityDelta: body.quantity_delta,
+              variantId: body.variant_id,
+              locationId: body.location_id,
+            },
+          };
+
+          return reply.status(201).send({
+            adjustment: result.adjustment,
+            movement: result.movement,
+            balance: result.balance,
+            low_stock: result.lowStock,
+          });
+        } catch (err: unknown) {
+          // CHECK constraint violation means available would go negative
+          const pgErr = err as { code?: string; constraint?: string };
+          if (pgErr.code === "23514" && pgErr.constraint?.includes("ck_inventory_balance")) {
+            return reply.status(422).send({
+              error: "ERR_INVENTORY_INSUFFICIENT",
+              message: "Adjustment would result in negative inventory balance",
+            });
+          }
+          throw err;
+        }
       },
     );
 

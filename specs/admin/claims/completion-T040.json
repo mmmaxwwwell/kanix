@@ -1,0 +1,22 @@
+{
+  "task_id": "T040",
+  "status": "complete",
+  "summary": "Implemented inventory balance listing (GET /api/admin/inventory/balances) with variant_id, location_id, and low_stock_only filters, and inventory adjustment creation (POST /api/admin/inventory/adjustments) with atomic on_hand/available updates, audit log, movement ledger entries, low-stock detection, and CHECK constraint enforcement preventing negative available",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/inventory.ts",
+    "api/src/admin-inventory.integration.test.ts"
+  ],
+  "files_modified": [
+    "api/src/db/queries/index.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

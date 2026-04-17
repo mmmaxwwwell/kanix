@@ -46,3 +46,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Product status state machine (`draft→active`, `active→draft`, `draft→archived`, `active→archived`; archived is terminal) is enforced in the route handler via `isValidProductTransition()` — keep the transition map in the query module alongside the data access functions
 - Drizzle's `sql` template tag works well for compound WHERE conditions on composite-key tables like `collection_product` — use `sql\`col1 = ${val1} AND col2 = ${val2}\`` instead of chaining multiple `.where()` calls
 - When T039 runs in parallel and commits server.ts changes, ensure your route additions (media, collections) are present — Fastify route registration order matters for param-based routes (`:id` must come after fixed paths like `/reorder`)
+
+## T040 — Implement inventory balance + adjustment API (admin)
+- `inventoryBalance` has a UNIQUE(variant_id, location_id) constraint — use `onConflictDoNothing()` for upsert, then fetch existing row if insert returns nothing (same pattern as T039 for product-class membership)
+- PostgreSQL CHECK constraint `ck_inventory_balance_available CHECK (available >= 0)` enforces non-negative inventory — catch error code `23514` with constraint name containing `ck_inventory_balance` to return a clean `ERR_INVENTORY_INSUFFICIENT` response
+- Use `sql` template for atomic column updates (`on_hand + delta`, `available + delta`) rather than reading, computing, and writing — avoids race conditions and lets the DB enforce constraints in a single statement

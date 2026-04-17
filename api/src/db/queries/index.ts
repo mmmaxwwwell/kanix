@@ -53,3 +53,18 @@ export {
   findMembershipsByProductId,
 } from "./product-class.js";
 export type { NewProductClass, ProductClass, ProductClassMembership } from "./product-class.js";
+export {
+  findInventoryBalances,
+  findBalanceByVariantAndLocation,
+  createInventoryAdjustment,
+  findLocationByCode,
+  insertInventoryLocation,
+} from "./inventory.js";
+export type {
+  InventoryBalance,
+  InventoryAdjustment,
+  InventoryMovement,
+  BalanceFilters,
+  CreateAdjustmentInput,
+  AdjustmentResult,
+} from "./inventory.js";

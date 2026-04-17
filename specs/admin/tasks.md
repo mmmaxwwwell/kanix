@@ -141,7 +141,7 @@
 - [x] T039 Implement product variant + classification API (admin) [FR-002, FR-003] [P]
   Done when: POST/PATCH /admin/products/:id/variants; variants have material axis (TPU/PA11/TPC), independent price_minor, sku, weight, dimensions; product_class CRUD; product_class_membership assignment; integration tests: create product → add TPU variant ($29.99) → add PA11 variant ($49.99) → assign to class "modules"; variant status transitions (draft→active→inactive→archived)
 
-- [ ] T040 Implement inventory balance + adjustment API (admin) [FR-032, FR-033, FR-037, FR-038]
+- [x] T040 Implement inventory balance + adjustment API (admin) [FR-032, FR-033, FR-037, FR-038]
   Done when: GET /admin/inventory/balances with filters; POST /admin/inventory/adjustments with adjustment_type (restock/shrinkage/damage), quantity_delta, reason, notes; adjustment atomically updates on_hand and available; audit log entry created with actor; low-stock detection: when available < safety_stock, flag variant; inventory_movement ledger entry created for every adjustment; integration tests: restock +100 → verify balance; shrinkage -5 → verify; CHECK constraint prevents negative available
 
 - [ ] T041 Implement inventory reservation system [FR-034, FR-035, FR-036]
