@@ -81,6 +81,15 @@ import {
   getCartWithItems,
 } from "./db/queries/cart.js";
 import {
+  insertKitDefinition,
+  findKitDefinitionById,
+  listKitDefinitions,
+  updateKitDefinition,
+  setKitClassRequirements,
+  findKitClassRequirements,
+  addKitToCart,
+} from "./db/queries/kit.js";
+import {
   reserveInventory,
   consumeReservation,
   releaseReservation,
@@ -1703,6 +1712,203 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     );
 
     // -----------------------------------------------------------------------
+    // Kit Definition CRUD — /admin/kits
+    // -----------------------------------------------------------------------
+
+    // List kit definitions
+    app.get(
+      "/api/admin/kits",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.PRODUCTS_READ)],
+      },
+      async () => {
+        const kits = await listKitDefinitions(database.db);
+        return { kits };
+      },
+    );
+
+    // Create kit definition
+    app.post(
+      "/api/admin/kits",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.PRODUCTS_WRITE)],
+      },
+      async (request, reply) => {
+        const body = request.body as {
+          slug?: string;
+          title?: string;
+          description?: string;
+          price_minor?: number;
+          status?: string;
+          requirements?: Array<{ product_class_id: string; quantity: number }>;
+        };
+
+        if (!body.slug || !body.title || body.price_minor === undefined) {
+          return reply.status(400).send({
+            error: "ERR_VALIDATION",
+            message: "slug, title, and price_minor are required",
+          });
+        }
+
+        const kit = await insertKitDefinition(database.db, {
+          slug: body.slug,
+          title: body.title,
+          description: body.description ?? null,
+          priceMinor: body.price_minor,
+          status: body.status ?? "draft",
+        });
+
+        // Set requirements if provided
+        let requirements: Awaited<ReturnType<typeof setKitClassRequirements>> = [];
+        if (body.requirements && body.requirements.length > 0) {
+          requirements = await setKitClassRequirements(
+            database.db,
+            kit.id,
+            body.requirements.map((r) => ({
+              productClassId: r.product_class_id,
+              quantity: r.quantity,
+            })),
+          );
+        }
+
+        request.auditContext = {
+          action: "CREATE",
+          entityType: "kit_definition",
+          entityId: kit.id,
+          beforeJson: null,
+          afterJson: { ...kit, requirements },
+        };
+
+        return reply.status(201).send({ kit, requirements });
+      },
+    );
+
+    // Get kit definition with requirements
+    app.get(
+      "/api/admin/kits/:kitId",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.PRODUCTS_READ)],
+      },
+      async (request, reply) => {
+        const { kitId } = request.params as { kitId: string };
+        const kit = await findKitDefinitionById(database.db, kitId);
+        if (!kit) {
+          return reply.status(404).send({
+            error: "ERR_NOT_FOUND",
+            message: "Kit definition not found",
+          });
+        }
+        const requirements = await findKitClassRequirements(database.db, kitId);
+        return { kit, requirements };
+      },
+    );
+
+    // Update kit definition
+    app.put(
+      "/api/admin/kits/:kitId",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.PRODUCTS_WRITE)],
+      },
+      async (request, reply) => {
+        const { kitId } = request.params as { kitId: string };
+        const existing = await findKitDefinitionById(database.db, kitId);
+        if (!existing) {
+          return reply.status(404).send({
+            error: "ERR_NOT_FOUND",
+            message: "Kit definition not found",
+          });
+        }
+
+        const body = request.body as {
+          slug?: string;
+          title?: string;
+          description?: string;
+          price_minor?: number;
+          status?: string;
+          requirements?: Array<{ product_class_id: string; quantity: number }>;
+        };
+
+        const updated = await updateKitDefinition(database.db, kitId, {
+          ...(body.slug !== undefined && { slug: body.slug }),
+          ...(body.title !== undefined && { title: body.title }),
+          ...(body.description !== undefined && { description: body.description }),
+          ...(body.price_minor !== undefined && { priceMinor: body.price_minor }),
+          ...(body.status !== undefined && { status: body.status }),
+        });
+
+        let requirements: Awaited<ReturnType<typeof setKitClassRequirements>> | undefined;
+        if (body.requirements) {
+          requirements = await setKitClassRequirements(
+            database.db,
+            kitId,
+            body.requirements.map((r) => ({
+              productClassId: r.product_class_id,
+              quantity: r.quantity,
+            })),
+          );
+        }
+
+        request.auditContext = {
+          action: "UPDATE",
+          entityType: "kit_definition",
+          entityId: kitId,
+          beforeJson: existing,
+          afterJson: { ...updated, requirements },
+        };
+
+        return { kit: updated, requirements };
+      },
+    );
+
+    // Set kit class requirements
+    app.put(
+      "/api/admin/kits/:kitId/requirements",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.PRODUCTS_WRITE)],
+      },
+      async (request, reply) => {
+        const { kitId } = request.params as { kitId: string };
+        const kit = await findKitDefinitionById(database.db, kitId);
+        if (!kit) {
+          return reply.status(404).send({
+            error: "ERR_NOT_FOUND",
+            message: "Kit definition not found",
+          });
+        }
+
+        const body = request.body as {
+          requirements?: Array<{ product_class_id: string; quantity: number }>;
+        };
+
+        if (!body.requirements || !Array.isArray(body.requirements)) {
+          return reply.status(400).send({
+            error: "ERR_VALIDATION",
+            message: "requirements array is required",
+          });
+        }
+
+        const requirements = await setKitClassRequirements(
+          database.db,
+          kitId,
+          body.requirements.map((r) => ({
+            productClassId: r.product_class_id,
+            quantity: r.quantity,
+          })),
+        );
+
+        request.auditContext = {
+          action: "UPDATE",
+          entityType: "kit_class_requirement",
+          entityId: kitId,
+          beforeJson: null,
+          afterJson: requirements,
+        };
+
+        return { requirements };
+      },
+    );
+
+    // -----------------------------------------------------------------------
     // Product Media
     // -----------------------------------------------------------------------
 
@@ -2227,6 +2433,100 @@ export async function createServer(options: CreateServerOptions): Promise<Server
 
       const cartWithItems = await getCartWithItems(db, cartRow.id);
       return reply.status(200).send({ cart: cartWithItems });
+    });
+
+    // POST /api/cart/kits — add kit to cart with selected variants per class
+    app.post("/api/cart/kits", async (request, reply) => {
+      const cartRow = await resolveCart(request);
+      if (!cartRow) {
+        return reply.status(404).send({
+          error: "ERR_CART_NOT_FOUND",
+          message: "Cart not found. Create a cart first or provide a valid X-Cart-Token.",
+        });
+      }
+
+      const body = request.body as {
+        kit_definition_id?: string;
+        selections?: Array<{ product_class_id: string; variant_id: string }>;
+      };
+
+      if (!body.kit_definition_id) {
+        return reply.status(400).send({
+          error: "ERR_VALIDATION",
+          message: "kit_definition_id is required",
+        });
+      }
+
+      if (!body.selections || !Array.isArray(body.selections) || body.selections.length === 0) {
+        return reply.status(400).send({
+          error: "ERR_VALIDATION",
+          message: "selections array is required and must not be empty",
+        });
+      }
+
+      try {
+        const result = await addKitToCart(db, cartRow.id, body.kit_definition_id, body.selections);
+        const cartWithItems = await getCartWithItems(db, cartRow.id);
+        return reply.status(201).send({ kit: result, cart: cartWithItems });
+      } catch (err: unknown) {
+        const appErr = err as { code?: string; message?: string; alternatives?: string[] };
+        if (appErr.code === "ERR_KIT_NOT_FOUND") {
+          return reply.status(404).send({
+            error: "ERR_KIT_NOT_FOUND",
+            message: "Kit definition not found",
+          });
+        }
+        if (appErr.code === "ERR_KIT_NOT_AVAILABLE") {
+          return reply.status(400).send({
+            error: "ERR_KIT_NOT_AVAILABLE",
+            message: "Kit is not available",
+          });
+        }
+        if (appErr.code === "ERR_KIT_INCOMPLETE") {
+          return reply.status(400).send({
+            error: "ERR_KIT_INCOMPLETE",
+            message: appErr.message ?? "Kit requirements not satisfied",
+          });
+        }
+        if (appErr.code === "ERR_KIT_EXCESS_SELECTIONS") {
+          return reply.status(400).send({
+            error: "ERR_KIT_EXCESS_SELECTIONS",
+            message: appErr.message ?? "Too many selections",
+          });
+        }
+        if (appErr.code === "ERR_KIT_INVALID_CLASS") {
+          return reply.status(400).send({
+            error: "ERR_KIT_INVALID_CLASS",
+            message: appErr.message ?? "Invalid class selection",
+          });
+        }
+        if (appErr.code === "ERR_VARIANT_NOT_FOUND") {
+          return reply.status(404).send({
+            error: "ERR_VARIANT_NOT_FOUND",
+            message: "Variant not found",
+          });
+        }
+        if (appErr.code === "ERR_VARIANT_NOT_AVAILABLE") {
+          return reply.status(400).send({
+            error: "ERR_VARIANT_NOT_AVAILABLE",
+            message: "Variant is not available",
+          });
+        }
+        if (appErr.code === "ERR_KIT_CLASS_MISMATCH") {
+          return reply.status(400).send({
+            error: "ERR_KIT_CLASS_MISMATCH",
+            message: appErr.message ?? "Variant does not belong to specified class",
+          });
+        }
+        if (appErr.code === "ERR_KIT_COMPONENT_OUT_OF_STOCK") {
+          return reply.status(400).send({
+            error: "ERR_KIT_COMPONENT_OUT_OF_STOCK",
+            message: appErr.message ?? "Component out of stock",
+            alternatives: appErr.alternatives ?? [],
+          });
+        }
+        throw err;
+      }
     });
 
     // GET /api/cart — get cart with current prices + availability

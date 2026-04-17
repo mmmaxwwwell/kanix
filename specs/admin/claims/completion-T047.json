@@ -1,0 +1,24 @@
+{
+  "task_id": "T047",
+  "status": "complete",
+  "summary": "Implemented kit composition system with kit_definition/kit_class_requirement/cart_kit_selection entities, POST /api/cart/kits endpoint with full validation (class requirements, stock, class membership, swap suggestions), admin kit CRUD routes, savings calculation, and integration tests",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/kit.ts",
+    "api/src/kit-composition.integration.test.ts",
+    "specs/admin/claims/completion-T047.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/index.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

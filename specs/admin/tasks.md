@@ -169,7 +169,7 @@
 - [x] T046 Implement cart API [FR-012, FR-013, FR-014] [produces: IC-010]
   Done when: POST /api/cart (creates guest cart, returns `cart.token` UUID — distinct from `cart.id` PK for security); POST /api/cart/items (add variant, validate availability); DELETE /api/cart/items/:id; GET /api/cart (returns items with current prices + availability); guest carts looked up by `token` column via `X-Cart-Token` header; authenticated carts linked to customer_id; cart validates inventory on read (stale items flagged); integration tests: create guest cart → add items → verify totals; add out-of-stock item → rejected
 
-- [ ] T047 Implement kit composition system [FR-007, FR-008, FR-009, FR-010, FR-011]
+- [x] T047 Implement kit composition system [FR-007, FR-008, FR-009, FR-010, FR-011]
   Done when: kit_definition, kit_class_requirement, cart_kit_selection entities; POST /api/cart/kits (add kit to cart with selected variants per class); validation: all class requirements satisfied, all selected variants in stock and match class membership; kit price_minor stored on kit_definition (admin-set fixed price); UI shows savings vs individual; inventory reservation per component; integration tests: valid kit → added; incomplete kit → rejected with message "Select 2 more from Plates"; out-of-stock component → rejected with swap suggestion
 
 - [ ] T048 Implement Stripe Tax adapter [FR-117, FR-118, FR-119, FR-120]

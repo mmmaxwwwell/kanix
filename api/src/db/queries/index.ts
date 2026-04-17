@@ -103,3 +103,21 @@ export {
   getCartWithItems,
 } from "./cart.js";
 export type { Cart, CartLine, CartLineWithDetails, CartWithItems } from "./cart.js";
+export {
+  insertKitDefinition,
+  findKitDefinitionById,
+  findKitDefinitionBySlug,
+  listKitDefinitions,
+  updateKitDefinition,
+  setKitClassRequirements,
+  findKitClassRequirements,
+  addKitToCart,
+} from "./kit.js";
+export type {
+  KitDefinition,
+  NewKitDefinition,
+  KitClassRequirement,
+  NewKitClassRequirement,
+  KitSelection,
+  AddKitToCartResult,
+} from "./kit.js";

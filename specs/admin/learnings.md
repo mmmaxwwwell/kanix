@@ -52,3 +52,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Fastify rejects `POST` with `Content-Type: application/json` and no body (`FST_ERR_CTP_EMPTY_JSON_BODY`) — for endpoints that accept an empty POST, tests must send `body: JSON.stringify({})` or omit the Content-Type header
 - Cart routes use a separate `if (database)` block with `const db = database.db` captured up front — this avoids TypeScript narrowing issues inside closures where `database` could be `undefined`
 - `addCartItem` merges quantity when the same variant is already in the cart (idempotent add) — check existing cart_line before insert and update quantity if found
+
+## T047 — Implement kit composition system
+- Kit validation checks class requirements first (fail fast on missing selections), then validates each variant individually — this ordering gives the best error messages ("Select 2 more from Plates" vs generic "invalid selection")
+- The dynamic import `await import("../schema/product-class.js")` inside `addKitToCart` works for getting the `productClass` table reference when constructing the human-readable error message — avoid circular deps by not importing it at top level alongside `productClassMembership`
+- Out-of-stock swap suggestions scan all products in the same class for active, in-stock variants — limit results with `.slice(0, 3)` to avoid bloating the error response
