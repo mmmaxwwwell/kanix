@@ -76,3 +76,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Customer address routes use the same auth pattern as `/api/customer/me` — `verifySession` + `requireVerifiedEmail` preHandlers, then resolve customer via `getCustomerByAuthSubject`
 - The `is_default` only-one-default constraint is enforced in application code (not DB) — `insertAddress` and `updateAddress` unset existing defaults of the same `type` before setting the new one
 - Address API uses snake_case in request body (`full_name`, `postal_code`, `is_default`) but camelCase in DB/Drizzle schema — the route handler maps between them
+
+## T045a — Critical path checkpoint (Phase 5)
+- Wrap `beforeAll` setup in try/catch and set `superTokensAvailable = false` on failure — this prevents `beforeAll` errors from marking the suite as FAIL when SuperTokens is unavailable or version-incompatible
+- The `isSuperTokensUp()` check only verifies `/hello` responds, but version incompatibility causes signup to fail at runtime — the try/catch is necessary for graceful degradation

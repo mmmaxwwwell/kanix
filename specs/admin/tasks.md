@@ -159,7 +159,7 @@
 - [x] T045 Implement customer address CRUD API [FR-067]
   Done when: POST/GET/PATCH/DELETE /api/customer/addresses; addresses linked to customer_id; `is_default` flag with only-one-default constraint; US-only validation on address fields; integration tests: create address → set as default → update → delete; non-US address rejected
 
-- [ ] T045a Critical path checkpoint (Phase 5) [Critical Path]
+- [x] T045a Critical path checkpoint (Phase 5) [Critical Path]
   Done when: integration test exercises: seed data → list products via public API → check inventory → reserve variant → release reservation → verify balance restored
 
 ---
