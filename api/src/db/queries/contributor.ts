@@ -1,4 +1,4 @@
-import { eq, inArray, and } from "drizzle-orm";
+import { eq, inArray, and, sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import {
   contributor,
@@ -852,4 +852,127 @@ export async function createPayout(
     .returning(payoutColumns);
 
   return row;
+}
+
+// ---------------------------------------------------------------------------
+// Find contributor by customer ID (for dashboard lookup)
+// ---------------------------------------------------------------------------
+
+export async function findContributorByCustomerId(
+  db: PostgresJsDatabase,
+  customerId: string,
+): Promise<ContributorRow | null> {
+  const [row] = await db
+    .select(contributorColumns)
+    .from(contributor)
+    .where(eq(contributor.customerId, customerId));
+  return row ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// List payouts by contributor
+// ---------------------------------------------------------------------------
+
+export async function listPayoutsByContributor(
+  db: PostgresJsDatabase,
+  contributorId: string,
+): Promise<PayoutRow[]> {
+  return db
+    .select(payoutColumns)
+    .from(contributorPayout)
+    .where(eq(contributorPayout.contributorId, contributorId));
+}
+
+// ---------------------------------------------------------------------------
+// Contributor dashboard — aggregated view [FR-075]
+// ---------------------------------------------------------------------------
+
+export interface DashboardDesign {
+  id: string;
+  productId: string;
+  productTitle: string | null;
+  productSlug: string | null;
+  salesCount: number;
+}
+
+export interface DashboardRoyaltySummary {
+  totalMinor: number;
+  paidMinor: number;
+  pendingMinor: number;
+  clawedBackMinor: number;
+  currency: string;
+}
+
+export interface DashboardResult {
+  contributor: ContributorRow;
+  designs: DashboardDesign[];
+  royaltySummary: DashboardRoyaltySummary;
+  milestones: MilestoneRow[];
+  payouts: PayoutRow[];
+}
+
+/**
+ * Get a full dashboard view for a contributor.
+ * Aggregates designs with sales counts, royalty totals, milestones, and payouts.
+ */
+export async function getContributorDashboard(
+  db: PostgresJsDatabase,
+  contributorId: string,
+): Promise<DashboardResult | null> {
+  const contrib = await findContributorById(db, contributorId);
+  if (!contrib) return null;
+
+  // Designs with product info and sales counts
+  const designs = await db
+    .select({
+      id: contributorDesign.id,
+      productId: contributorDesign.productId,
+      productTitle: product.title,
+      productSlug: product.slug,
+      salesCount: contributorDesign.salesCount,
+    })
+    .from(contributorDesign)
+    .leftJoin(product, eq(contributorDesign.productId, product.id))
+    .where(eq(contributorDesign.contributorId, contributorId));
+
+  // Royalty aggregation by status
+  const royaltyRows = await db
+    .select({
+      status: contributorRoyalty.status,
+      total: sql<number>`coalesce(sum(${contributorRoyalty.amountMinor}), 0)`.as("total"),
+    })
+    .from(contributorRoyalty)
+    .where(eq(contributorRoyalty.contributorId, contributorId))
+    .groupBy(contributorRoyalty.status);
+
+  let accruedMinor = 0;
+  let clawedBackMinor = 0;
+  for (const row of royaltyRows) {
+    if (row.status === "accrued") accruedMinor = Number(row.total);
+    if (row.status === "clawed_back") clawedBackMinor = Number(row.total);
+  }
+
+  // Sum completed payouts to determine paid amount
+  const payouts = await listPayoutsByContributor(db, contributorId);
+  const paidMinor = payouts
+    .filter((p) => p.status === "completed")
+    .reduce((sum, p) => sum + p.amountMinor, 0);
+
+  const pendingMinor = accruedMinor - paidMinor;
+
+  const milestones = await listMilestonesByContributor(db, contributorId);
+
+  return {
+    contributor: contrib,
+    designs,
+    royaltySummary: {
+      totalMinor: accruedMinor,
+      paidMinor,
+      pendingMinor,
+      clawedBackMinor,
+      currency: "USD",
+    },
+    milestones,
+    payouts,
+  };
 }

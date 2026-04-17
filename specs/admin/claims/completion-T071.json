@@ -1,0 +1,22 @@
+{
+  "task_id": "T071",
+  "status": "complete",
+  "summary": "Implemented GET /api/contributors/dashboard endpoint with aggregated designs, sales counts, royalty summary (total/paid/pending/clawed_back), milestones, and payout history; added findContributorByCustomerId, listPayoutsByContributor, and getContributorDashboard query functions; wrote integration test verifying 30-sale dashboard totals",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/contributor-dashboard.integration.test.ts",
+    "specs/admin/claims/completion-T071.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/contributor.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

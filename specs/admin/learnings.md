@@ -78,3 +78,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Milestone auto-detection is hooked into `processOrderCompletionSales` (not a separate cron) — uses `detectMilestones()` wrapped in try/catch so milestone failures don't block order processing; milestones are idempotent (check-before-insert pattern)
 - The `contributor_milestone`, `contributor_tax_document`, and `contributor_payout` tables already existed in migration 002 and Drizzle schema — only query functions, routes, and tests needed to be created
 - CTR-3 invariant (payout blocked without approved tax document) is enforced in the `createPayout` query function itself, not in routes — throws `ERR_TAX_DOC_REQUIRED` which routes translate to 403
+
+## T071 — Implement contributor dashboard API
+- Dashboard route uses customer→contributor lookup chain: `session.getUserId()` → `getCustomerByAuthSubject()` → `findContributorByCustomerId()` — contributor links to customer via `contributor.customerId` FK, not via matching `githubUserId`
+- Royalty aggregation uses SQL `coalesce(sum(...), 0)` grouped by status to get accrued vs clawed_back totals; `paidMinor` is derived from completed payouts (not a royalty status), so `pendingMinor = accruedMinor - paidMinor`
+- ESLint forbids `!.` non-null assertions in test files — use optional chaining `?.` instead (e.g., `expect(result?.field).toBe(...)`) following existing test patterns

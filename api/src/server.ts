@@ -208,6 +208,8 @@ import {
   listTaxDocumentsByContributor,
   updateTaxDocumentStatus,
   createPayout,
+  findContributorByCustomerId,
+  getContributorDashboard,
   TAX_DOCUMENT_TYPES,
   type MilestoneType,
   type TaxDocumentType,
@@ -6311,6 +6313,51 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         }
 
         return { tax_document: taxDoc };
+      },
+    );
+
+    // GET /api/contributors/dashboard — contributor dashboard [FR-075]
+    app.get(
+      "/api/contributors/dashboard",
+      {
+        preHandler: [verifySession, requireVerifiedEmail],
+      },
+      async (request, reply) => {
+        const session = request.session;
+        if (!session) {
+          return reply.status(401).send({
+            error: "ERR_AUTHENTICATION_FAILED",
+            message: "Authentication required",
+          });
+        }
+
+        const userId = session.getUserId();
+        const cust = await getCustomerByAuthSubject(db, userId);
+        if (!cust) {
+          return reply.status(404).send({
+            error: "ERR_NOT_FOUND",
+            message: "Customer record not found",
+          });
+        }
+
+        // Find contributor linked to this customer
+        const contrib = await findContributorByCustomerId(db, cust.id);
+        if (!contrib) {
+          return reply.status(404).send({
+            error: "ERR_NOT_FOUND",
+            message: "No contributor account linked to this customer",
+          });
+        }
+
+        const dashboard = await getContributorDashboard(db, contrib.id);
+        if (!dashboard) {
+          return reply.status(404).send({
+            error: "ERR_NOT_FOUND",
+            message: "Contributor not found",
+          });
+        }
+
+        return { dashboard };
       },
     );
 

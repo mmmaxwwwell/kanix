@@ -297,7 +297,7 @@
 - [x] T070 Implement milestone tracking + tax documents [FR-073, FR-074]
   Done when: contributor_milestone tracks: accepted_pr, royalty_activation (25 units), starter_kit (50 units); milestones auto-detected on sales; tax document upload: POST /api/contributors/tax-documents with W-9/W-8BEN file; storage via adapter; approval workflow (admin reviews); payout blocked until tax doc approved; integration tests: milestone progression; tax doc upload + approval; payout blocked without approved doc
 
-- [ ] T071 Implement contributor dashboard API [FR-075]
+- [x] T071 Implement contributor dashboard API [FR-075]
   Done when: GET /api/contributors/dashboard (requires linked GitHub account) returns: designs contributed, per-design sales counts, royalty accrual (total, paid, pending), milestone progress, payout history; integration test: contributor with 30 sales → dashboard shows correct totals
 
 ---
