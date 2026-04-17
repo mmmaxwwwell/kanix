@@ -1,0 +1,24 @@
+{
+  "task_id": "T039",
+  "status": "complete",
+  "summary": "Implemented product variant CRUD (POST/GET/PATCH with material axis and status transitions), product_class CRUD, and product_class_membership assignment with integration tests",
+  "commands_run": [
+    {"command": "npx tsc --noEmit", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/variant.ts",
+    "api/src/db/queries/product-class.ts",
+    "api/src/catalog/variant-class.integration.test.ts",
+    "specs/admin/claims/completion-T039.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/index.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

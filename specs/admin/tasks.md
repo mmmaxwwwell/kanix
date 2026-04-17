@@ -138,7 +138,7 @@
 - [ ] T038 Implement product CRUD API (admin) [FR-001, FR-004, FR-005] [P]
   Done when: POST/GET/PATCH /admin/products; status transitions validated (draft→active→archived, archived is terminal); product media upload with sort_order and alt_text; collection CRUD with product-collection associations; permission check: `products.write` for mutations, `products.read` for reads; integration tests cover: create draft → activate → archive; media reorder; collection management
 
-- [ ] T039 Implement product variant + classification API (admin) [FR-002, FR-003] [P]
+- [x] T039 Implement product variant + classification API (admin) [FR-002, FR-003] [P]
   Done when: POST/PATCH /admin/products/:id/variants; variants have material axis (TPU/PA11/TPC), independent price_minor, sku, weight, dimensions; product_class CRUD; product_class_membership assignment; integration tests: create product → add TPU variant ($29.99) → add PA11 variant ($49.99) → assign to class "modules"; variant status transitions (draft→active→inactive→archived)
 
 - [ ] T040 Implement inventory balance + adjustment API (admin) [FR-032, FR-033, FR-037, FR-038]
