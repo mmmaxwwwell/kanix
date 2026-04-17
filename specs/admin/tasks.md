@@ -54,7 +54,7 @@
 - [x] T014 Implement api/src/logger.ts — Pino structured logging [FR-104]
   Done when: Pino configured with structured JSON to stderr; 5 levels (DEBUG/INFO/WARN/ERROR/FATAL); LOG_LEVEL configurable via config module; correlation ID generated per request via Fastify hook and attached to all log entries; unit test verifies JSON output format with timestamp, level, message, module, correlationId fields
 
-- [ ] T015 Implement api/src/shutdown.ts — graceful shutdown [FR-106]
+- [x] T015 Implement api/src/shutdown.ts — graceful shutdown [FR-106]
   Done when: SIGTERM/SIGINT handlers registered; shutdown sequence: log "Shutdown initiated" → stop accepting connections → mark /ready as 503 → drain in-flight → close WebSocket → close DB pool → close externals → flush logs → exit 0; 30s timeout with force exit 1; shutdown hook registry (reverse order); unit test verifies sequence logging
 
 - [ ] T016 Implement Fastify server skeleton with health endpoints [FR-103]

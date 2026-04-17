@@ -54,3 +54,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T014 — Pino structured logging
 - Pino v10 writes to stderr by default (good for structured logging). To capture output in tests, pass a `Writable` stream as `destination` option — pino's second constructor arg accepts `DestinationStream`
 - ESLint `@typescript-eslint/no-require-imports` rule blocks `require()` in tests — use ESM `import` at module top and pass pino instances via `createLogger({ destination: stream })` instead of inline `require("pino")(opts, stream)`
+
+## T015 — Graceful shutdown
+- Module-level `shutdownInitiated` flag works for `/ready` endpoint integration but makes test isolation tricky — the flag persists across tests in the same Vitest run. Future: consider resetting via an exported `_resetForTesting()` if tests need to check `isShuttingDown() === false`
+- Use `EventEmitter` as a fake `NodeJS.Process` for testing signal handlers — cast via `as unknown as NodeJS.Process` since only `.on()` and `.emit()` are needed

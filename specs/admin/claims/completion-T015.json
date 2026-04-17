@@ -1,0 +1,14 @@
+{
+  "task_id": "T015",
+  "status": "complete",
+  "summary": "Implemented graceful shutdown manager with SIGTERM/SIGINT handlers, reverse-order hook registry, 30s timeout with force exit, and isShuttingDown() for /ready endpoint",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": ["api/src/shutdown.ts", "api/src/shutdown.test.ts", "specs/admin/claims/completion-T015.json"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
