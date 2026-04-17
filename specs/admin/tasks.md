@@ -316,7 +316,7 @@
 - [x] T072 Implement WebSocket server with auth [FR-081, FR-082, FR-083] [produces: IC-008]
   Done when: @fastify/websocket configured; WebSocket upgrade validates token (admin session, customer session, or cart token); authenticated connections subscribe to relevant entity channels; message format: `{type, entity, entityId, data, sequenceId}`; automatic reconnection guidance (client uses exponential backoff); integration tests: admin connects → receives events; unauthenticated → rejected; guest with cart token → receives cart/order events only
 
-- [ ] T073 Implement server-side message buffering [FR-083]
+- [x] T073 Implement server-side message buffering [FR-083]
   Done when: server buffers messages per connection for up to 5 minutes on disconnect; on reconnect, client sends lastSequenceId; server replays missed messages; integration test: connect → receive message (seq 1) → disconnect → new message sent (seq 2) → reconnect with lastSequenceId=1 → receive seq 2
 
 - [ ] T074 Implement pub/sub for domain events [FR-081, FR-082]

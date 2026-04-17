@@ -48,3 +48,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `@fastify/websocket` v11 handler signature is `(socket: WebSocket, request: FastifyRequest)` — no `SocketStream` wrapper; `WebSocket` type comes from `ws` package (needs `@types/ws` as devDependency)
 - `Session.getSessionWithoutRequestResponse(token)` validates an access token without HTTP request/reply — useful for WebSocket upgrade auth where there's no standard Fastify request lifecycle
 - `ws` must be added as a direct dependency (not just transitive via `@fastify/websocket`) for test files that import it as a WebSocket client — pnpm strict hoisting prevents resolving transitive deps
+
+## T073 — Implement server-side message buffering
+- A global buffer (array of all published messages with timestamps) is simpler and more correct than per-subject buffers — on replay, filter by the reconnecting client's channels and `sequenceId > lastSequenceId`
+- The `lastSequenceId` query parameter on the `/ws` endpoint enables reconnect replay — parsed after auth/welcome so the welcome message always arrives first, then replayed messages follow
+- `setInterval(...).unref()` prevents the cleanup timer from keeping the Node process alive during tests or graceful shutdown

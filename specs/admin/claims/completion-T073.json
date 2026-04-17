@@ -1,0 +1,22 @@
+{
+  "task_id": "T073",
+  "status": "complete",
+  "summary": "Implemented server-side message buffering with global buffer, 5-minute TTL, periodic cleanup, and lastSequenceId-based replay on WebSocket reconnect",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test -- --testPathPattern=websocket", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0}
+  ],
+  "files_created": [
+    "specs/admin/claims/completion-T073.json"
+  ],
+  "files_modified": [
+    "api/src/ws/manager.ts",
+    "api/src/websocket.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

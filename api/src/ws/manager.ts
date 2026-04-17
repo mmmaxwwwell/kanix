@@ -34,6 +34,13 @@ export interface WsConnection {
   lastSequenceId: number;
 }
 
+export interface BufferedMessage {
+  message: WsMessage;
+  channel: string;
+  wildcardChannel: string;
+  timestamp: number;
+}
+
 export interface WsManager {
   /** All active connections (exposed for testing). */
   connections: Map<string, WsConnection>;
@@ -41,6 +48,10 @@ export interface WsManager {
   publish(entity: string, entityId: string, type: string, data: Record<string, unknown>): void;
   /** Global monotonic sequence counter (exposed for testing). */
   getSequence(): number;
+  /** Global message buffer (exposed for testing). */
+  messageBuffer: BufferedMessage[];
+  /** Stop the buffer cleanup timer (for graceful shutdown in tests). */
+  stopCleanup(): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,17 +118,30 @@ export interface RegisterWsOptions {
   db: PostgresJsDatabase;
 }
 
+const BUFFER_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CLEANUP_INTERVAL_MS = 60 * 1000; // Run cleanup every minute
+
 export async function registerWebSocket(options: RegisterWsOptions): Promise<WsManager> {
   const { app, db } = options;
 
   await app.register(websocket);
 
   const connections = new Map<string, WsConnection>();
+  const messageBuffer: BufferedMessage[] = [];
   let sequenceCounter = 0;
 
   function nextSequence(): number {
     return ++sequenceCounter;
   }
+
+  // Periodic cleanup of expired buffer entries
+  const cleanupTimer = setInterval(() => {
+    const cutoff = Date.now() - BUFFER_TTL_MS;
+    while (messageBuffer.length > 0 && messageBuffer[0].timestamp <= cutoff) {
+      messageBuffer.shift();
+    }
+  }, CLEANUP_INTERVAL_MS);
+  cleanupTimer.unref();
 
   function publish(
     entity: string,
@@ -131,6 +155,9 @@ export async function registerWebSocket(options: RegisterWsOptions): Promise<WsM
     const message: WsMessage = { type, entity, entityId, data, sequenceId: seq };
     const payload = JSON.stringify(message);
 
+    // Buffer the message for replay on reconnect
+    messageBuffer.push({ message, channel, wildcardChannel, timestamp: Date.now() });
+
     for (const conn of connections.values()) {
       if (conn.channels.has(channel) || conn.channels.has(wildcardChannel)) {
         if (conn.socket.readyState === 1) {
@@ -141,10 +168,23 @@ export async function registerWebSocket(options: RegisterWsOptions): Promise<WsM
     }
   }
 
+  function replayMessages(conn: WsConnection, lastSequenceId: number): void {
+    const cutoff = Date.now() - BUFFER_TTL_MS;
+    for (const entry of messageBuffer) {
+      if (entry.timestamp <= cutoff) continue;
+      if (entry.message.sequenceId <= lastSequenceId) continue;
+      if (conn.channels.has(entry.channel) || conn.channels.has(entry.wildcardChannel)) {
+        conn.socket.send(JSON.stringify(entry.message));
+        conn.lastSequenceId = entry.message.sequenceId;
+      }
+    }
+  }
+
   app.get("/ws", { websocket: true }, async (socket: WebSocket, request: FastifyRequest) => {
     const url = new URL(request.url, `http://${request.hostname}`);
     const token = url.searchParams.get("token");
     const cartToken = url.searchParams.get("cart_token");
+    const lastSequenceIdParam = url.searchParams.get("lastSequenceId");
 
     let role: ConnectionRole;
     let subjectId: string;
@@ -227,6 +267,14 @@ export async function registerWebSocket(options: RegisterWsOptions): Promise<WsM
     socket.send(JSON.stringify(welcome));
     conn.lastSequenceId = welcome.sequenceId;
 
+    // Replay buffered messages if client provided lastSequenceId
+    if (lastSequenceIdParam !== null) {
+      const lastSeq = parseInt(lastSequenceIdParam, 10);
+      if (!isNaN(lastSeq)) {
+        replayMessages(conn, lastSeq);
+      }
+    }
+
     // Handle incoming messages (for future use — e.g., subscribe to specific entities)
     socket.on("message", (raw: Buffer | string) => {
       try {
@@ -260,6 +308,8 @@ export async function registerWebSocket(options: RegisterWsOptions): Promise<WsM
     connections,
     publish,
     getSequence: () => sequenceCounter,
+    messageBuffer,
+    stopCleanup: () => clearInterval(cleanupTimer),
   };
 
   return manager;

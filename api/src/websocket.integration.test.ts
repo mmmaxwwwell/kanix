@@ -477,4 +477,145 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
 
     ws.close();
   });
+
+  // ---------------------------------------------------------------------------
+  // T073: Message buffering tests
+  // ---------------------------------------------------------------------------
+
+  it("replays missed messages on reconnect with lastSequenceId", async () => {
+    if (!superTokensAvailable) return;
+
+    const accessToken = await signInAndGetAccessToken(address, adminEmail, adminPassword);
+
+    // First connection: connect and receive a message
+    const ws1 = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
+    await waitForOpen(ws1);
+    const welcome1 = await waitForMessage(ws1);
+    expect(welcome1.type).toBe("connected");
+
+    // Publish message seq 1 — admin receives it
+    const msg1Promise = waitForMessage(ws1);
+    wsManager.publish("order", "buf-order-1", "order.placed", { num: 1 });
+    const msg1 = await msg1Promise;
+    expect(msg1.type).toBe("order.placed");
+    const seq1 = msg1.sequenceId;
+
+    // Disconnect
+    ws1.close();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // While disconnected, publish another message (seq 2)
+    wsManager.publish("order", "buf-order-2", "order.placed", { num: 2 });
+
+    // Reconnect with lastSequenceId = seq1
+    const ws2 = new WebSocket(`${wsAddress}/ws?token=${accessToken}&lastSequenceId=${seq1}`);
+    await waitForOpen(ws2);
+
+    // Should receive welcome first
+    const welcome2 = await waitForMessage(ws2);
+    expect(welcome2.type).toBe("connected");
+
+    // Then the replayed missed message (seq 2)
+    const replayed = await waitForMessage(ws2);
+    expect(replayed.type).toBe("order.placed");
+    expect(replayed.entityId).toBe("buf-order-2");
+    expect(replayed.data?.num).toBe(2);
+    expect(replayed.sequenceId).toBeGreaterThan(seq1);
+
+    ws2.close();
+  });
+
+  it("does not replay messages already received (sequenceId <= lastSequenceId)", async () => {
+    if (!superTokensAvailable) return;
+
+    const accessToken = await signInAndGetAccessToken(address, adminEmail, adminPassword);
+
+    // Connect and receive some messages
+    const ws1 = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
+    await waitForOpen(ws1);
+    await waitForMessage(ws1); // welcome
+
+    const msg1Promise = waitForMessage(ws1);
+    wsManager.publish("order", "no-replay-1", "order.placed", {});
+    await msg1Promise;
+
+    const msg2Promise = waitForMessage(ws1);
+    wsManager.publish("order", "no-replay-2", "order.placed", {});
+    const msg2 = await msg2Promise;
+
+    const lastSeq = msg2.sequenceId;
+
+    // Disconnect
+    ws1.close();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // Reconnect with lastSequenceId = lastSeq (already received everything)
+    const ws2 = new WebSocket(`${wsAddress}/ws?token=${accessToken}&lastSequenceId=${lastSeq}`);
+    await waitForOpen(ws2);
+
+    // Should receive welcome
+    const welcome2 = await waitForMessage(ws2);
+    expect(welcome2.type).toBe("connected");
+
+    // No more messages should arrive (nothing missed)
+    const received = await Promise.race([
+      waitForMessage(ws2, 500).then(() => true),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 600)),
+    ]);
+    expect(received).toBe(false);
+
+    ws2.close();
+  });
+
+  it("buffers messages and they are available in the buffer", async () => {
+    if (!superTokensAvailable) return;
+
+    const bufferLengthBefore = wsManager.messageBuffer.length;
+
+    // Publish a message — it should be buffered
+    wsManager.publish("order", "buffer-test-1", "order.placed", { test: true });
+
+    expect(wsManager.messageBuffer.length).toBeGreaterThan(bufferLengthBefore);
+
+    const last = wsManager.messageBuffer[wsManager.messageBuffer.length - 1];
+    expect(last?.message.entityId).toBe("buffer-test-1");
+    expect(last?.channel).toBe("order:buffer-test-1");
+    expect(last?.wildcardChannel).toBe("order:*");
+  });
+
+  it("guest reconnects and receives missed cart events", async () => {
+    if (!superTokensAvailable) return;
+
+    // Connect as guest
+    const ws1 = new WebSocket(`${wsAddress}/ws?cart_token=${testCartToken}`);
+    await waitForOpen(ws1);
+    const welcome1 = await waitForMessage(ws1);
+    expect(welcome1.data?.role).toBe("guest");
+
+    // Receive a cart event
+    const cartMsgPromise = waitForMessage(ws1);
+    wsManager.publish("cart", testCartId, "cart.updated", { items: 1 });
+    const cartMsg = await cartMsgPromise;
+    const seq1 = cartMsg.sequenceId;
+
+    // Disconnect
+    ws1.close();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // Publish another cart event while disconnected
+    wsManager.publish("cart", testCartId, "cart.updated", { items: 2 });
+
+    // Reconnect with lastSequenceId
+    const ws2 = new WebSocket(`${wsAddress}/ws?cart_token=${testCartToken}&lastSequenceId=${seq1}`);
+    await waitForOpen(ws2);
+    await waitForMessage(ws2); // welcome
+
+    // Should receive the missed cart event
+    const replayed = await waitForMessage(ws2);
+    expect(replayed.type).toBe("cart.updated");
+    expect(replayed.data?.items).toBe(2);
+    expect(replayed.sequenceId).toBeGreaterThan(seq1);
+
+    ws2.close();
+  });
 });
