@@ -1,0 +1,14 @@
+{
+  "task_id": "T023",
+  "status": "complete",
+  "summary": "Added smoke integration test that starts Fastify on a real port, verifies /health returns 200, /ready returns 503, and SIGTERM triggers clean shutdown",
+  "commands_run": [
+    {"command": "pnpm test -- --reporter=verbose src/smoke.test.ts", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm typecheck", "exit_code": 0}
+  ],
+  "files_created": ["api/src/smoke.test.ts", "specs/admin/claims/completion-T023.json"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

@@ -88,3 +88,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T022 — CLAUDE.md development section
 - No UI_FLOW.md exists in the project yet — task mentions it but there's nothing to reference until a future task creates it
 - CLAUDE.md is loaded into Claude Code context automatically — keep it concise to avoid context window bloat
+
+## T023 — Smoke test: server boots and responds
+- `createShutdownManager` defaults `exitFn` to `process.exit.bind(process)` (the real process, not `processRef`) — smoke tests that trigger SIGTERM shutdown must `vi.spyOn(process, "exit").mockImplementation(...)` to prevent Vitest from catching the real `process.exit(0)` call
+- Use `fetch()` against the real address returned by `server.start()` for true smoke tests; `app.inject()` bypasses the network stack

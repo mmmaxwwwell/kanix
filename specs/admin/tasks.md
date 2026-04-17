@@ -78,7 +78,7 @@
 - [x] T022 Create CLAUDE.md development section [FR-099]
   Done when: CLAUDE.md includes: quick start (nix develop → pnpm dev), available scripts table, environment setup (.env.example → .env), project structure overview, UI_FLOW.md instructions, test commands for all languages/platforms
 
-- [ ] T023 Smoke test: server boots and responds [FR-103]
+- [x] T023 Smoke test: server boots and responds [FR-103]
   Done when: integration test starts Fastify server, verifies /health returns 200, /ready returns 503 (no DB), server shuts down cleanly on SIGTERM
 
 ---
