@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/cart.dart';
 import '../models/kit.dart';
+import '../providers/cart_provider.dart';
 import '../providers/kit_provider.dart';
 
 class KitBuilderScreen extends ConsumerWidget {
@@ -423,7 +425,7 @@ class _KitProductTile extends StatelessWidget {
   }
 }
 
-class _BottomBar extends StatelessWidget {
+class _BottomBar extends ConsumerWidget {
   final KitDefinition kit;
   final bool allSatisfied;
   final Map<String, List<String>> selections;
@@ -447,8 +449,33 @@ class _BottomBar extends StatelessWidget {
     return 'Still need: ${missing.join(', ')}';
   }
 
+  void _addKitToCart(WidgetRef ref) {
+    final cart = ref.read(cartProvider.notifier);
+    for (final req in kit.requirements) {
+      final selectedIds = selections[req.productClassId] ?? [];
+      for (final variantId in selectedIds) {
+        for (final product in req.products) {
+          for (final variant in product.variants) {
+            if (variant.id == variantId) {
+              cart.addItem(CartItem(
+                variantId: variant.id,
+                productId: product.id,
+                productTitle: product.title,
+                variantTitle: variant.title,
+                material: variant.material,
+                priceCents: variant.priceCents,
+                quantity: 1,
+                imageUrl: product.imageUrl,
+              ));
+            }
+          }
+        }
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final missingMsg = _missingClassMessage;
 
@@ -478,6 +505,7 @@ class _BottomBar extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: allSatisfied
                     ? () {
+                        _addKitToCart(ref);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Kit added to cart'),

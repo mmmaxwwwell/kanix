@@ -363,7 +363,7 @@ class _MockAuthNotifier extends AsyncNotifier<AuthState>
   @override
   Future<void> resendVerificationEmail() async {}
   @override
-  Future<void> linkGitHub() async {}
+  Future<String?> linkGitHub() async => null;
   @override
   Future<void> signOut() async {}
 }

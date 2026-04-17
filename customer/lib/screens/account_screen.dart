@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/auth_provider.dart';
 
@@ -59,8 +60,14 @@ class AccountScreen extends ConsumerWidget {
                       : 'Not linked'),
                   trailing: user?.githubLinked == null
                       ? FilledButton.tonal(
-                          onPressed: () {
-                            ref.read(authStateProvider.notifier).linkGitHub();
+                          onPressed: () async {
+                            final url = await ref
+                                .read(authStateProvider.notifier)
+                                .linkGitHub();
+                            if (url != null && context.mounted) {
+                              await launchUrl(Uri.parse(url),
+                                  mode: LaunchMode.externalApplication);
+                            }
                           },
                           child: const Text('Link GitHub'),
                         )

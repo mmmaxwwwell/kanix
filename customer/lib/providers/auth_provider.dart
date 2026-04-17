@@ -205,16 +205,18 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     }
   }
 
-  Future<void> linkGitHub() async {
+  Future<String?> linkGitHub() async {
     try {
       final dio = ref.read(dioProvider);
       final response = await dio.get('/api/customer/github/auth-url');
       if (response.statusCode == 200) {
-        // The URL would be opened in a browser; handled by the UI layer
+        final data = response.data as Map<String, dynamic>;
+        return data['url'] as String?;
       }
     } catch (_) {
-      // Handled by UI
+      // Caller handles null return
     }
+    return null;
   }
 
   Future<void> signOut() async {
