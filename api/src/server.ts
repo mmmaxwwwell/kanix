@@ -112,6 +112,7 @@ import {
   findOrderStatusHistory,
 } from "./db/queries/order-state-machine.js";
 import type { OrderStatusType } from "./db/queries/order-state-machine.js";
+import { cancelOrder } from "./db/queries/order-cancel.js";
 import {
   hasEventBeenProcessed,
   findPaymentByIntentId,
@@ -122,6 +123,7 @@ import {
   handleChargeRefunded,
   handleDisputeCreated,
 } from "./db/queries/webhook.js";
+import { processRefund, findRefundsByOrderId } from "./db/queries/refund.js";
 import Stripe from "stripe";
 
 // ---------------------------------------------------------------------------
@@ -934,6 +936,112 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         }
         const history = await findOrderStatusHistory(database.db, id);
         return { history };
+      },
+    );
+
+    // -----------------------------------------------------------------------
+    // Order Refunds
+    // -----------------------------------------------------------------------
+
+    // Create a refund for an order
+    app.post(
+      "/api/admin/orders/:id/refunds",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.ORDERS_REFUND)],
+        schema: {
+          body: {
+            type: "object",
+            required: ["amount", "reason"],
+            properties: {
+              amount: { type: "number" },
+              reason: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id: orderId } = request.params as { id: string };
+        const body = request.body as { amount: number; reason: string };
+
+        // Verify order exists
+        const found = await findOrderById(database.db, orderId);
+        if (!found) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_ORDER_NOT_FOUND", message: "Order not found" });
+        }
+
+        const actorAdminUserId = request.adminContext?.adminUserId ?? "";
+
+        try {
+          const refundRecord = await processRefund(database.db, {
+            orderId,
+            amountMinor: body.amount,
+            reason: body.reason,
+            actorAdminUserId,
+            createStripeRefund: async (paymentIntentId, amountMinor) => {
+              return paymentAdapter.createRefund({
+                paymentIntentId,
+                amountMinor,
+                reason: body.reason,
+              });
+            },
+          });
+
+          // Set audit context for automatic audit logging
+          request.auditContext = {
+            action: "refund.create",
+            entityType: "order",
+            entityId: orderId,
+            afterJson: {
+              refundId: refundRecord.id,
+              amountMinor: refundRecord.amountMinor,
+              reason: refundRecord.reason,
+            },
+          };
+
+          return reply.status(201).send({ refund: refundRecord });
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_REFUND_EXCEEDS_PAYMENT") {
+            return reply.status(400).send({
+              error: "ERR_REFUND_EXCEEDS_PAYMENT",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_PAYMENT_NOT_FOUND") {
+            return reply.status(400).send({
+              error: "ERR_PAYMENT_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_VALIDATION") {
+            return reply.status(400).send({
+              error: "ERR_VALIDATION",
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // List refunds for an order
+    app.get(
+      "/api/admin/orders/:id/refunds",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.ORDERS_REFUND)],
+      },
+      async (request, reply) => {
+        const { id: orderId } = request.params as { id: string };
+        const found = await findOrderById(database.db, orderId);
+        if (!found) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_ORDER_NOT_FOUND", message: "Order not found" });
+        }
+        const refunds = await findRefundsByOrderId(database.db, orderId);
+        return { refunds };
       },
     );
 
@@ -3029,167 +3137,163 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         return Readable.from(rawBody);
       },
       handler: async (request, reply) => {
-      const signature = request.headers["stripe-signature"] as string | undefined;
-      if (!signature) {
-        return reply.status(401).send({
-          error: "ERR_MISSING_SIGNATURE",
-          message: "Missing stripe-signature header",
-        });
-      }
-
-      const rawBody = (request as unknown as Record<string, unknown>).rawBody as Buffer;
-
-      // Verify webhook signature
-      let event: Stripe.Event;
-      try {
-        const stripe = new Stripe(config.STRIPE_SECRET_KEY);
-        event = stripe.webhooks.constructEvent(
-          rawBody,
-          signature,
-          config.STRIPE_WEBHOOK_SECRET,
-        );
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : "Invalid signature";
-        return reply.status(401).send({
-          error: "ERR_INVALID_SIGNATURE",
-          message: errMsg,
-        });
-      }
-
-      // Idempotency check: skip if event already processed
-      const alreadyProcessed = await hasEventBeenProcessed(db, event.id);
-      if (alreadyProcessed) {
-        return reply.status(200).send({ received: true, duplicate: true });
-      }
-
-      // Route by event type
-      const eventType = event.type;
-
-      if (eventType === "payment_intent.succeeded") {
-        const pi = event.data.object as Stripe.PaymentIntent;
-        const paymentRecord = await findPaymentByIntentId(db, pi.id);
-        if (!paymentRecord) {
-          logger.warn({ piId: pi.id }, "No payment found for PaymentIntent");
-          return reply.status(200).send({ received: true, skipped: true });
+        const signature = request.headers["stripe-signature"] as string | undefined;
+        if (!signature) {
+          return reply.status(401).send({
+            error: "ERR_MISSING_SIGNATURE",
+            message: "Missing stripe-signature header",
+          });
         }
 
-        // Extract charge ID from the latest charge
-        const chargeId =
-          typeof pi.latest_charge === "string"
-            ? pi.latest_charge
-            : (pi.latest_charge as Stripe.Charge | null)?.id;
+        const rawBody = (request as unknown as Record<string, unknown>).rawBody as Buffer;
 
-        // Store event record
-        await storePaymentEvent(db, {
-          paymentId: paymentRecord.id,
-          providerEventId: event.id,
-          eventType,
-          payloadJson: event.data.object,
-        });
-
-        await handlePaymentSucceeded(db, paymentRecord, chargeId ?? undefined);
-      } else if (eventType === "payment_intent.payment_failed") {
-        const pi = event.data.object as Stripe.PaymentIntent;
-        const paymentRecord = await findPaymentByIntentId(db, pi.id);
-        if (!paymentRecord) {
-          logger.warn({ piId: pi.id }, "No payment found for PaymentIntent");
-          return reply.status(200).send({ received: true, skipped: true });
+        // Verify webhook signature
+        let event: Stripe.Event;
+        try {
+          const stripe = new Stripe(config.STRIPE_SECRET_KEY);
+          event = stripe.webhooks.constructEvent(rawBody, signature, config.STRIPE_WEBHOOK_SECRET);
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : "Invalid signature";
+          return reply.status(401).send({
+            error: "ERR_INVALID_SIGNATURE",
+            message: errMsg,
+          });
         }
 
-        await storePaymentEvent(db, {
-          paymentId: paymentRecord.id,
-          providerEventId: event.id,
-          eventType,
-          payloadJson: event.data.object,
-        });
+        // Idempotency check: skip if event already processed
+        const alreadyProcessed = await hasEventBeenProcessed(db, event.id);
+        if (alreadyProcessed) {
+          return reply.status(200).send({ received: true, duplicate: true });
+        }
 
-        await handlePaymentFailed(db, paymentRecord);
-      } else if (eventType === "charge.refunded") {
-        const charge = event.data.object as Stripe.Charge;
-        const paymentRecord = await findPaymentByChargeId(db, charge.id);
-        if (!paymentRecord) {
-          // Try to find by payment intent ID
-          const piId =
-            typeof charge.payment_intent === "string"
-              ? charge.payment_intent
-              : (charge.payment_intent as Stripe.PaymentIntent | null)?.id;
-          if (piId) {
-            const byPi = await findPaymentByIntentId(db, piId);
-            if (byPi) {
-              await storePaymentEvent(db, {
-                paymentId: byPi.id,
-                providerEventId: event.id,
-                eventType,
-                payloadJson: event.data.object,
-              });
-              const refundAmount = charge.amount_refunded;
-              await handleChargeRefunded(db, byPi, refundAmount);
-              return reply.status(200).send({ received: true });
+        // Route by event type
+        const eventType = event.type;
+
+        if (eventType === "payment_intent.succeeded") {
+          const pi = event.data.object as Stripe.PaymentIntent;
+          const paymentRecord = await findPaymentByIntentId(db, pi.id);
+          if (!paymentRecord) {
+            logger.warn({ piId: pi.id }, "No payment found for PaymentIntent");
+            return reply.status(200).send({ received: true, skipped: true });
+          }
+
+          // Extract charge ID from the latest charge
+          const chargeId =
+            typeof pi.latest_charge === "string"
+              ? pi.latest_charge
+              : (pi.latest_charge as Stripe.Charge | null)?.id;
+
+          // Store event record
+          await storePaymentEvent(db, {
+            paymentId: paymentRecord.id,
+            providerEventId: event.id,
+            eventType,
+            payloadJson: event.data.object,
+          });
+
+          await handlePaymentSucceeded(db, paymentRecord, chargeId ?? undefined);
+        } else if (eventType === "payment_intent.payment_failed") {
+          const pi = event.data.object as Stripe.PaymentIntent;
+          const paymentRecord = await findPaymentByIntentId(db, pi.id);
+          if (!paymentRecord) {
+            logger.warn({ piId: pi.id }, "No payment found for PaymentIntent");
+            return reply.status(200).send({ received: true, skipped: true });
+          }
+
+          await storePaymentEvent(db, {
+            paymentId: paymentRecord.id,
+            providerEventId: event.id,
+            eventType,
+            payloadJson: event.data.object,
+          });
+
+          await handlePaymentFailed(db, paymentRecord);
+        } else if (eventType === "charge.refunded") {
+          const charge = event.data.object as Stripe.Charge;
+          const paymentRecord = await findPaymentByChargeId(db, charge.id);
+          if (!paymentRecord) {
+            // Try to find by payment intent ID
+            const piId =
+              typeof charge.payment_intent === "string"
+                ? charge.payment_intent
+                : (charge.payment_intent as Stripe.PaymentIntent | null)?.id;
+            if (piId) {
+              const byPi = await findPaymentByIntentId(db, piId);
+              if (byPi) {
+                await storePaymentEvent(db, {
+                  paymentId: byPi.id,
+                  providerEventId: event.id,
+                  eventType,
+                  payloadJson: event.data.object,
+                });
+                const refundAmount = charge.amount_refunded;
+                await handleChargeRefunded(db, byPi, refundAmount);
+                return reply.status(200).send({ received: true });
+              }
+            }
+            logger.warn({ chargeId: charge.id }, "No payment found for charge");
+            return reply.status(200).send({ received: true, skipped: true });
+          }
+
+          await storePaymentEvent(db, {
+            paymentId: paymentRecord.id,
+            providerEventId: event.id,
+            eventType,
+            payloadJson: event.data.object,
+          });
+
+          const refundAmount = charge.amount_refunded;
+          await handleChargeRefunded(db, paymentRecord, refundAmount);
+        } else if (eventType === "charge.dispute.created") {
+          const disputeObj = event.data.object as Stripe.Dispute;
+          const chargeId =
+            typeof disputeObj.charge === "string"
+              ? disputeObj.charge
+              : (disputeObj.charge as Stripe.Charge | null)?.id;
+
+          let paymentRecord: { id: string; orderId: string; amountMinor: number } | null = null;
+          if (chargeId) {
+            paymentRecord = await findPaymentByChargeId(db, chargeId);
+          }
+          if (!paymentRecord) {
+            // Try via payment_intent
+            const piId =
+              typeof disputeObj.payment_intent === "string"
+                ? disputeObj.payment_intent
+                : (disputeObj.payment_intent as Stripe.PaymentIntent | null)?.id;
+            if (piId) {
+              paymentRecord = await findPaymentByIntentId(db, piId);
             }
           }
-          logger.warn({ chargeId: charge.id }, "No payment found for charge");
-          return reply.status(200).send({ received: true, skipped: true });
-        }
-
-        await storePaymentEvent(db, {
-          paymentId: paymentRecord.id,
-          providerEventId: event.id,
-          eventType,
-          payloadJson: event.data.object,
-        });
-
-        const refundAmount = charge.amount_refunded;
-        await handleChargeRefunded(db, paymentRecord, refundAmount);
-      } else if (eventType === "charge.dispute.created") {
-        const disputeObj = event.data.object as Stripe.Dispute;
-        const chargeId =
-          typeof disputeObj.charge === "string"
-            ? disputeObj.charge
-            : (disputeObj.charge as Stripe.Charge | null)?.id;
-
-        let paymentRecord: { id: string; orderId: string; amountMinor: number } | null = null;
-        if (chargeId) {
-          paymentRecord = await findPaymentByChargeId(db, chargeId);
-        }
-        if (!paymentRecord) {
-          // Try via payment_intent
-          const piId =
-            typeof disputeObj.payment_intent === "string"
-              ? disputeObj.payment_intent
-              : (disputeObj.payment_intent as Stripe.PaymentIntent | null)?.id;
-          if (piId) {
-            paymentRecord = await findPaymentByIntentId(db, piId);
+          if (!paymentRecord) {
+            logger.warn({ disputeId: disputeObj.id }, "No payment found for dispute");
+            return reply.status(200).send({ received: true, skipped: true });
           }
+
+          await storePaymentEvent(db, {
+            paymentId: paymentRecord.id,
+            providerEventId: event.id,
+            eventType,
+            payloadJson: event.data.object,
+          });
+
+          await handleDisputeCreated(db, paymentRecord, {
+            providerDisputeId: disputeObj.id,
+            reason: disputeObj.reason ?? undefined,
+            amountMinor: disputeObj.amount,
+            currency: disputeObj.currency.toUpperCase(),
+            openedAt: new Date(disputeObj.created * 1000),
+            dueBy: disputeObj.evidence_details?.due_by
+              ? new Date(disputeObj.evidence_details.due_by * 1000)
+              : undefined,
+          });
+        } else {
+          // Unhandled event type — acknowledge receipt
+          logger.info({ eventType }, "Unhandled Stripe webhook event type");
         }
-        if (!paymentRecord) {
-          logger.warn({ disputeId: disputeObj.id }, "No payment found for dispute");
-          return reply.status(200).send({ received: true, skipped: true });
-        }
 
-        await storePaymentEvent(db, {
-          paymentId: paymentRecord.id,
-          providerEventId: event.id,
-          eventType,
-          payloadJson: event.data.object,
-        });
-
-        await handleDisputeCreated(db, paymentRecord, {
-          providerDisputeId: disputeObj.id,
-          reason: disputeObj.reason ?? undefined,
-          amountMinor: disputeObj.amount,
-          currency: disputeObj.currency.toUpperCase(),
-          openedAt: new Date(disputeObj.created * 1000),
-          dueBy: disputeObj.evidence_details?.due_by
-            ? new Date(disputeObj.evidence_details.due_by * 1000)
-            : undefined,
-        });
-      } else {
-        // Unhandled event type — acknowledge receipt
-        logger.info({ eventType }, "Unhandled Stripe webhook event type");
-      }
-
-      return reply.status(200).send({ received: true });
-    },
+        return reply.status(200).send({ received: true });
+      },
     });
   }
 

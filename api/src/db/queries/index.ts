@@ -142,3 +142,13 @@ export type {
   TransitionInput,
   TransitionResult,
 } from "./order-state-machine.js";
+export {
+  findPaymentByOrderId,
+  getTotalRefundedForOrder,
+  insertRefund,
+  findRefundsByOrderId,
+  processRefund,
+} from "./refund.js";
+export type { RefundRecord } from "./refund.js";
+export { cancelOrder } from "./order-cancel.js";
+export type { CancelOrderInput, CancelOrderResult } from "./order-cancel.js";

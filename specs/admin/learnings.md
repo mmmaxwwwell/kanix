@@ -77,3 +77,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Fastify only allows one content type parser per MIME type — for Stripe webhook signature verification (which requires the raw body), use a `preParsing` route hook to capture the raw buffer and attach it to `request.rawBody`, then return a `Readable.from(rawBody)` so Fastify still parses JSON normally for other middleware
 - The `createCheckoutOrder` function used `status: "checked_out"` for the cart, but the DB `ck_cart_status` constraint only allows `active`, `converted`, `abandoned`, `expired` — the correct status is `converted`
 - Webhook handlers must be idempotent at every transition: wrap each `transitionOrderStatus()` call in try/catch since the order may already be in the target state (e.g., re-delivered `payment_intent.succeeded` after order is already `confirmed`)
+
+## T052 — Implement refund API (admin)
+- Adding a method to `PaymentAdapter` interface requires updating all stub implementations across test files — the TypeScript compiler will catch missing methods but this creates cross-test-file changes
+- Use `COALESCE(SUM(...), 0)` when calculating total refunded to handle the case where no refunds exist yet — without COALESCE, the sum returns null which breaks the comparison
+- The refund `processRefund` function takes a `createStripeRefund` callback instead of the full adapter — this keeps the query layer decoupled from the adapter interface and makes unit testing easier

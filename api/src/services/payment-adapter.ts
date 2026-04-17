@@ -15,8 +15,20 @@ export interface PaymentIntentResult {
   clientSecret: string;
 }
 
+export interface CreateRefundInput {
+  paymentIntentId: string;
+  amountMinor: number;
+  reason?: string;
+}
+
+export interface RefundResult {
+  id: string;
+  status: string;
+}
+
 export interface PaymentAdapter {
   createPaymentIntent(input: CreatePaymentIntentInput): Promise<PaymentIntentResult>;
+  createRefund(input: CreateRefundInput): Promise<RefundResult>;
 }
 
 // ---------------------------------------------------------------------------
@@ -38,6 +50,17 @@ function createStripePaymentAdapter(stripeSecretKey: string): PaymentAdapter {
         clientSecret: intent.client_secret ?? "",
       };
     },
+    async createRefund(input: CreateRefundInput): Promise<RefundResult> {
+      const refund = await stripe.refunds.create({
+        payment_intent: input.paymentIntentId,
+        amount: input.amountMinor,
+        reason: "requested_by_customer",
+      });
+      return {
+        id: refund.id,
+        status: refund.status ?? "pending",
+      };
+    },
   };
 }
 
@@ -54,6 +77,13 @@ function createStubPaymentAdapter(): PaymentAdapter {
       return {
         id: `pi_stub_${stubCounter}_${Date.now()}`,
         clientSecret: `pi_stub_${stubCounter}_secret_${Date.now()}`,
+      };
+    },
+    async createRefund(): Promise<RefundResult> {
+      stubCounter++;
+      return {
+        id: `re_stub_${stubCounter}_${Date.now()}`,
+        status: "succeeded",
       };
     },
   };

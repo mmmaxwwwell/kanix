@@ -184,7 +184,7 @@
 - [x] T051 Implement Stripe webhook handler [FR-027, FR-028, FR-029, FR-031] [consumes: IC-004]
   Done when: POST /webhooks/stripe validates signature; idempotent: duplicate event processing is no-op (check payment_event.provider_event_id); handles: payment_intent.succeeded → payment_status=paid + reservation consumed; payment_intent.payment_failed → payment_status=failed + reservation released; charge.refunded → payment_status updated; charge.dispute.created → dispute record created; raw payload stored as payment_event; integration tests: success webhook → order confirmed; duplicate webhook → no-op; invalid signature → 401
 
-- [ ] T052 Implement refund API (admin) [FR-030] [P]
+- [x] T052 Implement refund API (admin) [FR-030] [P]
   Done when: POST /admin/orders/:id/refunds with amount + reason; validates amount <= remaining refundable; creates Stripe refund; updates payment_status (paid→partially_refunded or refunded); audit log with actor; integration tests: full refund; partial refund; over-refund rejected with ERR_REFUND_EXCEEDS_PAYMENT
 
 - [ ] T053 Implement order cancellation API (admin) [FR-024] [P]

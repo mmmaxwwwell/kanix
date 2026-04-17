@@ -87,6 +87,9 @@ function createStubPaymentAdapter(): PaymentAdapter {
         clientSecret: `pi_test_webhook_${paymentAdapterCallCount}_secret_${Date.now()}`,
       };
     },
+    async createRefund() {
+      return { id: `re_test_webhook_${Date.now()}`, status: "succeeded" };
+    },
   };
 }
 
@@ -260,10 +263,7 @@ describeWithDeps("Stripe webhook handler (T051)", () => {
     orderId = checkoutData.order.id;
 
     // Find the payment record and intent ID
-    const [paymentRow] = await db
-      .select()
-      .from(payment)
-      .where(eq(payment.orderId, orderId));
+    const [paymentRow] = await db.select().from(payment).where(eq(payment.orderId, orderId));
     paymentRecordId = paymentRow.id;
     paymentIntentId = paymentRow.providerPaymentIntentId;
   });
@@ -343,18 +343,12 @@ describeWithDeps("Stripe webhook handler (T051)", () => {
     expect(resBody.received).toBe(true);
 
     // Verify order status updated to confirmed
-    const [orderRow] = await db
-      .select()
-      .from(order)
-      .where(eq(order.id, orderId));
+    const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
     expect(orderRow.status).toBe("confirmed");
     expect(orderRow.paymentStatus).toBe("paid");
 
     // Verify payment record updated
-    const [paymentRow] = await db
-      .select()
-      .from(payment)
-      .where(eq(payment.id, paymentRecordId));
+    const [paymentRow] = await db.select().from(payment).where(eq(payment.id, paymentRecordId));
     expect(paymentRow.status).toBe("succeeded");
     expect(paymentRow.providerChargeId).toBe(`ch_test_${ts}`);
 
@@ -464,10 +458,7 @@ describeWithDeps("Stripe webhook handler (T051)", () => {
     expect(disputeRow.orderId).toBe(orderId);
 
     // Verify order payment status changed to disputed
-    const [orderRow] = await db
-      .select()
-      .from(order)
-      .where(eq(order.id, orderId));
+    const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
     expect(orderRow.paymentStatus).toBe("disputed");
   });
 });
@@ -595,10 +586,7 @@ describeWithDeps("Stripe webhook — payment_failed (T051)", () => {
     const checkoutData = JSON.parse(checkoutRes.body);
     orderId = checkoutData.order.id;
 
-    const [paymentRow] = await db
-      .select()
-      .from(payment)
-      .where(eq(payment.orderId, orderId));
+    const [paymentRow] = await db.select().from(payment).where(eq(payment.orderId, orderId));
     paymentIntentId = paymentRow.providerPaymentIntentId;
   });
 
@@ -645,10 +633,7 @@ describeWithDeps("Stripe webhook — payment_failed (T051)", () => {
     expect(res.statusCode).toBe(200);
 
     // Verify order payment_status is failed
-    const [orderRow] = await db
-      .select()
-      .from(order)
-      .where(eq(order.id, orderId));
+    const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
     expect(orderRow.paymentStatus).toBe("failed");
 
     // Verify reservations released

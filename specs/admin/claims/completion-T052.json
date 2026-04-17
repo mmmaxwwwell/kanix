@@ -1,0 +1,25 @@
+{
+  "task_id": "T052",
+  "status": "complete",
+  "summary": "Implemented admin refund API with POST /admin/orders/:id/refunds, PaymentAdapter.createRefund, refund query functions, payment_status transitions, audit logging, and integration tests for partial/full/over-refund scenarios",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/refund.ts",
+    "api/src/refund.integration.test.ts"
+  ],
+  "files_modified": [
+    "api/src/services/payment-adapter.ts",
+    "api/src/db/queries/index.ts",
+    "api/src/server.ts",
+    "api/src/checkout.integration.test.ts",
+    "api/src/webhook.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

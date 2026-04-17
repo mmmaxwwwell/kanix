@@ -88,6 +88,9 @@ function createStubPaymentAdapter(): PaymentAdapter {
         clientSecret: `pi_test_${paymentAdapterCallCount}_secret_${Date.now()}`,
       };
     },
+    async createRefund() {
+      return { id: `re_test_${Date.now()}`, status: "succeeded" };
+    },
   };
 }
 
