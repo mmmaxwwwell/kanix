@@ -50,3 +50,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 
 ## T013 — Error hierarchy
 - Straightforward module — no external dependencies needed. Prettier reformats constructor signatures with multiple params to single-line; run `pnpm format` before lint check
+
+## T014 — Pino structured logging
+- Pino v10 writes to stderr by default (good for structured logging). To capture output in tests, pass a `Writable` stream as `destination` option — pino's second constructor arg accepts `DestinationStream`
+- ESLint `@typescript-eslint/no-require-imports` rule blocks `require()` in tests — use ESM `import` at module top and pass pino instances via `createLogger({ destination: stream })` instead of inline `require("pino")(opts, stream)`

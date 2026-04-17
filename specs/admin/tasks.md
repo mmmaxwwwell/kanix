@@ -51,7 +51,7 @@
 - [x] T013 Implement api/src/errors.ts — typed error hierarchy [FR-105]
   Done when: AppError base class with subclasses: ValidationError (400), NotFoundError (404), ConflictError (409), AuthenticationError (401), AuthorizationError (403), ExternalServiceError (502), RateLimitError (429), InternalError (500); each has errorCode (e.g., ERR_ORDER_NOT_FOUND), HTTP status, userFacing flag; unit tests verify all mappings
 
-- [ ] T014 Implement api/src/logger.ts — Pino structured logging [FR-104]
+- [x] T014 Implement api/src/logger.ts — Pino structured logging [FR-104]
   Done when: Pino configured with structured JSON to stderr; 5 levels (DEBUG/INFO/WARN/ERROR/FATAL); LOG_LEVEL configurable via config module; correlation ID generated per request via Fastify hook and attached to all log entries; unit test verifies JSON output format with timestamp, level, message, module, correlationId fields
 
 - [ ] T015 Implement api/src/shutdown.ts — graceful shutdown [FR-106]

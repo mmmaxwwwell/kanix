@@ -1,0 +1,16 @@
+{
+  "task_id": "T014",
+  "status": "complete",
+  "summary": "Implemented api/src/logger.ts with Pino structured JSON logging, 5 log levels mapped from config, correlation ID helpers, and 12 unit tests verifying JSON output format",
+  "commands_run": [
+    {"command": "pnpm add pino", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm format", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": ["api/src/logger.ts", "api/src/logger.test.ts", "specs/admin/claims/completion-T014.json"],
+  "files_modified": ["api/package.json", "api/pnpm-lock.yaml", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
