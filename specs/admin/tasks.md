@@ -72,7 +72,7 @@
 - [x] T020 Set up CI workflow: lint, typecheck, test, security scan [FR-111] [P]
   Done when: `.github/workflows/api-ci.yml` runs on push/PR; stages: pnpm install → lint → typecheck → test → trivy fs → semgrep → gitleaks detect → npm audit; SARIF uploads to GitHub Security tab for trivy + semgrep + gitleaks; security-events: write permission; workflow passes on clean codebase
 
-- [ ] T021 Create security scanner script for local fix-validate loop [FR-111] [P]
+- [x] T021 Create security scanner script for local fix-validate loop [FR-111] [P]
   Done when: `scripts/security-scan.sh` runs trivy, semgrep, gitleaks, npm audit with JSON output to `test-logs/security/`; produces `test-logs/security/summary.json` with per-scanner findings count and pass/fail; script exits non-zero if any critical findings
 
 - [ ] T022 Create CLAUDE.md development section [FR-099]

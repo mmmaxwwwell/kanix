@@ -1,0 +1,12 @@
+{
+  "task_id": "T021",
+  "status": "complete",
+  "summary": "Created scripts/security-scan.sh that runs trivy, semgrep, gitleaks, and npm audit with JSON output to test-logs/security/ and produces summary.json with per-scanner findings count and pass/fail; exits non-zero on critical findings",
+  "commands_run": [
+    {"command": "bash scripts/security-scan.sh", "exit_code": 0}
+  ],
+  "files_created": ["scripts/security-scan.sh", "specs/admin/claims/completion-T021.json"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

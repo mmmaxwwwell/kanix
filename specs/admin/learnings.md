@@ -80,3 +80,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `returntocorp/semgrep-action@v1` has limited control over SARIF output path — using `pip install semgrep` + CLI directly gives better control over `--sarif --output` flags
 - `gitleaks/gitleaks-action@v2` doesn't support custom `args` input — install gitleaks CLI directly for SARIF output control via `--report-format sarif --report-path`
 - Security scan steps should use `|| true` or `if: always()` to avoid blocking the pipeline on findings while still uploading SARIF results
+
+## T021 — Security scanner script
+- Gitleaks `detect` writes an empty JSON array `[]` (not empty file) when no secrets found — parse with `len(data) if isinstance(data, list)` to handle both cases
+- All four scanners (trivy, semgrep, gitleaks, npm audit) are available from the Nix devshell — no installation needed in the script
