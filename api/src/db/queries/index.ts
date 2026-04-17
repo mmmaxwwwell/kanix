@@ -123,3 +123,22 @@ export type {
 } from "./kit.js";
 export { generateOrderNumber, createCheckoutOrder } from "./checkout.js";
 export type { CheckoutAddress, CreateOrderInput, CheckoutOrder } from "./checkout.js";
+export {
+  isValidOrderTransition,
+  transitionOrderStatus,
+  findOrderById,
+  findOrderStatusHistory,
+  STATUS_TRANSITIONS,
+  PAYMENT_STATUS_TRANSITIONS,
+  FULFILLMENT_STATUS_TRANSITIONS,
+  SHIPPING_STATUS_TRANSITIONS,
+} from "./order-state-machine.js";
+export type {
+  OrderStatusType,
+  OrderStatus,
+  PaymentStatus,
+  FulfillmentStatus,
+  ShippingStatus,
+  TransitionInput,
+  TransitionResult,
+} from "./order-state-machine.js";

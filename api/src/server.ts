@@ -106,6 +106,12 @@ import { sql } from "drizzle-orm";
 import { createPaymentAdapter, type PaymentAdapter } from "./services/payment-adapter.js";
 import { generateOrderNumber, createCheckoutOrder } from "./db/queries/checkout.js";
 import type { CheckoutAddress } from "./db/queries/checkout.js";
+import {
+  transitionOrderStatus,
+  findOrderById,
+  findOrderStatusHistory,
+} from "./db/queries/order-state-machine.js";
+import type { OrderStatusType } from "./db/queries/order-state-machine.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -816,8 +822,107 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.ORDERS_READ)],
       },
       async () => {
-        // Placeholder — will be implemented in Phase 6
+        // Placeholder — will be expanded later
         return { orders: [] };
+      },
+    );
+
+    // Get single order by ID
+    app.get(
+      "/api/admin/orders/:id",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.ORDERS_READ)],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const found = await findOrderById(database.db, id);
+        if (!found) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_ORDER_NOT_FOUND", message: "Order not found" });
+        }
+        return { order: found };
+      },
+    );
+
+    // Transition an order's status (any of the four state machines)
+    app.post(
+      "/api/admin/orders/:id/transition",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.ORDERS_READ)],
+        schema: {
+          body: {
+            type: "object",
+            required: ["status_type", "new_value"],
+            properties: {
+              status_type: {
+                type: "string",
+                enum: ["status", "payment_status", "fulfillment_status", "shipping_status"],
+              },
+              new_value: { type: "string" },
+              reason: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as {
+          status_type: OrderStatusType;
+          new_value: string;
+          reason?: string;
+        };
+
+        // Resolve admin user ID from request context
+        const adminContext = (request as unknown as Record<string, unknown>).adminContext as
+          | { adminUser: { id: string } }
+          | undefined;
+        const actorAdminUserId = adminContext?.adminUser?.id;
+
+        try {
+          const result = await transitionOrderStatus(database.db, {
+            orderId: id,
+            statusType: body.status_type,
+            newValue: body.new_value,
+            reason: body.reason,
+            actorAdminUserId,
+          });
+          return result;
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_INVALID_TRANSITION") {
+            return reply.status(400).send({
+              error: "ERR_INVALID_TRANSITION",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_ORDER_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_ORDER_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // Get order status history
+    app.get(
+      "/api/admin/orders/:id/history",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.ORDERS_READ)],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const found = await findOrderById(database.db, id);
+        if (!found) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_ORDER_NOT_FOUND", message: "Order not found" });
+        }
+        const history = await findOrderStatusHistory(database.db, id);
+        return { history };
       },
     );
 

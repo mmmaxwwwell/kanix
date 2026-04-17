@@ -178,7 +178,7 @@
 - [x] T049 Implement checkout flow [FR-012, FR-015, FR-016, FR-017, FR-018, FR-022, FR-023, FR-025, FR-026]
   Done when: POST /api/checkout: validates cart → creates inventory reservations (15 min TTL) → calculates shipping via EasyPost → calculates tax via Stripe Tax → creates Stripe PaymentIntent → creates order with status=pending_payment, payment_status=unpaid, `email` field set from checkout input → returns PaymentIntent client_secret; order_number generated as KNX-000001 format; order stores address snapshots + product/price snapshots on order_lines; US-only address validation (non-US → 400); integration tests: full checkout → order created with snapshots + email stored; non-US address rejected; inventory reserved
 
-- [ ] T050 Implement order state machines [FR-019, FR-020, FR-021]
+- [x] T050 Implement order state machines [FR-019, FR-020, FR-021]
   Done when: four orthogonal state machines on order: status (draft→pending_payment→confirmed→completed→canceled→closed), payment_status, fulfillment_status, shipping_status; invalid transitions rejected with ERR_INVALID_TRANSITION; all transitions create order_status_history entry with actor/reason; unit tests: every valid transition succeeds; every invalid transition rejected; integration test: full order lifecycle
 
 - [ ] T051 Implement Stripe webhook handler [FR-027, FR-028, FR-029, FR-031] [consumes: IC-004]

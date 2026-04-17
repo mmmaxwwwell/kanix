@@ -1,0 +1,24 @@
+{
+  "task_id": "T050",
+  "status": "complete",
+  "summary": "Implemented four orthogonal order state machines (status, payment_status, fulfillment_status, shipping_status) with transition validation, history tracking, and admin API routes; 54 unit tests cover all valid/invalid transitions; integration tests cover full lifecycle, cancellation, and dispute paths",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test -- --run", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/order-state-machine.ts",
+    "api/src/order-state-machine.test.ts",
+    "api/src/order-state-machine.integration.test.ts"
+  ],
+  "files_modified": [
+    "api/src/db/queries/index.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
