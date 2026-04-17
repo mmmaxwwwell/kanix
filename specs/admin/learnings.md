@@ -56,3 +56,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Flutter 3.41+ deprecates `RadioListTile.groupValue`/`onChanged` — use `RadioGroup<T>(groupValue:, onChanged:, child:)` as an ancestor widget wrapping a `Column` of `RadioListTile` children (parameter is `groupValue`, not `value`)
 - `CartNotifier` works well as a `Notifier<List<CartItem>>` (not Async) since cart state is local — keeps tests simple with `ProviderContainer` and no need to mock Dio; the API calls happen only at checkout time via a separate `AsyncNotifier`
 - When testing cart screen with items added programmatically via `ProviderScope.containerOf`, call `addItem` after `pumpWidget` + `pumpAndSettle` to ensure the container is accessible from the widget tree
+
+## T087 — Implement order history + tracking screens
+- Customer app needs its own `WebSocketNotifier` + `webSocketProvider` (mirroring admin's) since customer and admin are separate packages — can't import admin providers
+- `ref.listen(orderUpdatesProvider, (_, _) {...})` inside a `ConsumerWidget.build()` is the clean way to invalidate providers on WebSocket updates without rebuilding the entire widget tree
+- `ListView.separated` separator callback uses `(_, _)` not `(_, __)` in Dart 3.x — double underscore triggers `unnecessary_underscores` lint

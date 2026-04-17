@@ -366,7 +366,7 @@
 - [x] T086 Implement cart + checkout screens
   Done when: cart with item list, quantity adjustment, remove; checkout: saved address selection or new address entry; shipping rate display (from EasyPost); tax display; Stripe payment (using Stripe SDK for Flutter); order confirmation; widget tests
 
-- [ ] T087 Implement order history + tracking screens
+- [x] T087 Implement order history + tracking screens
   Done when: order list with status badges; order detail with timeline (status changes); shipment tracking with carrier events; real-time updates via WebSocket; widget tests
 
 - [ ] T088 Implement support + warranty screens

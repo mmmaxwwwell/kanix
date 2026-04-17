@@ -1,0 +1,25 @@
+{
+  "task_id": "T087",
+  "status": "complete",
+  "summary": "Implemented order history, order detail with timeline, shipment tracking with carrier events, WebSocket real-time updates, and 14 widget tests",
+  "commands_run": [
+    {"command": "flutter pub get", "exit_code": 0},
+    {"command": "FLUTTER_ROOT=.flutter-patched flutter test test/orders_test.dart", "exit_code": 0},
+    {"command": "FLUTTER_ROOT=.flutter-patched flutter test", "exit_code": 0},
+    {"command": "FLUTTER_ROOT=.flutter-patched flutter analyze", "exit_code": 0}
+  ],
+  "files_created": [
+    "customer/lib/models/order.dart",
+    "customer/lib/providers/order_provider.dart",
+    "customer/lib/providers/websocket_provider.dart",
+    "customer/test/orders_test.dart"
+  ],
+  "files_modified": [
+    "customer/lib/screens/orders_screen.dart",
+    "customer/lib/config/router.dart",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

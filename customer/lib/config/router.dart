@@ -15,7 +15,7 @@ import '../screens/checkout_screen.dart';
 import '../models/cart.dart' show OrderConfirmation;
 import '../screens/order_confirmation_screen.dart';
 import '../screens/orders_screen.dart'
-    show OrdersScreen, OrderDetailScreen;
+    show OrdersScreen, OrderDetailScreen, ShipmentTrackingScreen;
 import '../screens/support_screen.dart'
     show SupportScreen, SupportDetailScreen;
 import '../screens/warranty_screen.dart'
@@ -121,6 +121,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => OrderDetailScreen(
                   orderId: state.pathParameters['id']!,
                 ),
+                routes: [
+                  GoRoute(
+                    path: 'tracking/:shipmentId',
+                    builder: (context, state) => ShipmentTrackingScreen(
+                      shipmentId: state.pathParameters['shipmentId']!,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
