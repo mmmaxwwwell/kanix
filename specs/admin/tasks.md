@@ -75,7 +75,7 @@
 - [x] T021 Create security scanner script for local fix-validate loop [FR-111] [P]
   Done when: `scripts/security-scan.sh` runs trivy, semgrep, gitleaks, npm audit with JSON output to `test-logs/security/`; produces `test-logs/security/summary.json` with per-scanner findings count and pass/fail; script exits non-zero if any critical findings
 
-- [ ] T022 Create CLAUDE.md development section [FR-099]
+- [x] T022 Create CLAUDE.md development section [FR-099]
   Done when: CLAUDE.md includes: quick start (nix develop → pnpm dev), available scripts table, environment setup (.env.example → .env), project structure overview, UI_FLOW.md instructions, test commands for all languages/platforms
 
 - [ ] T023 Smoke test: server boots and responds [FR-103]

@@ -84,3 +84,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T021 — Security scanner script
 - Gitleaks `detect` writes an empty JSON array `[]` (not empty file) when no secrets found — parse with `len(data) if isinstance(data, list)` to handle both cases
 - All four scanners (trivy, semgrep, gitleaks, npm audit) are available from the Nix devshell — no installation needed in the script
+
+## T022 — CLAUDE.md development section
+- No UI_FLOW.md exists in the project yet — task mentions it but there's nothing to reference until a future task creates it
+- CLAUDE.md is loaded into Claude Code context automatically — keep it concise to avoid context window bloat
