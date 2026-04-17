@@ -38,6 +38,7 @@
 
             # Migrations
             liquibase
+            postgresql_jdbc
 
             # Infrastructure
             opentofu
@@ -51,6 +52,7 @@
 
           inputsFrom = [ scadShell siteShell apiShell adminShell customerShell deployShell ];
           OPENSCADPATH = "${scad.packages.${system}.bosl2}";
+          LIQUIBASE_CLASSPATH = "${pkgs.postgresql_jdbc}/share/java/postgresql-jdbc.jar";
         };
       }
     );

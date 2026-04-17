@@ -64,3 +64,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T024 — Configure Postgres in process-compose and deploy/nixos
 - Postgres in process-compose uses `trust` auth (initdb --auth=trust) — for local dev this is fine, but the kanix role still needs an explicit password so `DATABASE_URL` with `kanix:kanix@` works for the API
 - NixOS `services.postgresql.ensureUsers` with `ensureDBOwnership = true` auto-grants ownership of the matching database — no separate GRANT needed in production
+
+## T025 — Set up Liquibase with changelog structure
+- Liquibase 5 in Nix does NOT bundle the PostgreSQL JDBC driver — add `postgresql_jdbc` to `flake.nix` and set `LIQUIBASE_CLASSPATH` env var pointing to `${pkgs.postgresql_jdbc}/share/java/postgresql-jdbc.jar`
+- Liquibase `includeAll` in changelog-master.xml loads changeset files in alphabetical order — prefix filenames with `001-`, `002-`, etc. to control execution order
+- Liquibase reads `liquibase.properties` from the working directory by default — place it in `api/` alongside package.json so `pnpm db:migrate` works from the `api/` directory

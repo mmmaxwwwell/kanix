@@ -53,8 +53,8 @@ kanix/
 | `pnpm lint:fix`       | Auto-fix lint + format issues            |
 | `pnpm format`         | Format code with Prettier                |
 | `pnpm typecheck`      | Type-check without emitting              |
-| `pnpm migrate`        | Run Liquibase DB migrations              |
-| `pnpm migrate:rollback` | Rollback last migration                |
+| `pnpm db:migrate`     | Run Liquibase DB migrations              |
+| `pnpm db:rollback`    | Rollback last migration                  |
 
 ### Site (`site/`)
 

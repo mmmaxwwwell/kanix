@@ -88,7 +88,7 @@
 - [x] T024 Configure Postgres in process-compose and deploy/nixos [FR-101]
   Done when: `process-compose up` starts Postgres; `pg_isready` confirms connectivity; `deploy/nixos/postgres.nix` module configures Postgres 16 with auth, logging, backup settings
 
-- [ ] T025 Set up Liquibase with changelog structure [FR-101] [produces: IC-001]
+- [x] T025 Set up Liquibase with changelog structure [FR-101] [produces: IC-001]
   Done when: `api/migrations/changelog-master.xml` exists; `api/migrations/changesets/` directory with initial changeset; `pnpm db:migrate` runs Liquibase update; `pnpm db:rollback` runs Liquibase rollbackCount; Liquibase tracks applied changesets in databasechangelog table
 
 - [ ] T026 Create initial migration: all core entities from data-model.md [FR-032, FR-033]

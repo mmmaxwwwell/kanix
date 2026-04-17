@@ -1,0 +1,25 @@
+{
+  "task_id": "T025",
+  "status": "complete",
+  "summary": "Set up Liquibase with changelog-master.xml, changesets directory, liquibase.properties, PostgreSQL JDBC driver in flake.nix, and pnpm db:migrate/db:rollback scripts",
+  "commands_run": [
+    {"command": "pnpm db:migrate", "exit_code": 0},
+    {"command": "pnpm db:rollback", "exit_code": 0},
+    {"command": "pnpm db:migrate", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/liquibase.properties",
+    "api/migrations/changelog-master.xml",
+    "api/migrations/changesets/001-extensions.xml",
+    "specs/admin/claims/completion-T025.json"
+  ],
+  "files_modified": [
+    "flake.nix",
+    "api/package.json",
+    "CLAUDE.md",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
