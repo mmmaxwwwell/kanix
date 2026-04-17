@@ -12,6 +12,8 @@ import '../screens/kit_builder_screen.dart'
     show KitBuilderScreen, KitBuilderDetailScreen;
 import '../screens/cart_screen.dart';
 import '../screens/checkout_screen.dart';
+import '../models/cart.dart' show OrderConfirmation;
+import '../screens/order_confirmation_screen.dart';
 import '../screens/orders_screen.dart'
     show OrdersScreen, OrderDetailScreen;
 import '../screens/support_screen.dart'
@@ -98,6 +100,17 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/checkout',
             builder: (context, state) => const CheckoutScreen(),
+            routes: [
+              GoRoute(
+                path: 'confirmation',
+                builder: (context, state) {
+                  final confirmation =
+                      state.extra as OrderConfirmation;
+                  return OrderConfirmationScreen(
+                      confirmation: confirmation);
+                },
+              ),
+            ],
           ),
           GoRoute(
             path: '/orders',

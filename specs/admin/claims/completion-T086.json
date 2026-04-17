@@ -1,0 +1,26 @@
+{
+  "task_id": "T086",
+  "status": "complete",
+  "summary": "Implemented cart screen (item list, quantity adjustment, remove), checkout screen (saved address selection, new address form, shipping rate display, tax display, Stripe payment), order confirmation screen, cart models/providers, and widget tests",
+  "commands_run": [
+    {"command": "flutter pub get", "exit_code": 0},
+    {"command": "flutter analyze", "exit_code": 0},
+    {"command": "FLUTTER_ROOT=/home/max/git/kanix/.flutter-patched flutter test", "exit_code": 0}
+  ],
+  "files_created": [
+    "customer/lib/models/cart.dart",
+    "customer/lib/providers/cart_provider.dart",
+    "customer/lib/screens/order_confirmation_screen.dart",
+    "customer/test/cart_checkout_test.dart"
+  ],
+  "files_modified": [
+    "customer/lib/config/router.dart",
+    "customer/lib/screens/cart_screen.dart",
+    "customer/lib/screens/checkout_screen.dart",
+    "customer/lib/screens/product_detail_screen.dart",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

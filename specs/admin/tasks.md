@@ -363,7 +363,7 @@
 - [x] T085 Implement kit builder screen
   Done when: kit selection UI: shows class requirements (e.g., "Pick 2 Plates"), available products per class, in-stock indicator; validates all classes satisfied; shows kit price + savings vs individual; add kit to cart; widget tests
 
-- [ ] T086 Implement cart + checkout screens
+- [x] T086 Implement cart + checkout screens
   Done when: cart with item list, quantity adjustment, remove; checkout: saved address selection or new address entry; shipping rate display (from EasyPost); tax display; Stripe payment (using Stripe SDK for Flutter); order confirmation; widget tests
 
 - [ ] T087 Implement order history + tracking screens
@@ -427,6 +427,27 @@
 
 - [ ] T104 Security boundary tests [SC-008, SC-015]
   Done when: test: unauthenticated → 401 on all protected endpoints; wrong permission → 403; SQL injection attempts → rejected; XSS in input → sanitized; invalid webhook signature → rejected
+
+- [ ] T104a E2E: guest-order → account linking [FR-066]
+  Done when: Playwright test: complete 3 guest checkouts with email `jane@example.com` (no account) → sign up with same email → verify email → log in → all 3 orders appear in customer order history with customer_id populated; WebSocket delivers order-list update on account activation
+
+- [ ] T104b E2E: warranty claim submission [FR-055]
+  Done when: flutter integration test: login → order history → select delivered order within warranty window → file warranty claim (describe defect, upload 2 photos) → verify support_ticket created with category=warranty_claim, priority=high, attachments accessible; admin receives ticket in queue via WebSocket; expired-warranty claim rejected with clear error
+
+- [ ] T104c E2E: admin refund (full + partial) through Stripe [FR-030]
+  Done when: flutter integration test: admin opens paid order → issue full refund → Stripe test refund processed → payment_status=refunded → customer sees refund in order timeline via WebSocket; second test: partial refund → payment_status=partially_refunded; over-refund attempt rejected with ERR_REFUND_EXCEEDS_PAYMENT; audit log entries exist for both
+
+- [ ] T104d E2E: reservation expiry → late payment race [FR-E008]
+  Done when: test: create checkout → reservation created (short TTL) → force expiry via cleanup cron → fire payment_intent.succeeded webhook → verify either (a) re-reservation succeeded + order confirmed, or (b) order flagged for manual review with admin alert delivered via WebSocket; both branches exercised with stock-available and stock-exhausted setups
+
+- [ ] T104e E2E: low-stock alert → notification delivery [FR-038, FR-085]
+  Done when: test: set variant safety_stock=10 → admin connected via WebSocket with email preference → adjust inventory so available drops below threshold → verify in-app WebSocket notification received within 2s AND email logged to `logs/emails.jsonl` with correct variant SKU, product title, available count, threshold
+
+- [ ] T104f E2E: Stripe Tax calculation with live test key [FR-117, FR-118]
+  Done when: test (gated on STRIPE_TAX_ENABLED=true + Stripe test key present): checkout with TX shipping address → verify Stripe Tax API called → non-zero tax returned → tax reflected in PaymentIntent metadata and order totals; checkout with tax-exempt state → correct tax returned; test skipped cleanly when Stripe test key unavailable
+
+- [ ] T104g E2E: cross-app real-time propagation [FR-081, FR-082]
+  Done when: test: customer app connected (customer session) + admin app connected (admin session) → admin creates shipment + buys label for customer's order → customer receives shipment.created + tracking events via WebSocket within 2s; customer posts support ticket message → admin receives ticket.updated event within 2s; admin internal note NOT delivered to customer channel
 
 - [ ] T105 Create/verify UI_FLOW.md for admin and customer apps
   Done when: UI_FLOW.md documents all screens, routes, state machines, API calls, field validations, and real-time connections for both Flutter apps and Astro checkout; every flow has a corresponding E2E test reference

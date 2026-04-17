@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/cart.dart';
 import '../models/product.dart';
+import '../providers/cart_provider.dart';
 import '../providers/catalog_provider.dart';
 
 class ProductDetailScreen extends ConsumerStatefulWidget {
@@ -56,7 +58,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   }
 }
 
-class _ProductDetailBody extends StatelessWidget {
+class _ProductDetailBody extends ConsumerWidget {
   final Product product;
   final String? selectedVariantId;
   final ValueChanged<String> onVariantSelected;
@@ -68,7 +70,7 @@ class _ProductDetailBody extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final activeVariants =
         product.variants.where((v) => v.status == 'active').toList();
@@ -219,6 +221,18 @@ class _ProductDetailBody extends StatelessWidget {
                     onPressed: selectedVariant != null &&
                             selectedVariant.isInStock
                         ? () {
+                            ref.read(cartProvider.notifier).addItem(
+                                  CartItem(
+                                    variantId: selectedVariant.id,
+                                    productId: product.id,
+                                    productTitle: product.title,
+                                    variantTitle: selectedVariant.title,
+                                    material: selectedVariant.material,
+                                    priceCents: selectedVariant.priceCents,
+                                    quantity: 1,
+                                    imageUrl: product.primaryImageUrl,
+                                  ),
+                                );
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Added to cart'),

@@ -51,3 +51,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Kit `individualTotalMinor` savings calculation must pick the N cheapest variants across ALL products in each class, not per-product — sort all variant prices from all products in the class together before picking the cheapest N
 - The public API needed a new `GET /api/kits` endpoint since admin kit endpoints require auth — added `findActiveKitsWithDetails` query that joins kit_definition → kit_class_requirement → product_class → product_class_membership → product → variants + inventory
 - When testing kit builder with `ChoiceChip` variant selectors, out-of-stock indicators are per-product (`isAvailable`) not per-variant — a product with mixed stock shows "In Stock" while individual chip `onSelected` is null for OOS variants
+
+## T086 — Implement cart + checkout screens
+- Flutter 3.41+ deprecates `RadioListTile.groupValue`/`onChanged` — use `RadioGroup<T>(groupValue:, onChanged:, child:)` as an ancestor widget wrapping a `Column` of `RadioListTile` children (parameter is `groupValue`, not `value`)
+- `CartNotifier` works well as a `Notifier<List<CartItem>>` (not Async) since cart state is local — keeps tests simple with `ProviderContainer` and no need to mock Dio; the API calls happen only at checkout time via a separate `AsyncNotifier`
+- When testing cart screen with items added programmatically via `ProviderScope.containerOf`, call `addItem` after `pumpWidget` + `pumpAndSettle` to ensure the container is accessible from the widget tree
