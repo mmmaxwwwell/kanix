@@ -42,3 +42,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `FLUTTER_ROOT` must point to the patched symlink farm at `.flutter-patched/` when running `flutter test` outside the nix devshell — the shell hook sets this automatically but headless agents need `FLUTTER_ROOT="$(pwd)/.flutter-patched"`
 - When writing `show` imports for files that export both a list screen and detail screen (e.g., `FulfillmentScreen, FulfillmentDetailScreen`), the router file must explicitly name both classes in the `show` clause
 - `StreamProvider.autoDispose<WsMessage>` for real-time updates can be defined in the screen file itself (not just provider files) — keeps WebSocket subject filtering co-located with the UI that consumes it
+
+## T080 — Implement admin inventory + product screens
+- `DropdownButtonFormField` `value` parameter is deprecated since Flutter 3.33; use `initialValue` instead to set the initial form field value
+- Private widgets like `_ProductStatusChip` should not declare `super.key` — private classes cannot be subclassed externally, so the `key` parameter triggers `unused_element_parameter` warning
+- `FutureProvider.autoDispose.family` can be chained for detail+adjustments on the same screen — watch both providers and invalidate both on WebSocket updates for consistent state

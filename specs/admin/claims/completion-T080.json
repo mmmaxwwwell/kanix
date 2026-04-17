@@ -1,0 +1,27 @@
+{
+  "task_id": "T080",
+  "status": "complete",
+  "summary": "Implemented admin inventory screens (overview with low-stock highlighting, variant balance detail, adjustment creation) and product screens (CRUD, variant/media/classification management) with widget tests",
+  "commands_run": [
+    {"command": "flutter pub get", "exit_code": 0},
+    {"command": "FLUTTER_ROOT=.flutter-patched flutter test", "exit_code": 0},
+    {"command": "flutter analyze", "exit_code": 0}
+  ],
+  "files_created": [
+    "admin/lib/models/inventory.dart",
+    "admin/lib/models/product.dart",
+    "admin/lib/providers/inventory_provider.dart",
+    "admin/lib/providers/product_provider.dart",
+    "admin/test/inventory_screen_test.dart",
+    "admin/test/products_screen_test.dart"
+  ],
+  "files_modified": [
+    "admin/lib/config/router.dart",
+    "admin/lib/screens/inventory_screen.dart",
+    "admin/lib/screens/products_screen.dart",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

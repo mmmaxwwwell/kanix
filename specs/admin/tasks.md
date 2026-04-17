@@ -341,7 +341,7 @@
 - [x] T079 Implement admin fulfillment + shipment screens
   Done when: fulfillment task queue with assignment; pick/pack workflow screens; shipment creation, label purchase, tracking view; real-time queue updates; widget tests
 
-- [ ] T080 Implement admin inventory + product screens
+- [x] T080 Implement admin inventory + product screens
   Done when: inventory overview with low-stock highlighting; variant balance detail; adjustment creation; product CRUD with variant/media/classification management; widget tests
 
 - [ ] T081 Implement admin support + dispute screens
