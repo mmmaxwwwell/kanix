@@ -107,3 +107,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The `inventory_adjustment` table already had `idempotency_key` column with UNIQUE constraint from the migration — the implementation only needed a pre-check query and race-condition handling (catch `23505` unique violation for concurrent duplicates)
 - Accept `idempotency_key` from both header (`idempotency_key` or `idempotency-key`) and body field — HTTP headers are lowercased by Fastify, so `request.headers["idempotency_key"]` works when the client sends `Idempotency_Key`
 - Duplicate requests return HTTP 200 (not 201) with the original adjustment result — this signals to the client that no new resource was created while still returning useful data
+
+## T054d — Implement Stripe unreachable checkout error
+- The checkout route already had partial Stripe error handling (`StripeConnectionError`, `StripeAPIError`) — expanding it to also catch `StripeTimeoutError` and generic network errors (`ECONNREFUSED`, `ETIMEDOUT`) makes the 502 response more robust
+- The reservation release + no-order-created guarantee is inherent in the existing flow — reservations are created first, PaymentIntent is created before `createCheckoutOrder`, so a Stripe failure naturally prevents order creation
+- For integration tests, simulating Stripe failure only requires a `PaymentAdapter` stub that throws with `type: "StripeConnectionError"` — duck typing on the error's `type` property means no need to import actual Stripe error classes

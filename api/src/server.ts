@@ -3313,7 +3313,13 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           }
         }
         const stripeErr = err as { type?: string; code?: string };
-        if (stripeErr.type === "StripeConnectionError" || stripeErr.type === "StripeAPIError") {
+        if (
+          stripeErr.type === "StripeConnectionError" ||
+          stripeErr.type === "StripeAPIError" ||
+          stripeErr.type === "StripeTimeoutError" ||
+          stripeErr.code === "ECONNREFUSED" ||
+          stripeErr.code === "ETIMEDOUT"
+        ) {
           return reply.status(502).send({
             error: "ERR_EXTERNAL_SERVICE_UNAVAILABLE",
             message: "Payment service is temporarily unavailable",

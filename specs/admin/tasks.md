@@ -202,7 +202,7 @@
 - [x] T054c Implement idempotent inventory adjustments [FR-E009]
   Done when: POST /admin/inventory/adjustments accepts optional `idempotency_key` header; duplicate requests with the same key return the original result without creating a second adjustment; integration test: submit adjustment with key → submit same key again → verify only one adjustment record exists
 
-- [ ] T054d Implement Stripe unreachable checkout error [FR-E012]
+- [x] T054d Implement Stripe unreachable checkout error [FR-E012]
   Done when: when Stripe API is unreachable during PaymentIntent creation, checkout returns 502 with ERR_EXTERNAL_SERVICE_UNAVAILABLE and does NOT create an order; inventory reservations are released; integration test: mock Stripe timeout → verify 502 response + no order + reservations released
 
 - [ ] T054e Implement duplicate email verification conflict detection [FR-E017]
