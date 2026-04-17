@@ -468,4 +468,93 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
     });
     expect(res.status).toBe(400);
   });
+
+  it("should return original result for duplicate idempotency_key header (T054c)", async () => {
+    if (!superTokensAvailable) return;
+
+    const idempotencyKey = `idem-test-${Date.now()}`;
+    const adjustmentBody = {
+      variant_id: testVariantId,
+      location_id: testLocationId,
+      adjustment_type: "restock",
+      quantity_delta: 10,
+      reason: "Idempotency test restock",
+    };
+
+    // First request — should create the adjustment
+    const res1 = await fetch(`${address}/api/admin/inventory/adjustments`, {
+      method: "POST",
+      headers: {
+        ...adminHeaders,
+        "Content-Type": "application/json",
+        idempotency_key: idempotencyKey,
+      },
+      body: JSON.stringify(adjustmentBody),
+    });
+    expect(res1.status).toBe(201);
+    const body1 = (await res1.json()) as {
+      adjustment: { id: string; idempotency_key: string };
+      balance: { on_hand: number };
+    };
+    expect(body1.adjustment.idempotency_key).toBe(idempotencyKey);
+
+    // Second request with same key — should return original without creating another
+    const res2 = await fetch(`${address}/api/admin/inventory/adjustments`, {
+      method: "POST",
+      headers: {
+        ...adminHeaders,
+        "Content-Type": "application/json",
+        idempotency_key: idempotencyKey,
+      },
+      body: JSON.stringify(adjustmentBody),
+    });
+    expect(res2.status).toBe(200);
+    const body2 = (await res2.json()) as {
+      adjustment: { id: string; idempotency_key: string };
+      balance: { on_hand: number };
+    };
+
+    // Same adjustment returned
+    expect(body2.adjustment.id).toBe(body1.adjustment.id);
+    expect(body2.adjustment.idempotency_key).toBe(idempotencyKey);
+
+    // Verify only one adjustment record exists with this key
+    const adjustments = await dbConn.db
+      .select()
+      .from(inventoryAdjustment)
+      .where(eq(inventoryAdjustment.idempotencyKey, idempotencyKey));
+    expect(adjustments.length).toBe(1);
+  });
+
+  it("should allow different idempotency keys to create separate adjustments", async () => {
+    if (!superTokensAvailable) return;
+
+    const key1 = `idem-diff-a-${Date.now()}`;
+    const key2 = `idem-diff-b-${Date.now()}`;
+    const adjustmentBody = {
+      variant_id: testVariantId,
+      location_id: testLocationId,
+      adjustment_type: "restock",
+      quantity_delta: 5,
+      reason: "Different key test",
+    };
+
+    const res1 = await fetch(`${address}/api/admin/inventory/adjustments`, {
+      method: "POST",
+      headers: { ...adminHeaders, "Content-Type": "application/json", idempotency_key: key1 },
+      body: JSON.stringify(adjustmentBody),
+    });
+    expect(res1.status).toBe(201);
+
+    const res2 = await fetch(`${address}/api/admin/inventory/adjustments`, {
+      method: "POST",
+      headers: { ...adminHeaders, "Content-Type": "application/json", idempotency_key: key2 },
+      body: JSON.stringify(adjustmentBody),
+    });
+    expect(res2.status).toBe(201);
+
+    const body1 = (await res1.json()) as { adjustment: { id: string } };
+    const body2 = (await res2.json()) as { adjustment: { id: string } };
+    expect(body1.adjustment.id).not.toBe(body2.adjustment.id);
+  });
 });

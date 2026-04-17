@@ -175,6 +175,50 @@ export async function createInventoryAdjustment(
 }
 
 /**
+ * Find an existing adjustment by idempotency key and return the full result
+ * (adjustment + movement + balance) so the caller can return a cached response.
+ */
+export async function findAdjustmentByIdempotencyKey(
+  db: PostgresJsDatabase,
+  idempotencyKey: string,
+): Promise<AdjustmentResult | null> {
+  const [adjustment] = await db
+    .select()
+    .from(inventoryAdjustment)
+    .where(eq(inventoryAdjustment.idempotencyKey, idempotencyKey));
+
+  if (!adjustment) return null;
+
+  // Fetch the corresponding movement
+  const [movement] = await db
+    .select()
+    .from(inventoryMovement)
+    .where(
+      and(
+        eq(inventoryMovement.referenceType, "adjustment"),
+        eq(inventoryMovement.referenceId, adjustment.id),
+      ),
+    );
+
+  // Fetch the current balance
+  const [balance] = await db
+    .select()
+    .from(inventoryBalance)
+    .where(
+      and(
+        eq(inventoryBalance.variantId, adjustment.variantId),
+        eq(inventoryBalance.locationId, adjustment.locationId),
+      ),
+    );
+
+  if (!movement || !balance) return null;
+
+  const lowStock = balance.available <= balance.safetyStock;
+
+  return { adjustment, movement, balance, lowStock };
+}
+
+/**
  * Ensure an inventory location exists, returning it.
  */
 export async function findLocationByCode(

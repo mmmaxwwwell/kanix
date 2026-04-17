@@ -199,7 +199,7 @@
 - [x] T054b Implement reservation expiry / payment race handler [FR-E008]
   Done when: when payment_intent.succeeded webhook fires and the order's reservations have been expired by the cleanup cron, the system either (a) re-reserves if stock is still available and confirms the order, or (b) flags the order for manual review with status=`pending_payment` and an admin alert; integration test: create reservation → force-expire it → fire payment success webhook → verify order flagged for review OR re-reserved
 
-- [ ] T054c Implement idempotent inventory adjustments [FR-E009]
+- [x] T054c Implement idempotent inventory adjustments [FR-E009]
   Done when: POST /admin/inventory/adjustments accepts optional `idempotency_key` header; duplicate requests with the same key return the original result without creating a second adjustment; integration test: submit adjustment with key → submit same key again → verify only one adjustment record exists
 
 - [ ] T054d Implement Stripe unreachable checkout error [FR-E012]

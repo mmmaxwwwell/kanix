@@ -63,6 +63,7 @@ import {
   findInventoryBalances,
   findBalanceByVariantAndLocation,
   createInventoryAdjustment,
+  findAdjustmentByIdempotencyKey,
 } from "./db/queries/inventory.js";
 import { findActiveProductsWithDetails, findActiveProductBySlug } from "./db/queries/catalog.js";
 import {
@@ -1201,6 +1202,25 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           });
         }
 
+        // Accept idempotency_key from header (preferred) or body
+        const idempotencyKey =
+          (request.headers["idempotency_key"] as string | undefined) ??
+          (request.headers["idempotency-key"] as string | undefined) ??
+          body.idempotency_key;
+
+        // Check for existing adjustment with this idempotency key
+        if (idempotencyKey) {
+          const existing = await findAdjustmentByIdempotencyKey(database.db, idempotencyKey);
+          if (existing) {
+            return reply.status(200).send({
+              adjustment: existing.adjustment,
+              movement: existing.movement,
+              balance: existing.balance,
+              low_stock: existing.lowStock,
+            });
+          }
+        }
+
         try {
           const result = await createInventoryAdjustment(database.db, {
             variantId: body.variant_id,
@@ -1215,7 +1235,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             reason: body.reason,
             notes: body.notes,
             actorAdminUserId: request.adminContext?.adminUserId ?? "",
-            idempotencyKey: body.idempotency_key,
+            idempotencyKey: idempotencyKey,
           });
 
           // Queue low-stock alert if applicable
@@ -1248,8 +1268,20 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             low_stock: result.lowStock,
           });
         } catch (err: unknown) {
-          // CHECK constraint violation means available would go negative
           const pgErr = err as { code?: string; constraint?: string };
+          // Unique constraint violation on idempotency_key (concurrent duplicate)
+          if (pgErr.code === "23505" && idempotencyKey) {
+            const existing = await findAdjustmentByIdempotencyKey(database.db, idempotencyKey);
+            if (existing) {
+              return reply.status(200).send({
+                adjustment: existing.adjustment,
+                movement: existing.movement,
+                balance: existing.balance,
+                low_stock: existing.lowStock,
+              });
+            }
+          }
+          // CHECK constraint violation means available would go negative
           if (pgErr.code === "23514" && pgErr.constraint?.includes("ck_inventory_balance")) {
             return reply.status(422).send({
               error: "ERR_INVENTORY_INSUFFICIENT",

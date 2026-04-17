@@ -1,0 +1,20 @@
+{
+  "task_id": "T054c",
+  "status": "complete",
+  "summary": "Added idempotent inventory adjustments: duplicate requests with same idempotency_key header return original result without creating a second adjustment",
+  "commands_run": [
+    {"command": "pnpm test -- --reporter=verbose --testPathPattern=admin-inventory", "exit_code": 0},
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T054c.json"],
+  "files_modified": [
+    "api/src/db/queries/inventory.ts",
+    "api/src/server.ts",
+    "api/src/admin-inventory.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

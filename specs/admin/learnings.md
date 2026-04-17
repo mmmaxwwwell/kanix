@@ -102,3 +102,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Move order status confirmation (`pending_payment → confirmed`) AFTER reservation consumption — this allows skipping confirmation when expired reservations can't be re-reserved, keeping the order in `pending_payment` for manual review
 - When re-reserving expired inventory, use `reservationReason: "payment_race_recovery"` so the audit trail distinguishes recovery reservations from checkout ones
 - The `AdminAlertService` follows the same DI pattern as `LowStockAlertService` — in-memory queue exposed via `ServerInstance`, injectable via `CreateServerOptions` for test access
+
+## T054c — Implement idempotent inventory adjustments
+- The `inventory_adjustment` table already had `idempotency_key` column with UNIQUE constraint from the migration — the implementation only needed a pre-check query and race-condition handling (catch `23505` unique violation for concurrent duplicates)
+- Accept `idempotency_key` from both header (`idempotency_key` or `idempotency-key`) and body field — HTTP headers are lowercased by Fastify, so `request.headers["idempotency_key"]` works when the client sends `Idempotency_Key`
+- Duplicate requests return HTTP 200 (not 201) with the original adjustment result — this signals to the client that no new resource was created while still returning useful data
