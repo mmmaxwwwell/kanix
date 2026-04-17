@@ -255,7 +255,7 @@
 - [x] T062 Implement ticket attachments [FR-053]
   Done when: POST /support/tickets/:id/attachments accepts JPEG/PNG/PDF up to 10MB, max 5 per message; stored via storage adapter (local filesystem dev, S3 prod); file access controlled: only ticket customer + admins; integration tests: upload valid file → accessible; upload invalid type → rejected; unauthorized access → 403
 
-- [ ] T063 Implement warranty claim flow [FR-055]
+- [x] T063 Implement warranty claim flow [FR-055]
   Done when: POST /api/support/warranty-claims with order_id, order_line_id, description; validates: order delivered, within 1-year warranty period (from delivered_at); creates support_ticket with category=warranty_claim, priority=high; if TPU heat deformation described, flags material limitation in response; integration tests: valid claim (11 months) → ticket created; expired claim (13 months) → rejected; TPU heat claim → flagged
 
 - [ ] T064 Implement dispute auto-creation [FR-056, FR-057]

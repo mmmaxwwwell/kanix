@@ -173,6 +173,7 @@ import {
   createTicketAttachment,
   findAttachmentById,
   listAttachmentsByTicketId,
+  createWarrantyClaim,
   ALLOWED_ATTACHMENT_TYPES,
   MAX_ATTACHMENT_SIZE_BYTES,
 } from "./db/queries/support-ticket.js";
@@ -2700,6 +2701,75 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           .header("Content-Type", attachment.contentType)
           .header("Content-Disposition", `attachment; filename="${attachment.fileName}"`)
           .send(file.data);
+      },
+    );
+
+    // -----------------------------------------------------------------------
+    // Warranty Claims (T063 — FR-055)
+    // -----------------------------------------------------------------------
+
+    // POST /api/support/warranty-claims — customer files a warranty claim
+    app.post(
+      "/api/support/warranty-claims",
+      {
+        preHandler: [verifySession, requireVerifiedEmail],
+        schema: {
+          body: {
+            type: "object",
+            required: ["order_id", "order_line_id", "description"],
+            properties: {
+              order_id: { type: "string" },
+              order_line_id: { type: "string" },
+              description: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const session = (request as unknown as { session: { getUserId: () => string } }).session;
+        const authSubject = session.getUserId();
+        const customerRow = await getCustomerByAuthSubject(database.db, authSubject);
+        if (!customerRow) {
+          return reply
+            .status(401)
+            .send({ error: "ERR_NOT_CUSTOMER", message: "Customer not found" });
+        }
+
+        const body = request.body as {
+          order_id: string;
+          order_line_id: string;
+          description: string;
+        };
+
+        try {
+          const result = await createWarrantyClaim(database.db, {
+            customerId: customerRow.id,
+            orderId: body.order_id,
+            orderLineId: body.order_line_id,
+            description: body.description,
+          });
+
+          return {
+            ticket: result.ticket,
+            material_limitation_flagged: result.materialLimitationFlagged,
+            material_limitation_note: result.materialLimitationNote,
+          };
+        } catch (err) {
+          const errObj = err as { code?: string; message?: string };
+          if (errObj.code === "ERR_ORDER_NOT_FOUND") {
+            return reply.status(404).send({ error: errObj.code, message: errObj.message });
+          }
+          if (errObj.code === "ERR_ORDER_LINE_NOT_FOUND") {
+            return reply.status(404).send({ error: errObj.code, message: errObj.message });
+          }
+          if (errObj.code === "ERR_ORDER_NOT_DELIVERED") {
+            return reply.status(400).send({ error: errObj.code, message: errObj.message });
+          }
+          if (errObj.code === "ERR_WARRANTY_EXPIRED") {
+            return reply.status(400).send({ error: errObj.code, message: errObj.message });
+          }
+          throw err;
+        }
       },
     );
 

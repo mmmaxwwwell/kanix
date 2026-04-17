@@ -61,3 +61,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The `supportTicketAttachment` schema already existed in `support.ts` and DB migration in `002-core-entities.xml` — only query functions, routes, storage adapter, and tests needed to be created
 - No `@fastify/multipart` needed: base64-encoded JSON body approach avoids adding a dependency and simplifies integration testing (send base64 data via JSON POST rather than multipart form data)
 - Test cleanup for attachments must delete `supportTicketAttachment` rows BEFORE `supportTicketMessage` rows due to the FK from attachment.message_id → message.id
+
+## T063 — Implement warranty claim flow
+- Warranty period validation uses `shipment.deliveredAt` (not an order-level field) — must query shipments for the order and find the earliest `deliveredAt`; if no shipment has `deliveredAt`, the order is considered undelivered
+- The `ShipmentRecord` interface does not include `deliveredAt` or `shippedAt` — query `shipment` table columns directly when you need these fields
+- TPU heat deformation detection is keyword-based on the claim description; the material limitation flag is returned in the API response AND stored as an internal system note on the ticket (visible only to admins)

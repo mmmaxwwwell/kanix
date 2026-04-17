@@ -6,6 +6,8 @@ import {
   supportTicketAttachment,
   supportTicketStatusHistory,
 } from "../schema/support.js";
+import { order, orderLine } from "../schema/order.js";
+import { shipment } from "../schema/fulfillment.js";
 
 // ---------------------------------------------------------------------------
 // Ticket status values and state machine (6.C)
@@ -675,4 +677,159 @@ export async function deleteTicketAttachment(
     .where(eq(supportTicketAttachment.id, id))
     .returning(attachmentColumns);
   return row ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Warranty claim flow (T063 — FR-055)
+// ---------------------------------------------------------------------------
+
+/** 1-year warranty period in milliseconds */
+const WARRANTY_PERIOD_MS = 365 * 24 * 60 * 60 * 1000;
+
+/** Keywords that indicate TPU heat deformation */
+const TPU_HEAT_KEYWORDS = [
+  "heat",
+  "deform",
+  "deformation",
+  "warp",
+  "warped",
+  "melted",
+  "melt",
+  "tpu",
+  "temperature",
+  "hot",
+  "sun",
+  "car dashboard",
+];
+
+export interface WarrantyClaimInput {
+  customerId: string;
+  orderId: string;
+  orderLineId: string;
+  description: string;
+}
+
+export interface WarrantyClaimResult {
+  ticket: TicketRecord;
+  materialLimitationFlagged: boolean;
+  materialLimitationNote: string | null;
+}
+
+export async function createWarrantyClaim(
+  db: PostgresJsDatabase,
+  input: WarrantyClaimInput,
+): Promise<WarrantyClaimResult> {
+  // 1. Validate order exists and belongs to the customer
+  const [orderRow] = await db
+    .select({
+      id: order.id,
+      customerId: order.customerId,
+      orderNumber: order.orderNumber,
+      shippingStatus: order.shippingStatus,
+    })
+    .from(order)
+    .where(eq(order.id, input.orderId));
+
+  if (!orderRow) {
+    throw { code: "ERR_ORDER_NOT_FOUND", message: "Order not found" };
+  }
+
+  if (orderRow.customerId !== input.customerId) {
+    throw { code: "ERR_ORDER_NOT_FOUND", message: "Order not found" };
+  }
+
+  // 2. Validate order line exists and belongs to the order
+  const [lineRow] = await db
+    .select({
+      id: orderLine.id,
+      orderId: orderLine.orderId,
+      titleSnapshot: orderLine.titleSnapshot,
+    })
+    .from(orderLine)
+    .where(and(eq(orderLine.id, input.orderLineId), eq(orderLine.orderId, input.orderId)));
+
+  if (!lineRow) {
+    throw {
+      code: "ERR_ORDER_LINE_NOT_FOUND",
+      message: "Order line not found for this order",
+    };
+  }
+
+  // 3. Validate the order has been delivered — find the latest delivered shipment
+  const shipments = await db
+    .select({
+      id: shipment.id,
+      deliveredAt: shipment.deliveredAt,
+    })
+    .from(shipment)
+    .where(eq(shipment.orderId, input.orderId));
+
+  // Find the earliest deliveredAt across all shipments for this order
+  let deliveredAt: Date | null = null;
+  for (const s of shipments) {
+    if (s.deliveredAt) {
+      if (!deliveredAt || s.deliveredAt < deliveredAt) {
+        deliveredAt = s.deliveredAt;
+      }
+    }
+  }
+
+  if (!deliveredAt) {
+    throw {
+      code: "ERR_ORDER_NOT_DELIVERED",
+      message: "Order has not been delivered yet",
+    };
+  }
+
+  // 4. Validate within 1-year warranty period
+  const warrantyExpiry = new Date(deliveredAt.getTime() + WARRANTY_PERIOD_MS);
+  const now = new Date();
+
+  if (now > warrantyExpiry) {
+    throw {
+      code: "ERR_WARRANTY_EXPIRED",
+      message: `Warranty period has expired. Order was delivered on ${deliveredAt.toISOString().split("T")[0]} and the 1-year warranty expired on ${warrantyExpiry.toISOString().split("T")[0]}.`,
+    };
+  }
+
+  // 5. Check for TPU heat deformation keywords in description
+  const descLower = input.description.toLowerCase();
+  const materialLimitationFlagged = TPU_HEAT_KEYWORDS.some((kw) => descLower.includes(kw));
+  const materialLimitationNote = materialLimitationFlagged
+    ? "This claim describes symptoms consistent with TPU heat deformation, which is a documented material limitation and may not be covered under warranty."
+    : null;
+
+  // 6. Create the support ticket with category=warranty_claim, priority=high
+  const ticket = await createSupportTicket(db, {
+    customerId: input.customerId,
+    orderId: input.orderId,
+    subject: `Warranty Claim: ${lineRow.titleSnapshot}`,
+    category: "warranty_claim",
+    priority: "high",
+    source: "customer_app",
+  });
+
+  // 7. Create the initial message with the claim description
+  await createTicketMessage(db, {
+    ticketId: ticket.id,
+    authorType: "customer",
+    customerId: input.customerId,
+    body: input.description,
+  });
+
+  // 8. If material limitation flagged, add an internal note for admin
+  if (materialLimitationFlagged) {
+    await createTicketMessage(db, {
+      ticketId: ticket.id,
+      authorType: "system",
+      body: materialLimitationNote as string,
+      isInternalNote: true,
+    });
+  }
+
+  return {
+    ticket,
+    materialLimitationFlagged,
+    materialLimitationNote,
+  };
 }
