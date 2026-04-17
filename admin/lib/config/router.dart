@@ -7,8 +7,10 @@ import '../screens/login_screen.dart';
 import '../screens/dashboard_screen.dart';
 import '../screens/orders_screen.dart';
 import '../screens/order_detail_screen.dart';
-import '../screens/fulfillment_screen.dart';
-import '../screens/shipments_screen.dart';
+import '../screens/fulfillment_screen.dart'
+    show FulfillmentScreen, FulfillmentDetailScreen;
+import '../screens/shipments_screen.dart'
+    show ShipmentsScreen, ShipmentDetailScreen;
 import '../screens/inventory_screen.dart';
 import '../screens/products_screen.dart';
 import '../screens/support_screen.dart';
@@ -66,10 +68,26 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/fulfillment',
             builder: (context, state) => const FulfillmentScreen(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (context, state) => FulfillmentDetailScreen(
+                  taskId: state.pathParameters['id']!,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: '/shipments',
             builder: (context, state) => const ShipmentsScreen(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (context, state) => ShipmentDetailScreen(
+                  shipmentId: state.pathParameters['id']!,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: '/inventory',

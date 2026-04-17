@@ -338,7 +338,7 @@
 - [x] T078 Implement admin order management screens
   Done when: order list with filters (status, payment, fulfillment, shipping, date range, search); order detail with tabs (summary, items, payment, fulfillment, shipping, support, evidence, audit); refund and cancel actions with confirmation dialogs; real-time updates via WebSocket; widget tests for list and detail
 
-- [ ] T079 Implement admin fulfillment + shipment screens
+- [x] T079 Implement admin fulfillment + shipment screens
   Done when: fulfillment task queue with assignment; pick/pack workflow screens; shipment creation, label purchase, tracking view; real-time queue updates; widget tests
 
 - [ ] T080 Implement admin inventory + product screens

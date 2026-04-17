@@ -37,3 +37,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - For complex screens with TabBar, DataTable, and dialogs, set `tester.view.physicalSize = Size(1920, 1080)` and `devicePixelRatio = 1.0` in widget tests to avoid RenderFlex overflow on the default 800x600 surface — always call `addTearDown(() => tester.view.resetPhysicalSize())`
 - `DropdownButtonFormField` requires a `Material` ancestor — when testing screens that use it outside the app's `Scaffold` shell, wrap in `Scaffold(body: ...)` in the test
 - `FutureProvider.autoDispose.family` providers can be overridden per-key in tests: `orderDetailProvider('order-1').overrideWith((_) => Future.value(order))` — useful for testing detail screens with specific IDs
+
+## T079 — Implement admin fulfillment + shipment screens
+- `FLUTTER_ROOT` must point to the patched symlink farm at `.flutter-patched/` when running `flutter test` outside the nix devshell — the shell hook sets this automatically but headless agents need `FLUTTER_ROOT="$(pwd)/.flutter-patched"`
+- When writing `show` imports for files that export both a list screen and detail screen (e.g., `FulfillmentScreen, FulfillmentDetailScreen`), the router file must explicitly name both classes in the `show` clause
+- `StreamProvider.autoDispose<WsMessage>` for real-time updates can be defined in the screen file itself (not just provider files) — keeps WebSocket subject filtering co-located with the UI that consumes it
