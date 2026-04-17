@@ -17,3 +17,5 @@ export {
   ROLE_CAPABILITIES,
 } from "./admin.js";
 export type { AdminContext } from "./admin.js";
+export { registerAdminAuditLog } from "./audit-log.js";
+export type { AuditContext } from "./audit-log.js";

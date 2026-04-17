@@ -17,9 +17,11 @@ import {
   createGitHubUserFetcher,
   createRequireAdmin,
   requireCapability,
+  registerAdminAuditLog,
   CAPABILITIES,
 } from "./auth/index.js";
 import type { GitHubUserFetcher } from "./auth/index.js";
+import { insertProduct } from "./db/queries/product.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -305,6 +307,9 @@ export async function createServer(options: CreateServerOptions): Promise<Server
   if (database) {
     const requireAdmin = createRequireAdmin(database.db);
 
+    // Register audit log hook for all admin routes
+    registerAdminAuditLog(app, database.db);
+
     // Admin profile — requires any admin auth (no specific capability)
     app.get(
       "/api/admin/me",
@@ -348,6 +353,49 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       async () => {
         // Placeholder — will be implemented in Phase 5
         return { inventory: [] };
+      },
+    );
+
+    // Admin create product — requires products.write capability
+    app.post(
+      "/api/admin/products",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.PRODUCTS_WRITE)],
+      },
+      async (request, reply) => {
+        const body = request.body as
+          | {
+              slug?: string;
+              title?: string;
+              description?: string;
+              status?: string;
+            }
+          | undefined;
+
+        if (!body?.slug || !body?.title) {
+          return reply.status(400).send({
+            error: "ERR_VALIDATION",
+            message: "Missing required fields: slug, title",
+          });
+        }
+
+        const created = await insertProduct(database.db, {
+          slug: body.slug,
+          title: body.title,
+          description: body.description,
+          status: body.status ?? "draft",
+        });
+
+        // Set audit context for the onResponse hook
+        request.auditContext = {
+          action: "CREATE",
+          entityType: "product",
+          entityId: created.id,
+          beforeJson: null,
+          afterJson: created,
+        };
+
+        return reply.status(201).send({ product: created });
       },
     );
   }

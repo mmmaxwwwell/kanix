@@ -122,7 +122,7 @@
 - [x] T034 Implement admin auth + capability-based permissions [FR-077, FR-078, FR-080] [produces: IC-003]
   Done when: admin auth via separate SuperTokens recipe; admin_role and admin_user_role tables populated from seed; `requireCapability('orders.read')` middleware checks admin's role capabilities; 403 returned for insufficient permissions; integration tests: admin login → has permission → allowed; admin without permission → 403; permission matrix matches spec (orders.read, orders.refund, orders.cancel, inventory.read, inventory.adjust, etc.)
 
-- [ ] T035 Implement admin_audit_log middleware [FR-079]
+- [x] T035 Implement admin_audit_log middleware [FR-079]
   Done when: Fastify hook on admin routes auto-creates audit_log entries with: actor_admin_user_id, action, entity_type, entity_id, before_json, after_json, ip_address, created_at; integration test: admin creates a product → audit log entry exists with correct before (null) and after (product JSON)
 
 - [ ] T036 Implement guest order → account linking [FR-066]

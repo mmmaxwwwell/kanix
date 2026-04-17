@@ -1,0 +1,26 @@
+{
+  "task_id": "T035",
+  "status": "complete",
+  "summary": "Implemented admin_audit_log middleware as Fastify onResponse hook that auto-creates audit_log entries with actor_admin_user_id, action, entity_type, entity_id, before_json, after_json, ip_address, created_at; added admin product creation endpoint with audit context; wrote integration tests verifying audit log entries are created on product creation",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm format", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/auth/audit-log.ts",
+    "api/src/auth/audit-log.integration.test.ts",
+    "api/src/db/queries/audit-log.ts"
+  ],
+  "files_modified": [
+    "api/src/auth/index.ts",
+    "api/src/db/queries/index.ts",
+    "api/src/server.ts",
+    "specs/admin/learnings.md",
+    "specs/admin/tasks.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

@@ -54,3 +54,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The data model's `admin_role` table doesn't include a capabilities column — add `capabilities_json` (JSONB, NOT NULL, default `[]`) via a new migration to store capability string arrays per role
 - Admin auth reuses the same SuperTokens EmailPassword recipe as customer auth — differentiation happens at the API layer by checking if the `auth_subject` maps to an `admin_user` record, not via a separate SuperTokens recipe
 - `createRequireAdmin(db)` returns a closure that captures the DB connection — this pattern avoids passing the DB into every route handler and works cleanly as a Fastify `preHandler`
+
+## T035 — Implement admin_audit_log middleware
+- Fastify's `onResponse` hook fires after the response is sent — use it for audit logging so it doesn't block the response. Route handlers set `request.auditContext` with action details; the hook persists them.
+- The `admin_audit_log` table and Drizzle schema were already created in the core migration (002-core-entities.xml) — no additional migration was needed
+- Audit log IP address extraction: use `x-forwarded-for` header first (for reverse proxy setups), fall back to `request.ip` for direct connections
