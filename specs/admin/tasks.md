@@ -372,7 +372,7 @@
 - [x] T088 Implement support + warranty screens
   Done when: create ticket; message thread with attachments; file warranty claim (select order → describe defect → upload photos); warranty period validation shown to user; widget tests
 
-- [ ] T089 Implement contributor dashboard screen
+- [x] T089 Implement contributor dashboard screen
   Done when: visible only when GitHub account linked; shows designs, per-design sales, royalty accrual, milestone progress (with visual progress bars), payout history; widget tests
 
 ---

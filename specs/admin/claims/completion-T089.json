@@ -1,0 +1,22 @@
+{
+  "task_id": "T089",
+  "status": "complete",
+  "summary": "Implemented contributor dashboard screen with GitHub-link gate, designs with per-design sales/royalty, milestone progress bars, payout history, and 8 widget tests",
+  "commands_run": [
+    {"command": "flutter pub get", "exit_code": 0},
+    {"command": "FLUTTER_ROOT=.flutter-patched flutter test test/contributor_dashboard_test.dart", "exit_code": 0}
+  ],
+  "files_created": [
+    "customer/lib/models/contributor.dart",
+    "customer/lib/providers/contributor_provider.dart",
+    "customer/test/contributor_dashboard_test.dart",
+    "specs/admin/claims/completion-T089.json"
+  ],
+  "files_modified": [
+    "customer/lib/screens/contributor_dashboard_screen.dart",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

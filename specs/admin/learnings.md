@@ -66,3 +66,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Customer support models need separate `MessageAttachment` and `WarrantyClaim` classes not present in admin — admin support model only has `SupportTicket` + `TicketMessage`, customer adds attachment metadata and warranty claim lifecycle
 - `WarrantyClaim.isWithinWarranty` computed from `warrantyExpiresAt` keeps warranty validation display-ready without recalculating from order date + material warranty period each time
 - `DraggableScrollableSheet` inside `showModalBottomSheet(useSafeArea: true)` works well for multi-step forms (warranty claim: select order → select product → describe defect → upload photos) that need more vertical space than a simple bottom sheet
+
+## T089 — Implement contributor dashboard screen
+- Contributor dashboard gate on `githubLinked` from `AuthState.user` — render a "link GitHub" prompt when null, only fetch dashboard data when linked; avoids unnecessary API calls for non-contributors
+- `_MockAuthNotifier` that extends `AsyncNotifier<AuthState>` and `implements AuthNotifier` lets tests control the github-linked state without needing Dio mocks — override `build()` to return a fixed `AuthState` with the desired `githubLinked` value
