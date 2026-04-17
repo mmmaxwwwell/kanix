@@ -32,7 +32,7 @@
 - [x] T008 Create .env.example with all environment variables [FR-112]
   Done when: .env.example lists every config key from spec (DATABASE_URL, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_TAX_ENABLED, SUPERTOKENS_API_KEY, SUPERTOKENS_CONNECTION_URI, EASYPOST_API_KEY, GITHUB_OAUTH_CLIENT_ID, GITHUB_OAUTH_CLIENT_SECRET, LOG_LEVEL, PORT) with placeholder values and comments
 
-- [ ] T009 Update .gitignore for all new directories
+- [x] T009 Update .gitignore for all new directories
   Done when: .gitignore covers: .direnv/, result, node_modules/, dist/, .dart_tool/, build/, .flutter-plugins*, .env, .env.local, *.pem, *.key, credentials.json, test-logs/, coverage/
 
 ---

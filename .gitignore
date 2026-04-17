@@ -58,3 +58,5 @@ htmlcov/
 # Flutter
 .flutter-patched/
 .dart_tool/
+build/
+.flutter-plugins*

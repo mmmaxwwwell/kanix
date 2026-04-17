@@ -1,0 +1,12 @@
+{
+  "task_id": "T009",
+  "status": "complete",
+  "summary": "Added build/ and .flutter-plugins* to .gitignore; all required patterns now covered",
+  "commands_run": [
+    {"command": "git diff", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T009.json"],
+  "files_modified": [".gitignore", "specs/admin/tasks.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
