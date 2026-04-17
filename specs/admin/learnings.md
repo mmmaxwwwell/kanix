@@ -81,3 +81,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The `evidenceBundle` schema already existed in `evidence.ts` — only the query functions (`generateEvidenceBundle`, `computeReadinessSummary`, `findDisputeById`), routes, and tests needed to be created
 - Bundle generation uses a two-layer pattern: the query layer creates the DB record and returns `_content`, then the route layer stores the content via `storageAdapter.put()` — this keeps the query layer storage-agnostic
 - Evidence completeness check uses all 5 `EVIDENCE_TYPES` as a hard requirement — the bundle generation rejects with `ERR_EVIDENCE_INCOMPLETE` and returns the readiness summary showing which types are missing
+
+## T066a — Implement manual evidence attachment API
+- Manual evidence reuses `createEvidenceRecord` directly — no new schema or migration needed; the `type` field accepts any admin-specified type (not constrained to EVIDENCE_TYPES) since manual evidence may have custom types
+- File upload follows the same base64 JSON body pattern as ticket attachments (T062) — storage key format: `evidence/{disputeId}/{uuid}/{fileName}`; cleanup on DB failure via storageAdapter.delete()
+- The `metadataJson` field stores `{ source: "manual", adminAttached: true }` to distinguish manual evidence from auto-collected evidence in queries and UI

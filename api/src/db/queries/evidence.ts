@@ -82,6 +82,21 @@ export async function createEvidenceRecord(
 }
 
 // ---------------------------------------------------------------------------
+// Find evidence record by ID
+// ---------------------------------------------------------------------------
+
+export async function findEvidenceById(
+  db: PostgresJsDatabase,
+  evidenceId: string,
+): Promise<EvidenceRecordRow | null> {
+  const [row] = await db
+    .select(evidenceColumns)
+    .from(evidenceRecord)
+    .where(eq(evidenceRecord.id, evidenceId));
+  return row ?? null;
+}
+
+// ---------------------------------------------------------------------------
 // Find evidence records by order ID
 // ---------------------------------------------------------------------------
 

@@ -181,9 +181,11 @@ import {
 import { createStorageAdapter, type StorageAdapter } from "./services/storage-adapter.js";
 import {
   findEvidenceByOrderId,
+  findEvidenceById,
   computeReadinessSummary,
   findDisputeById,
   generateEvidenceBundle,
+  createEvidenceRecord,
 } from "./db/queries/evidence.js";
 import Stripe from "stripe";
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -2871,6 +2873,171 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         const readiness = computeReadinessSummary(records);
 
         return { dispute_id: disputeId, readiness };
+      },
+    );
+
+    // POST /api/admin/disputes/:id/evidence — attach manual evidence
+    app.post(
+      "/api/admin/disputes/:id/evidence",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.DISPUTES_MANAGE)],
+        schema: {
+          body: {
+            type: "object",
+            required: ["type"],
+            properties: {
+              type: { type: "string", minLength: 1 },
+              textContent: { type: "string" },
+              fileName: { type: "string", minLength: 1 },
+              contentType: { type: "string" },
+              data: { type: "string", description: "Base64-encoded file data" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id: disputeId } = request.params as { id: string };
+        const body = request.body as {
+          type: string;
+          textContent?: string;
+          fileName?: string;
+          contentType?: string;
+          data?: string;
+        };
+
+        // Validate dispute exists
+        const disputeRow = await findDisputeById(database.db, disputeId);
+        if (!disputeRow) {
+          return reply.status(404).send({
+            error: "ERR_DISPUTE_NOT_FOUND",
+            message: `Dispute ${disputeId} not found`,
+          });
+        }
+
+        // Must provide either textContent or file data
+        if (!body.textContent && !body.data) {
+          return reply.status(400).send({
+            error: "ERR_MISSING_CONTENT",
+            message:
+              "Either textContent or file data (fileName + contentType + data) must be provided",
+          });
+        }
+
+        let storageKey: string | undefined;
+
+        // Handle file upload if provided
+        if (body.data) {
+          if (!body.fileName || !body.contentType) {
+            return reply.status(400).send({
+              error: "ERR_MISSING_FILE_METADATA",
+              message: "fileName and contentType are required when uploading a file",
+            });
+          }
+
+          const fileBuffer = Buffer.from(body.data, "base64");
+          storageKey = `evidence/${disputeId}/${randomUUID()}/${body.fileName}`;
+          await storageAdapter.put(storageKey, fileBuffer, body.contentType);
+        }
+
+        try {
+          const record = await createEvidenceRecord(database.db, {
+            orderId: disputeRow.orderId,
+            disputeId,
+            type: body.type as Parameters<typeof createEvidenceRecord>[1]["type"],
+            storageKey,
+            textContent: body.textContent,
+            metadataJson: {
+              source: "manual",
+              adminAttached: true,
+              ...(body.fileName ? { fileName: body.fileName, contentType: body.contentType } : {}),
+            },
+          });
+
+          request.auditContext = {
+            action: "evidence.manual_attach",
+            entityType: "evidence_record",
+            entityId: record.id,
+            afterJson: {
+              disputeId,
+              type: body.type,
+              storageKey: storageKey ?? null,
+            },
+          };
+
+          return reply.status(201).send({ evidence: record });
+        } catch (err) {
+          // Clean up stored file on DB failure
+          if (storageKey) {
+            await storageAdapter.delete(storageKey);
+          }
+          throw err;
+        }
+      },
+    );
+
+    // GET /api/admin/evidence/:id — get single evidence record
+    app.get(
+      "/api/admin/evidence/:id",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.DISPUTES_READ)],
+      },
+      async (request, reply) => {
+        const { id: evidenceId } = request.params as { id: string };
+
+        const record = await findEvidenceById(database.db, evidenceId);
+        if (!record) {
+          return reply.status(404).send({
+            error: "ERR_EVIDENCE_NOT_FOUND",
+            message: `Evidence record ${evidenceId} not found`,
+          });
+        }
+
+        // If there's a file, generate a download URL (or return storage key)
+        let downloadUrl: string | null = null;
+        if (record.storageKey) {
+          const file = await storageAdapter.get(record.storageKey);
+          if (file) {
+            downloadUrl = `/api/admin/evidence/${evidenceId}/download`;
+          }
+        }
+
+        return { evidence: record, download_url: downloadUrl };
+      },
+    );
+
+    // GET /api/admin/evidence/:id/download — download evidence file
+    app.get(
+      "/api/admin/evidence/:id/download",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.DISPUTES_READ)],
+      },
+      async (request, reply) => {
+        const { id: evidenceId } = request.params as { id: string };
+
+        const record = await findEvidenceById(database.db, evidenceId);
+        if (!record || !record.storageKey) {
+          return reply.status(404).send({
+            error: "ERR_EVIDENCE_NOT_FOUND",
+            message: `Evidence record or file not found`,
+          });
+        }
+
+        const file = await storageAdapter.get(record.storageKey);
+        if (!file) {
+          return reply.status(404).send({
+            error: "ERR_FILE_NOT_FOUND",
+            message: "Evidence file not found in storage",
+          });
+        }
+
+        const metadata = record.metadataJson as { fileName?: string; contentType?: string } | null;
+        const contentType = metadata?.contentType ?? file.contentType;
+        const fileName = metadata?.fileName ?? "evidence-file";
+
+        return reply
+          .header("Content-Type", contentType)
+          .header("Content-Disposition", `attachment; filename="${fileName}"`)
+          .send(file.data);
       },
     );
 

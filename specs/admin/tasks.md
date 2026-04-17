@@ -269,7 +269,7 @@
 
 ---
 
-- [ ] T066a Implement manual evidence attachment API
+- [x] T066a Implement manual evidence attachment API
   Done when: POST /admin/disputes/:id/evidence allows admin to attach manual evidence (file upload or text); creates evidence_record with admin-specified type; file stored via storage adapter; integration test: upload manual evidence → record created; accessible via GET /admin/evidence/:id
 
 - [ ] T066b Implement evidence browsing API
