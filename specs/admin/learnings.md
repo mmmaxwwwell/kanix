@@ -91,3 +91,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The `listEvidence` query uses Drizzle's `and()` with dynamic filter building — collect `SQL[]` conditions and apply them with `and(...conditions)` only when non-empty; when a single condition, pass it directly to avoid wrapping
 - GET /api/admin/evidence/:id already existed from T066a (including download endpoint) — T066b only needed the list endpoint with query param filters (type, order_id, shipment_id, ticket_id, dispute_id)
 - The `supportTicket` schema requires a `source` field (not `customerEmail`) — check actual schema columns before inserting test data
+
+## T066c — Implement fulfillment edge case handling
+- The `blocked → canceled` transition was not in the original state machine (`blocked` only allowed recovery to ACTIVE_STATES) — added `canceled` to blocked transitions since tasks should be cancelable from blocked state
+- The `fulfillment_task.assigned_admin_user_id` and `inventory_adjustment.actor_admin_user_id` both have real FK constraints to `admin_user` — test code must insert a real `admin_user` record rather than using fake UUIDs like `00000000-...01`
+- `POST_PICKING_STATES` (picked, packing, packed, shipment_pending) determines whether auto-inventory return happens on cancel — `picking` state itself is excluded since items haven't been fully picked yet

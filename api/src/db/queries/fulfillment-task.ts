@@ -1,8 +1,9 @@
 import { eq, and, desc } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { fulfillmentTask } from "../schema/fulfillment.js";
-import { order } from "../schema/order.js";
+import { order, orderLine } from "../schema/order.js";
 import { transitionOrderStatus } from "./order-state-machine.js";
+import { createInventoryAdjustment } from "./inventory.js";
 
 // ---------------------------------------------------------------------------
 // Fulfillment task status values and state machine (6.D)
@@ -46,7 +47,7 @@ export const FULFILLMENT_TASK_TRANSITIONS: Record<string, string[]> = {
   packed: ["shipment_pending", "blocked", "canceled"],
   shipment_pending: ["done", "blocked"],
   done: [],
-  blocked: [...ACTIVE_STATES], // blocked can go back to any active state
+  blocked: [...ACTIVE_STATES, "canceled"], // blocked can recover to any active state, or be canceled
   canceled: [],
 };
 
@@ -204,6 +205,9 @@ export interface TransitionFulfillmentTaskInput {
   actorAdminUserId?: string;
 }
 
+// States that have passed the picking phase (items physically handled)
+const POST_PICKING_STATES: readonly string[] = ["picked", "packing", "packed", "shipment_pending"];
+
 export async function transitionFulfillmentTaskStatus(
   db: PostgresJsDatabase,
   input: TransitionFulfillmentTaskInput,
@@ -213,6 +217,8 @@ export async function transitionFulfillmentTaskStatus(
   status: string;
   priority: string;
   assignedAdminUserId: string | null;
+  blockedReason: string | null;
+  preBlockedStatus: string | null;
   oldStatus: string;
   newStatus: string;
 }> {
@@ -224,6 +230,7 @@ export async function transitionFulfillmentTaskStatus(
         status: fulfillmentTask.status,
         priority: fulfillmentTask.priority,
         assignedAdminUserId: fulfillmentTask.assignedAdminUserId,
+        preBlockedStatus: fulfillmentTask.preBlockedStatus,
       })
       .from(fulfillmentTask)
       .where(eq(fulfillmentTask.id, input.taskId));
@@ -241,13 +248,30 @@ export async function transitionFulfillmentTaskStatus(
       };
     }
 
-    await tx
-      .update(fulfillmentTask)
-      .set({
-        status: input.newStatus,
-        updatedAt: new Date(),
-      })
-      .where(eq(fulfillmentTask.id, input.taskId));
+    // Require reason when transitioning to blocked
+    if (input.newStatus === "blocked" && !input.reason) {
+      throw {
+        code: "ERR_REASON_REQUIRED",
+        message: "A reason is required when blocking a fulfillment task",
+      };
+    }
+
+    const updateSet: Record<string, unknown> = {
+      status: input.newStatus,
+      updatedAt: new Date(),
+    };
+
+    if (input.newStatus === "blocked") {
+      // Store the current state so we can return to it on unblock
+      updateSet.blockedReason = input.reason ?? "";
+      updateSet.preBlockedStatus = current.status;
+    } else if (current.status === "blocked") {
+      // Unblocking — clear blocked fields
+      updateSet.blockedReason = null;
+      updateSet.preBlockedStatus = null;
+    }
+
+    await tx.update(fulfillmentTask).set(updateSet).where(eq(fulfillmentTask.id, input.taskId));
 
     return {
       id: current.id,
@@ -255,10 +279,176 @@ export async function transitionFulfillmentTaskStatus(
       status: input.newStatus,
       priority: current.priority,
       assignedAdminUserId: current.assignedAdminUserId,
+      blockedReason: input.newStatus === "blocked" ? (input.reason ?? null) : null,
+      preBlockedStatus: input.newStatus === "blocked" ? current.status : null,
       oldStatus: current.status,
       newStatus: input.newStatus,
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Block fulfillment task (with optional inventory adjustment)
+// ---------------------------------------------------------------------------
+
+export interface BlockFulfillmentTaskInput {
+  taskId: string;
+  reason: string;
+  actorAdminUserId?: string;
+  inventoryAdjustment?: {
+    variantId: string;
+    locationId: string;
+    adjustmentType: "shrinkage" | "correction" | "damage";
+    quantityDelta: number;
+  };
+}
+
+export async function blockFulfillmentTask(
+  db: PostgresJsDatabase,
+  input: BlockFulfillmentTaskInput,
+): Promise<{
+  task: {
+    id: string;
+    orderId: string;
+    status: string;
+    priority: string;
+    blockedReason: string | null;
+    preBlockedStatus: string | null;
+    oldStatus: string;
+    newStatus: string;
+  };
+  inventoryAdjustmentResult?: Awaited<ReturnType<typeof createInventoryAdjustment>>;
+}> {
+  const taskResult = await transitionFulfillmentTaskStatus(db, {
+    taskId: input.taskId,
+    newStatus: "blocked",
+    reason: input.reason,
+    actorAdminUserId: input.actorAdminUserId,
+  });
+
+  let inventoryAdjustmentResult;
+  if (input.inventoryAdjustment && input.actorAdminUserId) {
+    inventoryAdjustmentResult = await createInventoryAdjustment(db, {
+      variantId: input.inventoryAdjustment.variantId,
+      locationId: input.inventoryAdjustment.locationId,
+      adjustmentType: input.inventoryAdjustment.adjustmentType,
+      quantityDelta: input.inventoryAdjustment.quantityDelta,
+      reason: `Inventory discrepancy found during fulfillment task ${input.taskId}: ${input.reason}`,
+      actorAdminUserId: input.actorAdminUserId,
+      relatedOrderId: taskResult.orderId,
+      idempotencyKey: `block-${input.taskId}-${Date.now()}`,
+    });
+  }
+
+  return { task: taskResult, inventoryAdjustmentResult };
+}
+
+// ---------------------------------------------------------------------------
+// Unblock fulfillment task (returns to previous active state)
+// ---------------------------------------------------------------------------
+
+export async function unblockFulfillmentTask(
+  db: PostgresJsDatabase,
+  taskId: string,
+): Promise<{
+  id: string;
+  orderId: string;
+  status: string;
+  priority: string;
+  blockedReason: string | null;
+  preBlockedStatus: string | null;
+  oldStatus: string;
+  newStatus: string;
+}> {
+  // First, get the task to find the preBlockedStatus
+  const task = await findFulfillmentTaskById(db, taskId);
+  if (!task) {
+    throw { code: "ERR_TASK_NOT_FOUND", message: `Fulfillment task ${taskId} not found` };
+  }
+  if (task.status !== "blocked") {
+    throw {
+      code: "ERR_INVALID_TRANSITION",
+      message: `Cannot unblock task: current status is ${task.status}, expected blocked`,
+    };
+  }
+
+  const targetStatus = task.preBlockedStatus ?? "new";
+  return transitionFulfillmentTaskStatus(db, {
+    taskId,
+    newStatus: targetStatus,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Cancel fulfillment task (with auto inventory return after picking)
+// ---------------------------------------------------------------------------
+
+export async function cancelFulfillmentTask(
+  db: PostgresJsDatabase,
+  input: {
+    taskId: string;
+    reason?: string;
+    actorAdminUserId?: string;
+    locationId: string;
+  },
+): Promise<{
+  task: {
+    id: string;
+    orderId: string;
+    status: string;
+    oldStatus: string;
+    newStatus: string;
+  };
+  inventoryAdjustments: Awaited<ReturnType<typeof createInventoryAdjustment>>[];
+}> {
+  // Get the current task to check if items were picked
+  const task = await findFulfillmentTaskById(db, input.taskId);
+  if (!task) {
+    throw { code: "ERR_TASK_NOT_FOUND", message: `Fulfillment task ${input.taskId} not found` };
+  }
+
+  const wasPicked =
+    POST_PICKING_STATES.includes(task.status) ||
+    (task.status === "blocked" &&
+      task.preBlockedStatus !== null &&
+      POST_PICKING_STATES.includes(task.preBlockedStatus));
+
+  const taskResult = await transitionFulfillmentTaskStatus(db, {
+    taskId: input.taskId,
+    newStatus: "canceled",
+    reason: input.reason,
+    actorAdminUserId: input.actorAdminUserId,
+  });
+
+  const inventoryAdjustments: Awaited<ReturnType<typeof createInventoryAdjustment>>[] = [];
+
+  // Auto-create inventory adjustments to return picked items if post-picking
+  if (wasPicked && input.actorAdminUserId) {
+    // Get order lines to know what was picked
+    const lines = await db
+      .select({
+        variantId: orderLine.variantId,
+        quantity: orderLine.quantity,
+      })
+      .from(orderLine)
+      .where(eq(orderLine.orderId, taskResult.orderId));
+
+    for (const line of lines) {
+      const adj = await createInventoryAdjustment(db, {
+        variantId: line.variantId,
+        locationId: input.locationId,
+        adjustmentType: "return",
+        quantityDelta: line.quantity,
+        reason: `Auto-return: fulfillment task ${input.taskId} canceled after picking`,
+        actorAdminUserId: input.actorAdminUserId,
+        relatedOrderId: taskResult.orderId,
+        idempotencyKey: `cancel-return-${input.taskId}-${line.variantId}`,
+      });
+      inventoryAdjustments.push(adj);
+    }
+  }
+
+  return { task: taskResult, inventoryAdjustments };
 }
 
 // ---------------------------------------------------------------------------
@@ -352,6 +542,8 @@ export async function findFulfillmentTaskById(
   priority: string;
   assignedAdminUserId: string | null;
   notes: string | null;
+  blockedReason: string | null;
+  preBlockedStatus: string | null;
   createdAt: Date;
   updatedAt: Date;
 } | null> {
@@ -363,6 +555,8 @@ export async function findFulfillmentTaskById(
       priority: fulfillmentTask.priority,
       assignedAdminUserId: fulfillmentTask.assignedAdminUserId,
       notes: fulfillmentTask.notes,
+      blockedReason: fulfillmentTask.blockedReason,
+      preBlockedStatus: fulfillmentTask.preBlockedStatus,
       createdAt: fulfillmentTask.createdAt,
       updatedAt: fulfillmentTask.updatedAt,
     })
@@ -386,6 +580,8 @@ export async function findFulfillmentTasksByOrderId(
     priority: string;
     assignedAdminUserId: string | null;
     notes: string | null;
+    blockedReason: string | null;
+    preBlockedStatus: string | null;
     createdAt: Date;
     updatedAt: Date;
   }[]
@@ -398,6 +594,8 @@ export async function findFulfillmentTasksByOrderId(
       priority: fulfillmentTask.priority,
       assignedAdminUserId: fulfillmentTask.assignedAdminUserId,
       notes: fulfillmentTask.notes,
+      blockedReason: fulfillmentTask.blockedReason,
+      preBlockedStatus: fulfillmentTask.preBlockedStatus,
       createdAt: fulfillmentTask.createdAt,
       updatedAt: fulfillmentTask.updatedAt,
     })
@@ -425,6 +623,8 @@ export async function listFulfillmentTasks(
     priority: string;
     assignedAdminUserId: string | null;
     notes: string | null;
+    blockedReason: string | null;
+    preBlockedStatus: string | null;
     createdAt: Date;
     updatedAt: Date;
   }[]
@@ -448,6 +648,8 @@ export async function listFulfillmentTasks(
       priority: fulfillmentTask.priority,
       assignedAdminUserId: fulfillmentTask.assignedAdminUserId,
       notes: fulfillmentTask.notes,
+      blockedReason: fulfillmentTask.blockedReason,
+      preBlockedStatus: fulfillmentTask.preBlockedStatus,
       createdAt: fulfillmentTask.createdAt,
       updatedAt: fulfillmentTask.updatedAt,
     })

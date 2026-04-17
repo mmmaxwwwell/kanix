@@ -124,6 +124,9 @@ import {
   findFulfillmentTasksByOrderId,
   transitionFulfillmentTaskStatus,
   assignFulfillmentTask,
+  blockFulfillmentTask,
+  unblockFulfillmentTask,
+  cancelFulfillmentTask,
 } from "./db/queries/fulfillment-task.js";
 import {
   createShipment,
@@ -1345,11 +1348,198 @@ export async function createServer(options: CreateServerOptions): Promise<Server
               message: error.message,
             });
           }
+          if (error.code === "ERR_REASON_REQUIRED") {
+            return reply.status(400).send({
+              error: "ERR_REASON_REQUIRED",
+              message: error.message,
+            });
+          }
           if (error.code === "ERR_TASK_NOT_FOUND") {
             return reply.status(404).send({
               error: "ERR_TASK_NOT_FOUND",
               message: error.message,
             });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // Block fulfillment task (with optional inventory adjustment)
+    app.post(
+      "/api/admin/fulfillment-tasks/:id/block",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.FULFILLMENT_MANAGE),
+        ],
+        schema: {
+          body: {
+            type: "object",
+            required: ["reason"],
+            properties: {
+              reason: { type: "string" },
+              inventory_adjustment: {
+                type: "object",
+                required: ["variant_id", "location_id", "adjustment_type", "quantity_delta"],
+                properties: {
+                  variant_id: { type: "string" },
+                  location_id: { type: "string" },
+                  adjustment_type: { type: "string", enum: ["shrinkage", "correction", "damage"] },
+                  quantity_delta: { type: "number" },
+                },
+              },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as {
+          reason: string;
+          inventory_adjustment?: {
+            variant_id: string;
+            location_id: string;
+            adjustment_type: "shrinkage" | "correction" | "damage";
+            quantity_delta: number;
+          };
+        };
+        const actorAdminUserId = request.adminContext?.adminUserId ?? "";
+
+        try {
+          const result = await blockFulfillmentTask(database.db, {
+            taskId: id,
+            reason: body.reason,
+            actorAdminUserId,
+            inventoryAdjustment: body.inventory_adjustment
+              ? {
+                  variantId: body.inventory_adjustment.variant_id,
+                  locationId: body.inventory_adjustment.location_id,
+                  adjustmentType: body.inventory_adjustment.adjustment_type,
+                  quantityDelta: body.inventory_adjustment.quantity_delta,
+                }
+              : undefined,
+          });
+
+          request.auditContext = {
+            action: "fulfillment_task.block",
+            entityType: "fulfillment_task",
+            entityId: id,
+            afterJson: {
+              oldStatus: result.task.oldStatus,
+              newStatus: result.task.newStatus,
+              reason: body.reason,
+              hasInventoryAdjustment: !!result.inventoryAdjustmentResult,
+            },
+          };
+
+          return result;
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_INVALID_TRANSITION" || error.code === "ERR_REASON_REQUIRED") {
+            return reply.status(400).send({ error: error.code, message: error.message });
+          }
+          if (error.code === "ERR_TASK_NOT_FOUND") {
+            return reply.status(404).send({ error: error.code, message: error.message });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // Unblock fulfillment task (returns to previous active state)
+    app.post(
+      "/api/admin/fulfillment-tasks/:id/unblock",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.FULFILLMENT_MANAGE),
+        ],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+
+        try {
+          const result = await unblockFulfillmentTask(database.db, id);
+
+          request.auditContext = {
+            action: "fulfillment_task.unblock",
+            entityType: "fulfillment_task",
+            entityId: id,
+            afterJson: {
+              oldStatus: result.oldStatus,
+              newStatus: result.newStatus,
+            },
+          };
+
+          return result;
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_INVALID_TRANSITION") {
+            return reply.status(400).send({ error: error.code, message: error.message });
+          }
+          if (error.code === "ERR_TASK_NOT_FOUND") {
+            return reply.status(404).send({ error: error.code, message: error.message });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // Cancel fulfillment task (with auto inventory return after picking)
+    app.post(
+      "/api/admin/fulfillment-tasks/:id/cancel",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.FULFILLMENT_MANAGE),
+        ],
+        schema: {
+          body: {
+            type: "object",
+            required: ["location_id"],
+            properties: {
+              reason: { type: "string" },
+              location_id: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { reason?: string; location_id: string };
+        const actorAdminUserId = request.adminContext?.adminUserId ?? "";
+
+        try {
+          const result = await cancelFulfillmentTask(database.db, {
+            taskId: id,
+            reason: body.reason,
+            actorAdminUserId,
+            locationId: body.location_id,
+          });
+
+          request.auditContext = {
+            action: "fulfillment_task.cancel",
+            entityType: "fulfillment_task",
+            entityId: id,
+            afterJson: {
+              oldStatus: result.task.oldStatus,
+              newStatus: result.task.newStatus,
+              inventoryAdjustmentsCount: result.inventoryAdjustments.length,
+            },
+          };
+
+          return result;
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_INVALID_TRANSITION") {
+            return reply.status(400).send({ error: error.code, message: error.message });
+          }
+          if (error.code === "ERR_TASK_NOT_FOUND") {
+            return reply.status(404).send({ error: error.code, message: error.message });
           }
           throw err;
         }

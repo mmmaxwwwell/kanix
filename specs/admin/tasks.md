@@ -275,7 +275,7 @@
 - [x] T066b Implement evidence browsing API
   Done when: GET /admin/evidence with filters (type, order_id, shipment_id, ticket_id, dispute_id); GET /admin/evidence/:id returns single record with download URL for file-based evidence; integration tests: filter by order → returns all evidence for that order; filter by type → returns matching records
 
-- [ ] T066c Implement fulfillment edge case handling [FR-E013, FR-E023, FR-E024]
+- [x] T066c Implement fulfillment edge case handling [FR-E013, FR-E023, FR-E024]
   Done when: fulfillment_task.status `blocked` transition available from any active state with required `reason` field; unblock transitions back to previous active state; if inventory discrepancy found during picking, admin can block task and trigger inventory adjustment; if task canceled after picking, auto-create inventory adjustment to return picked items to available stock; integration tests: picking → blocked (reason: missing_inventory) → adjustment → unblock → picking; cancel after picking → verify auto-adjustment returns items to available
 
 - [ ] T066d Implement shipping edge cases [FR-E025, FR-E026, FR-E027]

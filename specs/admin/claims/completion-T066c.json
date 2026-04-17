@@ -1,0 +1,24 @@
+{
+  "task_id": "T066c",
+  "status": "complete",
+  "summary": "Implemented fulfillment edge case handling: blocked/unblock transitions with required reason and pre-blocked status tracking, inventory adjustment on block during picking, auto inventory return on cancel after picking, with 11 integration tests",
+  "commands_run": [
+    {"command": "pnpm db:migrate", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "vitest run src/fulfillment-edge-cases.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/migrations/changesets/007-fulfillment-task-blocked-fields.xml",
+    "api/src/fulfillment-edge-cases.integration.test.ts"
+  ],
+  "files_modified": [
+    "api/src/db/schema/fulfillment.ts",
+    "api/src/db/queries/fulfillment-task.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

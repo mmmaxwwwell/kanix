@@ -17,6 +17,8 @@ export const fulfillmentTask = pgTable("fulfillment_task", {
   pickingStatus: text("picking_status"),
   packingStatus: text("packing_status"),
   notes: text(),
+  blockedReason: text("blocked_reason"),
+  preBlockedStatus: text("pre_blocked_status"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
