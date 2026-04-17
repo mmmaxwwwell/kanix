@@ -72,3 +72,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Admin routes in server.ts reference `database.db` (not a local `db` variable) — the `if (database)` guard narrows the type but doesn't create a local alias in this block; use `database.db` directly
 - The `STATUS_COLUMNS` mapping needs an explicit union type (`"status" | "paymentStatus" | ...`) rather than `keyof typeof order.$inferSelect` — otherwise TS complains when indexing a select result that only has a subset of columns
 - Keep transition maps as plain `Record<string, string[]>` rather than typed enums — this makes the `isValidOrderTransition` function work with arbitrary string inputs (e.g., from webhook payloads) without requiring casting
+
+## T051 — Implement Stripe webhook handler
+- Fastify only allows one content type parser per MIME type — for Stripe webhook signature verification (which requires the raw body), use a `preParsing` route hook to capture the raw buffer and attach it to `request.rawBody`, then return a `Readable.from(rawBody)` so Fastify still parses JSON normally for other middleware
+- The `createCheckoutOrder` function used `status: "checked_out"` for the cart, but the DB `ck_cart_status` constraint only allows `active`, `converted`, `abandoned`, `expired` — the correct status is `converted`
+- Webhook handlers must be idempotent at every transition: wrap each `transitionOrderStatus()` call in try/catch since the order may already be in the target state (e.g., re-delivered `payment_intent.succeeded` after order is already `confirmed`)

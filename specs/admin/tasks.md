@@ -181,7 +181,7 @@
 - [x] T050 Implement order state machines [FR-019, FR-020, FR-021]
   Done when: four orthogonal state machines on order: status (draft→pending_payment→confirmed→completed→canceled→closed), payment_status, fulfillment_status, shipping_status; invalid transitions rejected with ERR_INVALID_TRANSITION; all transitions create order_status_history entry with actor/reason; unit tests: every valid transition succeeds; every invalid transition rejected; integration test: full order lifecycle
 
-- [ ] T051 Implement Stripe webhook handler [FR-027, FR-028, FR-029, FR-031] [consumes: IC-004]
+- [x] T051 Implement Stripe webhook handler [FR-027, FR-028, FR-029, FR-031] [consumes: IC-004]
   Done when: POST /webhooks/stripe validates signature; idempotent: duplicate event processing is no-op (check payment_event.provider_event_id); handles: payment_intent.succeeded → payment_status=paid + reservation consumed; payment_intent.payment_failed → payment_status=failed + reservation released; charge.refunded → payment_status updated; charge.dispute.created → dispute record created; raw payload stored as payment_event; integration tests: success webhook → order confirmed; duplicate webhook → no-op; invalid signature → 401
 
 - [ ] T052 Implement refund API (admin) [FR-030] [P]

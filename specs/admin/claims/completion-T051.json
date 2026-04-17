@@ -1,0 +1,23 @@
+{
+  "task_id": "T051",
+  "status": "complete",
+  "summary": "Implemented Stripe webhook handler with signature validation, idempotent event processing, and handlers for payment_intent.succeeded, payment_intent.payment_failed, charge.refunded, and charge.dispute.created",
+  "commands_run": [
+    {"command": "npx tsc --noEmit", "exit_code": 0},
+    {"command": "npx eslint src/db/queries/webhook.ts src/webhook.integration.test.ts", "exit_code": 0},
+    {"command": "npx vitest run src/webhook.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/webhook.ts",
+    "api/src/webhook.integration.test.ts",
+    "specs/admin/claims/completion-T051.json"
+  ],
+  "files_modified": [
+    "api/src/server.ts",
+    "api/src/db/queries/checkout.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

@@ -123,10 +123,10 @@ export async function createCheckoutOrder(
       currency: "USD",
     });
 
-    // 5. Mark cart as checked out
+    // 5. Mark cart as converted (checkout complete)
     await tx
       .update(cart)
-      .set({ status: "checked_out", updatedAt: new Date() })
+      .set({ status: "converted", updatedAt: new Date() })
       .where(eq(cart.id, input.cartWithItems.id));
 
     return {
