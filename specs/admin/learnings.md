@@ -69,3 +69,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Liquibase 5 in Nix does NOT bundle the PostgreSQL JDBC driver — add `postgresql_jdbc` to `flake.nix` and set `LIQUIBASE_CLASSPATH` env var pointing to `${pkgs.postgresql_jdbc}/share/java/postgresql-jdbc.jar`
 - Liquibase `includeAll` in changelog-master.xml loads changeset files in alphabetical order — prefix filenames with `001-`, `002-`, etc. to control execution order
 - Liquibase reads `liquibase.properties` from the working directory by default — place it in `api/` alongside package.json so `pnpm db:migrate` works from the `api/` directory
+
+## T026 — Core entities migration
+- Liquibase XML `<sql>` with `splitStatements="true"` handles large multi-statement SQL blocks well — use `stripComments="true"` to avoid issues with `--` comment lines in SQL
+- The `<=` operator in SQL partial indexes must be escaped as `&lt;=` in Liquibase XML (e.g. `WHERE available &lt;= safety_stock`)
+- Table `order` is a reserved word in PostgreSQL — must be quoted as `"order"` in all DDL and index statements

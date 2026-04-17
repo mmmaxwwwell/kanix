@@ -1,0 +1,1066 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="002-core-entities" author="kanix">
+        <comment>Create all core entity tables from data-model.md</comment>
+        <sql splitStatements="true" stripComments="true">
+
+-- ============================================================
+-- 2.A Identity and Admin
+-- ============================================================
+
+CREATE TABLE admin_user (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    auth_subject    text        NOT NULL,
+    email           text        NOT NULL,
+    name            text        NOT NULL,
+    status          text        NOT NULL DEFAULT 'active',
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_admin_user PRIMARY KEY (id),
+    CONSTRAINT uq_admin_user_auth_subject UNIQUE (auth_subject),
+    CONSTRAINT uq_admin_user_email UNIQUE (email),
+    CONSTRAINT ck_admin_user_status CHECK (status IN ('active', 'suspended', 'deactivated'))
+);
+
+CREATE TABLE admin_role (
+    id          uuid    NOT NULL DEFAULT gen_random_uuid(),
+    name        text    NOT NULL,
+    description text,
+
+    CONSTRAINT pk_admin_role PRIMARY KEY (id),
+    CONSTRAINT uq_admin_role_name UNIQUE (name)
+);
+
+CREATE TABLE admin_user_role (
+    admin_user_id uuid NOT NULL,
+    admin_role_id uuid NOT NULL,
+
+    CONSTRAINT pk_admin_user_role PRIMARY KEY (admin_user_id, admin_role_id),
+    CONSTRAINT fk_admin_user_role_user FOREIGN KEY (admin_user_id) REFERENCES admin_user(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_admin_user_role_role FOREIGN KEY (admin_role_id) REFERENCES admin_role(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE admin_audit_log (
+    id                      uuid        NOT NULL DEFAULT gen_random_uuid(),
+    actor_admin_user_id     uuid        NOT NULL,
+    action                  text        NOT NULL,
+    entity_type             text        NOT NULL,
+    entity_id               uuid        NOT NULL,
+    before_json             jsonb,
+    after_json              jsonb,
+    ip_address              inet,
+    created_at              timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_admin_audit_log PRIMARY KEY (id),
+    CONSTRAINT fk_admin_audit_log_actor FOREIGN KEY (actor_admin_user_id) REFERENCES admin_user(id) ON DELETE RESTRICT
+);
+
+-- ============================================================
+-- 2.B Customer Identity
+-- ============================================================
+
+CREATE TABLE customer (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    auth_subject    text        NOT NULL,
+    email           text        NOT NULL,
+    first_name      text,
+    last_name       text,
+    phone           text,
+    status          text        NOT NULL DEFAULT 'active',
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_customer PRIMARY KEY (id),
+    CONSTRAINT uq_customer_auth_subject UNIQUE (auth_subject),
+    CONSTRAINT uq_customer_email UNIQUE (email),
+    CONSTRAINT ck_customer_status CHECK (status IN ('active', 'suspended', 'banned'))
+);
+
+CREATE TABLE customer_address (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    customer_id     uuid        NOT NULL,
+    type            text        NOT NULL,
+    full_name       text        NOT NULL,
+    phone           text,
+    line1           text        NOT NULL,
+    line2           text,
+    city            text        NOT NULL,
+    state           text        NOT NULL,
+    postal_code     text        NOT NULL,
+    country         text        NOT NULL DEFAULT 'US',
+    is_default      boolean     NOT NULL DEFAULT false,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_customer_address PRIMARY KEY (id),
+    CONSTRAINT fk_customer_address_customer FOREIGN KEY (customer_id) REFERENCES customer(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_customer_address_type CHECK (type IN ('shipping', 'billing')),
+    CONSTRAINT ck_customer_address_country CHECK (country IN ('US'))
+);
+
+-- Partial unique index: at most one default per customer per type
+CREATE UNIQUE INDEX uq_customer_address_default
+    ON customer_address (customer_id, type) WHERE is_default = true;
+
+-- ============================================================
+-- 2.C Catalog
+-- ============================================================
+
+CREATE TABLE product (
+    id          uuid        NOT NULL DEFAULT gen_random_uuid(),
+    slug        text        NOT NULL,
+    title       text        NOT NULL,
+    subtitle    text,
+    description text,
+    status      text        NOT NULL DEFAULT 'draft',
+    brand       text,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_product PRIMARY KEY (id),
+    CONSTRAINT uq_product_slug UNIQUE (slug),
+    CONSTRAINT ck_product_status CHECK (status IN ('draft', 'active', 'archived'))
+);
+
+CREATE TABLE product_variant (
+    id                  uuid            NOT NULL DEFAULT gen_random_uuid(),
+    product_id          uuid            NOT NULL,
+    sku                 text            NOT NULL,
+    title               text            NOT NULL,
+    option_values_json  jsonb           NOT NULL DEFAULT '{}',
+    price_minor         integer         NOT NULL,
+    currency            text            NOT NULL DEFAULT 'USD',
+    weight              numeric(10,4),
+    dimensions_json     jsonb,
+    barcode             text,
+    status              text            NOT NULL DEFAULT 'draft',
+    created_at          timestamptz     NOT NULL DEFAULT now(),
+    updated_at          timestamptz     NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_product_variant PRIMARY KEY (id),
+    CONSTRAINT uq_product_variant_sku UNIQUE (sku),
+    CONSTRAINT fk_product_variant_product FOREIGN KEY (product_id) REFERENCES product(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_product_variant_price_minor CHECK (price_minor > 0),
+    CONSTRAINT ck_product_variant_currency CHECK (currency IN ('USD')),
+    CONSTRAINT ck_product_variant_status CHECK (status IN ('draft', 'active', 'inactive', 'archived'))
+);
+
+CREATE TABLE product_media (
+    id          uuid    NOT NULL DEFAULT gen_random_uuid(),
+    product_id  uuid    NOT NULL,
+    variant_id  uuid,
+    url         text    NOT NULL,
+    alt_text    text,
+    sort_order  integer NOT NULL DEFAULT 0,
+
+    CONSTRAINT pk_product_media PRIMARY KEY (id),
+    CONSTRAINT fk_product_media_product FOREIGN KEY (product_id) REFERENCES product(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_product_media_variant FOREIGN KEY (variant_id) REFERENCES product_variant(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE collection (
+    id          uuid    NOT NULL DEFAULT gen_random_uuid(),
+    slug        text    NOT NULL,
+    title       text    NOT NULL,
+    description text,
+    status      text    NOT NULL DEFAULT 'draft',
+
+    CONSTRAINT pk_collection PRIMARY KEY (id),
+    CONSTRAINT uq_collection_slug UNIQUE (slug),
+    CONSTRAINT ck_collection_status CHECK (status IN ('draft', 'active', 'archived'))
+);
+
+CREATE TABLE collection_product (
+    collection_id   uuid    NOT NULL,
+    product_id      uuid    NOT NULL,
+    sort_order      integer NOT NULL DEFAULT 0,
+
+    CONSTRAINT pk_collection_product PRIMARY KEY (collection_id, product_id),
+    CONSTRAINT fk_collection_product_collection FOREIGN KEY (collection_id) REFERENCES collection(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_collection_product_product FOREIGN KEY (product_id) REFERENCES product(id) ON DELETE RESTRICT
+);
+
+-- ============================================================
+-- 2.D Product Classes and Kit Definitions
+-- ============================================================
+
+CREATE TABLE product_class (
+    id          uuid    NOT NULL DEFAULT gen_random_uuid(),
+    name        text    NOT NULL,
+    slug        text    NOT NULL,
+    description text,
+    sort_order  integer NOT NULL DEFAULT 0,
+
+    CONSTRAINT pk_product_class PRIMARY KEY (id),
+    CONSTRAINT uq_product_class_name UNIQUE (name),
+    CONSTRAINT uq_product_class_slug UNIQUE (slug)
+);
+
+CREATE TABLE product_class_membership (
+    product_id       uuid NOT NULL,
+    product_class_id uuid NOT NULL,
+
+    CONSTRAINT pk_product_class_membership PRIMARY KEY (product_id, product_class_id),
+    CONSTRAINT fk_pcm_product FOREIGN KEY (product_id) REFERENCES product(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_pcm_class FOREIGN KEY (product_class_id) REFERENCES product_class(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE kit_definition (
+    id          uuid    NOT NULL DEFAULT gen_random_uuid(),
+    slug        text    NOT NULL,
+    title       text    NOT NULL,
+    description text,
+    price_minor integer NOT NULL,
+    currency    text    NOT NULL DEFAULT 'USD',
+    status      text    NOT NULL DEFAULT 'draft',
+
+    CONSTRAINT pk_kit_definition PRIMARY KEY (id),
+    CONSTRAINT uq_kit_definition_slug UNIQUE (slug),
+    CONSTRAINT ck_kit_definition_price_minor CHECK (price_minor >= 0),
+    CONSTRAINT ck_kit_definition_currency CHECK (currency IN ('USD')),
+    CONSTRAINT ck_kit_definition_status CHECK (status IN ('draft', 'active', 'archived'))
+);
+
+CREATE TABLE kit_class_requirement (
+    kit_definition_id uuid    NOT NULL,
+    product_class_id  uuid    NOT NULL,
+    quantity          integer NOT NULL,
+
+    CONSTRAINT pk_kit_class_requirement PRIMARY KEY (kit_definition_id, product_class_id),
+    CONSTRAINT fk_kcr_kit FOREIGN KEY (kit_definition_id) REFERENCES kit_definition(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_kcr_class FOREIGN KEY (product_class_id) REFERENCES product_class(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_kit_class_requirement_qty CHECK (quantity >= 1)
+);
+
+-- ============================================================
+-- 2.E Inventory
+-- ============================================================
+
+CREATE TABLE inventory_location (
+    id          uuid    NOT NULL DEFAULT gen_random_uuid(),
+    name        text    NOT NULL,
+    code        text    NOT NULL,
+    type        text    NOT NULL,
+    address_json jsonb,
+    is_active   boolean NOT NULL DEFAULT true,
+
+    CONSTRAINT pk_inventory_location PRIMARY KEY (id),
+    CONSTRAINT uq_inventory_location_code UNIQUE (code),
+    CONSTRAINT ck_inventory_location_type CHECK (type IN ('warehouse', 'store', 'dropship'))
+);
+
+CREATE TABLE inventory_balance (
+    id          uuid        NOT NULL DEFAULT gen_random_uuid(),
+    variant_id  uuid        NOT NULL,
+    location_id uuid        NOT NULL,
+    on_hand     integer     NOT NULL DEFAULT 0,
+    reserved    integer     NOT NULL DEFAULT 0,
+    available   integer     NOT NULL DEFAULT 0,
+    safety_stock integer    NOT NULL DEFAULT 0,
+    updated_at  timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_inventory_balance PRIMARY KEY (id),
+    CONSTRAINT uq_inventory_balance_variant_location UNIQUE (variant_id, location_id),
+    CONSTRAINT fk_inventory_balance_variant FOREIGN KEY (variant_id) REFERENCES product_variant(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_inventory_balance_location FOREIGN KEY (location_id) REFERENCES inventory_location(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_inventory_balance_on_hand CHECK (on_hand >= 0),
+    CONSTRAINT ck_inventory_balance_reserved CHECK (reserved >= 0),
+    CONSTRAINT ck_inventory_balance_available CHECK (available >= 0),
+    CONSTRAINT ck_inventory_balance_safety_stock CHECK (safety_stock >= 0)
+);
+
+-- ============================================================
+-- 2.F Cart and Order Lifecycle
+-- ============================================================
+
+CREATE TABLE cart (
+    id          uuid        NOT NULL DEFAULT gen_random_uuid(),
+    token       uuid        NOT NULL DEFAULT gen_random_uuid(),
+    customer_id uuid,
+    status      text        NOT NULL DEFAULT 'active',
+    currency    text        NOT NULL DEFAULT 'USD',
+    expires_at  timestamptz,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_cart PRIMARY KEY (id),
+    CONSTRAINT uq_cart_token UNIQUE (token),
+    CONSTRAINT fk_cart_customer FOREIGN KEY (customer_id) REFERENCES customer(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_cart_status CHECK (status IN ('active', 'converted', 'abandoned', 'expired')),
+    CONSTRAINT ck_cart_currency CHECK (currency IN ('USD'))
+);
+
+CREATE TABLE cart_line (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    cart_id         uuid        NOT NULL,
+    variant_id      uuid        NOT NULL,
+    quantity        integer     NOT NULL,
+    unit_price_minor integer    NOT NULL,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_cart_line PRIMARY KEY (id),
+    CONSTRAINT fk_cart_line_cart FOREIGN KEY (cart_id) REFERENCES cart(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_cart_line_variant FOREIGN KEY (variant_id) REFERENCES product_variant(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_cart_line_quantity CHECK (quantity >= 1),
+    CONSTRAINT ck_cart_line_unit_price_minor CHECK (unit_price_minor >= 0)
+);
+
+-- cart_kit_selection (from 2.D, depends on cart_line)
+CREATE TABLE cart_kit_selection (
+    cart_line_id      uuid NOT NULL,
+    kit_definition_id uuid NOT NULL,
+    variant_id        uuid NOT NULL,
+    product_class_id  uuid NOT NULL,
+
+    CONSTRAINT fk_cks_cart_line FOREIGN KEY (cart_line_id) REFERENCES cart_line(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_cks_kit FOREIGN KEY (kit_definition_id) REFERENCES kit_definition(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_cks_variant FOREIGN KEY (variant_id) REFERENCES product_variant(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_cks_class FOREIGN KEY (product_class_id) REFERENCES product_class(id) ON DELETE RESTRICT,
+    CONSTRAINT uq_cart_kit_selection UNIQUE (cart_line_id, kit_definition_id, product_class_id, variant_id)
+);
+
+CREATE TABLE "order" (
+    id                              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    order_number                    text        NOT NULL,
+    customer_id                     uuid,
+    email                           text        NOT NULL,
+    status                          text        NOT NULL DEFAULT 'draft',
+    payment_status                  text        NOT NULL DEFAULT 'unpaid',
+    fulfillment_status              text        NOT NULL DEFAULT 'unfulfilled',
+    shipping_status                 text        NOT NULL DEFAULT 'not_shipped',
+    currency                        text        NOT NULL DEFAULT 'USD',
+    subtotal_minor                  integer     NOT NULL,
+    tax_minor                       integer     NOT NULL DEFAULT 0,
+    shipping_minor                  integer     NOT NULL DEFAULT 0,
+    discount_minor                  integer     NOT NULL DEFAULT 0,
+    total_minor                     integer     NOT NULL,
+    billing_address_snapshot_json   jsonb,
+    shipping_address_snapshot_json  jsonb,
+    placed_at                       timestamptz,
+    created_at                      timestamptz NOT NULL DEFAULT now(),
+    updated_at                      timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_order PRIMARY KEY (id),
+    CONSTRAINT uq_order_order_number UNIQUE (order_number),
+    CONSTRAINT fk_order_customer FOREIGN KEY (customer_id) REFERENCES customer(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_order_status CHECK (status IN ('draft', 'pending_payment', 'confirmed', 'completed', 'canceled', 'closed')),
+    CONSTRAINT ck_order_payment_status CHECK (payment_status IN ('unpaid', 'processing', 'paid', 'partially_refunded', 'refunded', 'failed', 'disputed')),
+    CONSTRAINT ck_order_fulfillment_status CHECK (fulfillment_status IN ('unfulfilled', 'queued', 'picking', 'packing', 'ready_to_ship', 'partially_fulfilled', 'fulfilled', 'canceled')),
+    CONSTRAINT ck_order_shipping_status CHECK (shipping_status IN ('not_shipped', 'label_pending', 'label_purchased', 'shipped', 'in_transit', 'out_for_delivery', 'delivered', 'delivery_exception', 'returned', 'canceled')),
+    CONSTRAINT ck_order_currency CHECK (currency IN ('USD')),
+    CONSTRAINT ck_order_subtotal_minor CHECK (subtotal_minor >= 0),
+    CONSTRAINT ck_order_tax_minor CHECK (tax_minor >= 0),
+    CONSTRAINT ck_order_shipping_minor CHECK (shipping_minor >= 0),
+    CONSTRAINT ck_order_discount_minor CHECK (discount_minor >= 0),
+    CONSTRAINT ck_order_total_minor CHECK (total_minor >= 0)
+);
+
+CREATE TABLE order_line (
+    id                          uuid    NOT NULL DEFAULT gen_random_uuid(),
+    order_id                    uuid    NOT NULL,
+    variant_id                  uuid    NOT NULL,
+    sku_snapshot                text    NOT NULL,
+    title_snapshot              text    NOT NULL,
+    option_values_snapshot_json jsonb   NOT NULL DEFAULT '{}',
+    quantity                    integer NOT NULL,
+    unit_price_minor            integer NOT NULL,
+    total_minor                 integer NOT NULL,
+
+    CONSTRAINT pk_order_line PRIMARY KEY (id),
+    CONSTRAINT fk_order_line_order FOREIGN KEY (order_id) REFERENCES "order"(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_order_line_variant FOREIGN KEY (variant_id) REFERENCES product_variant(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_order_line_quantity CHECK (quantity >= 1),
+    CONSTRAINT ck_order_line_unit_price_minor CHECK (unit_price_minor >= 0),
+    CONSTRAINT ck_order_line_total_minor CHECK (total_minor >= 0)
+);
+
+CREATE TABLE order_status_history (
+    id                  uuid        NOT NULL DEFAULT gen_random_uuid(),
+    order_id            uuid        NOT NULL,
+    status_type         text        NOT NULL,
+    old_value           text        NOT NULL,
+    new_value           text        NOT NULL,
+    reason              text,
+    actor_admin_user_id uuid,
+    created_at          timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_order_status_history PRIMARY KEY (id),
+    CONSTRAINT fk_osh_order FOREIGN KEY (order_id) REFERENCES "order"(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_osh_actor FOREIGN KEY (actor_admin_user_id) REFERENCES admin_user(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_osh_status_type CHECK (status_type IN ('status', 'payment_status', 'fulfillment_status', 'shipping_status'))
+);
+
+-- inventory_reservation (depends on order and cart)
+CREATE TABLE inventory_reservation (
+    id                  uuid        NOT NULL DEFAULT gen_random_uuid(),
+    order_id            uuid,
+    cart_id             uuid,
+    variant_id          uuid        NOT NULL,
+    location_id         uuid        NOT NULL,
+    quantity            integer     NOT NULL,
+    status              text        NOT NULL DEFAULT 'pending',
+    reservation_reason  text        NOT NULL,
+    expires_at          timestamptz,
+    created_at          timestamptz NOT NULL DEFAULT now(),
+    released_at         timestamptz,
+
+    CONSTRAINT pk_inventory_reservation PRIMARY KEY (id),
+    CONSTRAINT fk_ir_order FOREIGN KEY (order_id) REFERENCES "order"(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ir_cart FOREIGN KEY (cart_id) REFERENCES cart(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ir_variant FOREIGN KEY (variant_id) REFERENCES product_variant(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ir_location FOREIGN KEY (location_id) REFERENCES inventory_location(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_ir_quantity CHECK (quantity >= 1),
+    CONSTRAINT ck_ir_status CHECK (status IN ('pending', 'active', 'consumed', 'released', 'expired', 'canceled'))
+);
+
+-- inventory_adjustment (depends on admin_user, order)
+CREATE TABLE inventory_adjustment (
+    id                  uuid        NOT NULL DEFAULT gen_random_uuid(),
+    idempotency_key     text,
+    variant_id          uuid        NOT NULL,
+    location_id         uuid        NOT NULL,
+    adjustment_type     text        NOT NULL,
+    quantity_delta      integer     NOT NULL,
+    reason              text        NOT NULL,
+    notes               text,
+    actor_admin_user_id uuid,
+    related_order_id    uuid,
+    created_at          timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_inventory_adjustment PRIMARY KEY (id),
+    CONSTRAINT uq_inventory_adjustment_idempotency UNIQUE (idempotency_key),
+    CONSTRAINT fk_ia_variant FOREIGN KEY (variant_id) REFERENCES product_variant(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ia_location FOREIGN KEY (location_id) REFERENCES inventory_location(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ia_actor FOREIGN KEY (actor_admin_user_id) REFERENCES admin_user(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ia_order FOREIGN KEY (related_order_id) REFERENCES "order"(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_ia_adjustment_type CHECK (adjustment_type IN ('restock', 'shrinkage', 'correction', 'damage', 'return'))
+);
+
+CREATE TABLE inventory_movement (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    variant_id      uuid        NOT NULL,
+    location_id     uuid        NOT NULL,
+    movement_type   text        NOT NULL,
+    quantity_delta   integer    NOT NULL,
+    reference_type  text        NOT NULL,
+    reference_id    uuid        NOT NULL,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_inventory_movement PRIMARY KEY (id),
+    CONSTRAINT fk_im_variant FOREIGN KEY (variant_id) REFERENCES product_variant(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_im_location FOREIGN KEY (location_id) REFERENCES inventory_location(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_im_movement_type CHECK (movement_type IN ('reservation', 'consumption', 'release', 'adjustment', 'return'))
+);
+
+-- ============================================================
+-- 2.G Payments and Disputes
+-- ============================================================
+
+CREATE TABLE payment (
+    id                          uuid        NOT NULL DEFAULT gen_random_uuid(),
+    order_id                    uuid        NOT NULL,
+    provider                    text        NOT NULL DEFAULT 'stripe',
+    provider_payment_intent_id  text        NOT NULL,
+    provider_charge_id          text,
+    status                      text        NOT NULL DEFAULT 'pending',
+    amount_minor                integer     NOT NULL,
+    currency                    text        NOT NULL DEFAULT 'USD',
+    payment_method_type         text,
+    created_at                  timestamptz NOT NULL DEFAULT now(),
+    updated_at                  timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_payment PRIMARY KEY (id),
+    CONSTRAINT uq_payment_intent UNIQUE (provider_payment_intent_id),
+    CONSTRAINT fk_payment_order FOREIGN KEY (order_id) REFERENCES "order"(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_payment_provider CHECK (provider IN ('stripe')),
+    CONSTRAINT ck_payment_status CHECK (status IN ('pending', 'processing', 'succeeded', 'failed', 'canceled')),
+    CONSTRAINT ck_payment_amount_minor CHECK (amount_minor >= 0),
+    CONSTRAINT ck_payment_currency CHECK (currency IN ('USD'))
+);
+
+CREATE TABLE payment_event (
+    id                  uuid        NOT NULL DEFAULT gen_random_uuid(),
+    payment_id          uuid        NOT NULL,
+    provider_event_id   text        NOT NULL,
+    event_type          text        NOT NULL,
+    payload_json        jsonb       NOT NULL,
+    created_at          timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_payment_event PRIMARY KEY (id),
+    CONSTRAINT uq_payment_event_provider UNIQUE (provider_event_id),
+    CONSTRAINT fk_pe_payment FOREIGN KEY (payment_id) REFERENCES payment(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE refund (
+    id                  uuid        NOT NULL DEFAULT gen_random_uuid(),
+    order_id            uuid        NOT NULL,
+    payment_id          uuid        NOT NULL,
+    provider_refund_id  text,
+    amount_minor        integer     NOT NULL,
+    reason              text        NOT NULL,
+    status              text        NOT NULL DEFAULT 'pending',
+    actor_admin_user_id uuid,
+    created_at          timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_refund PRIMARY KEY (id),
+    CONSTRAINT fk_refund_order FOREIGN KEY (order_id) REFERENCES "order"(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_refund_payment FOREIGN KEY (payment_id) REFERENCES payment(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_refund_actor FOREIGN KEY (actor_admin_user_id) REFERENCES admin_user(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_refund_amount_minor CHECK (amount_minor > 0),
+    CONSTRAINT ck_refund_status CHECK (status IN ('pending', 'processing', 'succeeded', 'failed'))
+);
+
+CREATE TABLE dispute (
+    id                  uuid        NOT NULL DEFAULT gen_random_uuid(),
+    payment_id          uuid        NOT NULL,
+    order_id            uuid        NOT NULL,
+    provider_dispute_id text        NOT NULL,
+    reason              text,
+    amount_minor        integer     NOT NULL,
+    currency            text        NOT NULL DEFAULT 'USD',
+    status              text        NOT NULL DEFAULT 'opened',
+    due_by              timestamptz,
+    opened_at           timestamptz NOT NULL,
+    closed_at           timestamptz,
+
+    CONSTRAINT pk_dispute PRIMARY KEY (id),
+    CONSTRAINT uq_dispute_provider UNIQUE (provider_dispute_id),
+    CONSTRAINT fk_dispute_payment FOREIGN KEY (payment_id) REFERENCES payment(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_dispute_order FOREIGN KEY (order_id) REFERENCES "order"(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_dispute_amount_minor CHECK (amount_minor >= 0),
+    CONSTRAINT ck_dispute_currency CHECK (currency IN ('USD')),
+    CONSTRAINT ck_dispute_status CHECK (status IN ('opened', 'evidence_gathering', 'ready_to_submit', 'submitted', 'won', 'lost', 'accepted', 'closed'))
+);
+
+-- ============================================================
+-- 2.H Shipping and Fulfillment
+-- ============================================================
+
+CREATE TABLE fulfillment_task (
+    id                      uuid        NOT NULL DEFAULT gen_random_uuid(),
+    order_id                uuid        NOT NULL,
+    status                  text        NOT NULL DEFAULT 'new',
+    priority                text        NOT NULL DEFAULT 'normal',
+    assigned_admin_user_id  uuid,
+    picking_status          text,
+    packing_status          text,
+    notes                   text,
+    created_at              timestamptz NOT NULL DEFAULT now(),
+    updated_at              timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_fulfillment_task PRIMARY KEY (id),
+    CONSTRAINT fk_ft_order FOREIGN KEY (order_id) REFERENCES "order"(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ft_admin FOREIGN KEY (assigned_admin_user_id) REFERENCES admin_user(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_ft_status CHECK (status IN ('new', 'assigned', 'picking', 'picked', 'packing', 'packed', 'shipment_pending', 'done', 'blocked', 'canceled')),
+    CONSTRAINT ck_ft_priority CHECK (priority IN ('low', 'normal', 'high', 'urgent'))
+);
+
+CREATE TABLE shipment (
+    id                  uuid        NOT NULL DEFAULT gen_random_uuid(),
+    order_id            uuid        NOT NULL,
+    shipment_number     text        NOT NULL,
+    status              text        NOT NULL DEFAULT 'draft',
+    carrier             text,
+    service_level       text,
+    shipping_provider   text,
+    tracking_number     text,
+    tracking_url        text,
+    label_url           text,
+    label_purchased_at  timestamptz,
+    shipped_at          timestamptz,
+    delivered_at        timestamptz,
+    created_at          timestamptz NOT NULL DEFAULT now(),
+    updated_at          timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_shipment PRIMARY KEY (id),
+    CONSTRAINT uq_shipment_number UNIQUE (shipment_number),
+    CONSTRAINT fk_shipment_order FOREIGN KEY (order_id) REFERENCES "order"(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_shipment_status CHECK (status IN ('draft', 'label_pending', 'label_purchased', 'ready', 'shipped', 'in_transit', 'delivered', 'exception', 'returned', 'voided'))
+);
+
+CREATE TABLE shipment_package (
+    id              uuid NOT NULL DEFAULT gen_random_uuid(),
+    shipment_id     uuid NOT NULL,
+    weight          numeric(10,4),
+    dimensions_json jsonb,
+    package_type    text,
+    label_url       text,
+
+    CONSTRAINT pk_shipment_package PRIMARY KEY (id),
+    CONSTRAINT fk_sp_shipment FOREIGN KEY (shipment_id) REFERENCES shipment(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE shipment_line (
+    id              uuid    NOT NULL DEFAULT gen_random_uuid(),
+    shipment_id     uuid    NOT NULL,
+    order_line_id   uuid    NOT NULL,
+    quantity        integer NOT NULL,
+
+    CONSTRAINT pk_shipment_line PRIMARY KEY (id),
+    CONSTRAINT fk_sl_shipment FOREIGN KEY (shipment_id) REFERENCES shipment(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_sl_order_line FOREIGN KEY (order_line_id) REFERENCES order_line(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_sl_quantity CHECK (quantity >= 1)
+);
+
+CREATE TABLE shipment_event (
+    id                  uuid        NOT NULL DEFAULT gen_random_uuid(),
+    shipment_id         uuid        NOT NULL,
+    provider_event_id   text,
+    status              text        NOT NULL,
+    description         text,
+    occurred_at         timestamptz NOT NULL,
+    raw_payload_json    jsonb,
+
+    CONSTRAINT pk_shipment_event PRIMARY KEY (id),
+    CONSTRAINT fk_se_shipment FOREIGN KEY (shipment_id) REFERENCES shipment(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE shipping_label_purchase (
+    id                  uuid        NOT NULL DEFAULT gen_random_uuid(),
+    shipment_id         uuid        NOT NULL,
+    provider_label_id   text        NOT NULL,
+    cost_minor          integer     NOT NULL,
+    currency            text        NOT NULL DEFAULT 'USD',
+    purchased_at        timestamptz NOT NULL,
+    raw_payload_json    jsonb,
+
+    CONSTRAINT pk_shipping_label_purchase PRIMARY KEY (id),
+    CONSTRAINT uq_slp_shipment UNIQUE (shipment_id),
+    CONSTRAINT fk_slp_shipment FOREIGN KEY (shipment_id) REFERENCES shipment(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_slp_cost_minor CHECK (cost_minor >= 0),
+    CONSTRAINT ck_slp_currency CHECK (currency IN ('USD'))
+);
+
+-- ============================================================
+-- 2.I Support
+-- ============================================================
+
+CREATE TABLE support_ticket (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    ticket_number   text        NOT NULL,
+    customer_id     uuid,
+    order_id        uuid,
+    shipment_id     uuid,
+    subject         text        NOT NULL,
+    category        text        NOT NULL,
+    priority        text        NOT NULL DEFAULT 'normal',
+    status          text        NOT NULL DEFAULT 'open',
+    source          text        NOT NULL,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+    resolved_at     timestamptz,
+
+    CONSTRAINT pk_support_ticket PRIMARY KEY (id),
+    CONSTRAINT uq_support_ticket_number UNIQUE (ticket_number),
+    CONSTRAINT fk_st_customer FOREIGN KEY (customer_id) REFERENCES customer(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_st_order FOREIGN KEY (order_id) REFERENCES "order"(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_st_shipment FOREIGN KEY (shipment_id) REFERENCES shipment(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_st_priority CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+    CONSTRAINT ck_st_status CHECK (status IN ('open', 'waiting_on_customer', 'waiting_on_internal', 'resolved', 'closed', 'spam'))
+);
+
+CREATE TABLE support_ticket_message (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    ticket_id       uuid        NOT NULL,
+    author_type     text        NOT NULL,
+    customer_id     uuid,
+    admin_user_id   uuid,
+    body            text        NOT NULL,
+    is_internal_note boolean    NOT NULL DEFAULT false,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_support_ticket_message PRIMARY KEY (id),
+    CONSTRAINT fk_stm_ticket FOREIGN KEY (ticket_id) REFERENCES support_ticket(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_stm_customer FOREIGN KEY (customer_id) REFERENCES customer(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_stm_admin FOREIGN KEY (admin_user_id) REFERENCES admin_user(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_stm_author_type CHECK (author_type IN ('customer', 'admin', 'system'))
+);
+
+CREATE TABLE support_ticket_attachment (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    ticket_id       uuid        NOT NULL,
+    message_id      uuid,
+    storage_key     text        NOT NULL,
+    file_name       text        NOT NULL,
+    content_type    text        NOT NULL,
+    size_bytes      integer     NOT NULL,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_support_ticket_attachment PRIMARY KEY (id),
+    CONSTRAINT fk_sta_ticket FOREIGN KEY (ticket_id) REFERENCES support_ticket(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_sta_message FOREIGN KEY (message_id) REFERENCES support_ticket_message(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_sta_size_bytes CHECK (size_bytes > 0)
+);
+
+CREATE TABLE support_ticket_status_history (
+    id                  uuid        NOT NULL DEFAULT gen_random_uuid(),
+    ticket_id           uuid        NOT NULL,
+    old_status          text        NOT NULL,
+    new_status          text        NOT NULL,
+    actor_admin_user_id uuid,
+    created_at          timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_support_ticket_status_history PRIMARY KEY (id),
+    CONSTRAINT fk_stsh_ticket FOREIGN KEY (ticket_id) REFERENCES support_ticket(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_stsh_actor FOREIGN KEY (actor_admin_user_id) REFERENCES admin_user(id) ON DELETE RESTRICT
+);
+
+-- ============================================================
+-- 2.J Evidence and Policy
+-- ============================================================
+
+CREATE TABLE evidence_record (
+    id                  uuid        NOT NULL DEFAULT gen_random_uuid(),
+    order_id            uuid,
+    payment_id          uuid,
+    shipment_id         uuid,
+    dispute_id          uuid,
+    support_ticket_id   uuid,
+    type                text        NOT NULL,
+    storage_key         text,
+    text_content        text,
+    metadata_json       jsonb,
+    created_at          timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_evidence_record PRIMARY KEY (id),
+    CONSTRAINT fk_er_order FOREIGN KEY (order_id) REFERENCES "order"(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_er_payment FOREIGN KEY (payment_id) REFERENCES payment(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_er_shipment FOREIGN KEY (shipment_id) REFERENCES shipment(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_er_dispute FOREIGN KEY (dispute_id) REFERENCES dispute(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_er_ticket FOREIGN KEY (support_ticket_id) REFERENCES support_ticket(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_er_type CHECK (type IN ('delivery_proof', 'tracking_history', 'customer_communication', 'policy_acceptance', 'payment_receipt')),
+    CONSTRAINT ck_er_has_content CHECK (storage_key IS NOT NULL OR text_content IS NOT NULL)
+);
+
+CREATE TABLE evidence_bundle (
+    id              uuid    NOT NULL DEFAULT gen_random_uuid(),
+    dispute_id      uuid    NOT NULL,
+    status          text    NOT NULL DEFAULT 'generating',
+    generated_at    timestamptz,
+    storage_key     text,
+    metadata_json   jsonb,
+
+    CONSTRAINT pk_evidence_bundle PRIMARY KEY (id),
+    CONSTRAINT fk_eb_dispute FOREIGN KEY (dispute_id) REFERENCES dispute(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_eb_status CHECK (status IN ('generating', 'generated', 'submitted', 'failed'))
+);
+
+CREATE TABLE policy_snapshot (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    policy_type     text        NOT NULL,
+    version         integer     NOT NULL,
+    content_html    text        NOT NULL,
+    content_text    text        NOT NULL,
+    effective_at    timestamptz NOT NULL,
+
+    CONSTRAINT pk_policy_snapshot PRIMARY KEY (id),
+    CONSTRAINT uq_policy_snapshot_type_version UNIQUE (policy_type, version)
+);
+
+CREATE TABLE order_policy_acknowledgment (
+    id                  uuid        NOT NULL DEFAULT gen_random_uuid(),
+    order_id            uuid        NOT NULL,
+    policy_snapshot_id  uuid        NOT NULL,
+    acknowledged_at     timestamptz NOT NULL,
+    context_json        jsonb,
+
+    CONSTRAINT pk_order_policy_acknowledgment PRIMARY KEY (id),
+    CONSTRAINT fk_opa_order FOREIGN KEY (order_id) REFERENCES "order"(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_opa_policy FOREIGN KEY (policy_snapshot_id) REFERENCES policy_snapshot(id) ON DELETE RESTRICT
+);
+
+-- ============================================================
+-- 2.K Contributor Program
+-- ============================================================
+
+CREATE TABLE contributor (
+    id                  uuid        NOT NULL DEFAULT gen_random_uuid(),
+    github_username     text        NOT NULL,
+    github_user_id      text        NOT NULL,
+    customer_id         uuid,
+    cla_accepted_at     timestamptz,
+    status              text        NOT NULL DEFAULT 'pending',
+
+    CONSTRAINT pk_contributor PRIMARY KEY (id),
+    CONSTRAINT uq_contributor_github_username UNIQUE (github_username),
+    CONSTRAINT uq_contributor_github_user_id UNIQUE (github_user_id),
+    CONSTRAINT uq_contributor_customer UNIQUE (customer_id),
+    CONSTRAINT fk_contributor_customer FOREIGN KEY (customer_id) REFERENCES customer(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_contributor_status CHECK (status IN ('pending', 'active', 'suspended', 'deactivated'))
+);
+
+CREATE TABLE contributor_design (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    contributor_id  uuid        NOT NULL,
+    product_id      uuid        NOT NULL,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_contributor_design PRIMARY KEY (id),
+    CONSTRAINT uq_contributor_design UNIQUE (contributor_id, product_id),
+    CONSTRAINT fk_cd_contributor FOREIGN KEY (contributor_id) REFERENCES contributor(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_cd_product FOREIGN KEY (product_id) REFERENCES product(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE contributor_royalty (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    contributor_id  uuid        NOT NULL,
+    order_line_id   uuid        NOT NULL,
+    amount_minor    integer     NOT NULL,
+    currency        text        NOT NULL DEFAULT 'USD',
+    status          text        NOT NULL DEFAULT 'accrued',
+    created_at      timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_contributor_royalty PRIMARY KEY (id),
+    CONSTRAINT uq_contributor_royalty_order_line UNIQUE (order_line_id),
+    CONSTRAINT fk_cr_contributor FOREIGN KEY (contributor_id) REFERENCES contributor(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_cr_order_line FOREIGN KEY (order_line_id) REFERENCES order_line(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_cr_amount_minor CHECK (amount_minor >= 0),
+    CONSTRAINT ck_cr_currency CHECK (currency IN ('USD')),
+    CONSTRAINT ck_cr_status CHECK (status IN ('accrued', 'paid', 'clawed_back'))
+);
+
+CREATE TABLE contributor_milestone (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    contributor_id  uuid        NOT NULL,
+    milestone_type  text        NOT NULL,
+    reached_at      timestamptz NOT NULL,
+    fulfilled_at    timestamptz,
+    notes           text,
+
+    CONSTRAINT pk_contributor_milestone PRIMARY KEY (id),
+    CONSTRAINT fk_cm_contributor FOREIGN KEY (contributor_id) REFERENCES contributor(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_cm_milestone_type CHECK (milestone_type IN ('accepted_pr', 'royalty_activation', 'starter_kit'))
+);
+
+CREATE TABLE contributor_tax_document (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    contributor_id  uuid        NOT NULL,
+    document_type   text        NOT NULL,
+    storage_key     text        NOT NULL,
+    uploaded_at     timestamptz NOT NULL,
+    status          text        NOT NULL DEFAULT 'pending_review',
+
+    CONSTRAINT pk_contributor_tax_document PRIMARY KEY (id),
+    CONSTRAINT fk_ctd_contributor FOREIGN KEY (contributor_id) REFERENCES contributor(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_ctd_document_type CHECK (document_type IN ('w9', 'w8ben')),
+    CONSTRAINT ck_ctd_status CHECK (status IN ('pending_review', 'approved', 'rejected'))
+);
+
+CREATE TABLE contributor_payout (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    contributor_id  uuid        NOT NULL,
+    amount_minor    integer     NOT NULL,
+    currency        text        NOT NULL DEFAULT 'USD',
+    payout_method   text        NOT NULL,
+    status          text        NOT NULL DEFAULT 'pending',
+    initiated_at    timestamptz NOT NULL,
+    completed_at    timestamptz,
+
+    CONSTRAINT pk_contributor_payout PRIMARY KEY (id),
+    CONSTRAINT fk_cp_contributor FOREIGN KEY (contributor_id) REFERENCES contributor(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_cp_amount_minor CHECK (amount_minor > 0),
+    CONSTRAINT ck_cp_currency CHECK (currency IN ('USD')),
+    CONSTRAINT ck_cp_status CHECK (status IN ('pending', 'processing', 'completed', 'failed'))
+);
+
+CREATE TABLE contributor_donation (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    contributor_id  uuid        NOT NULL,
+    charity_name    text        NOT NULL,
+    charity_ein     text        NOT NULL,
+    amount_minor    integer     NOT NULL,
+    currency        text        NOT NULL DEFAULT 'USD',
+    status          text        NOT NULL DEFAULT 'pending',
+    created_at      timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_contributor_donation PRIMARY KEY (id),
+    CONSTRAINT fk_cdn_contributor FOREIGN KEY (contributor_id) REFERENCES contributor(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_cdn_amount_minor CHECK (amount_minor > 0),
+    CONSTRAINT ck_cdn_currency CHECK (currency IN ('USD')),
+    CONSTRAINT ck_cdn_status CHECK (status IN ('pending', 'processing', 'completed', 'failed'))
+);
+
+-- ============================================================
+-- Indexes (Section 5 of data-model.md)
+-- ============================================================
+
+-- 5.1 Admin and Auth
+CREATE INDEX idx_admin_user_auth_subject ON admin_user (auth_subject);
+CREATE INDEX idx_customer_auth_subject ON customer (auth_subject);
+CREATE INDEX idx_audit_log_entity ON admin_audit_log (entity_type, entity_id);
+CREATE INDEX idx_audit_log_actor ON admin_audit_log (actor_admin_user_id, created_at DESC);
+
+-- 5.2 Catalog
+CREATE INDEX idx_product_status ON product (status) WHERE status = 'active';
+CREATE INDEX idx_variant_product ON product_variant (product_id);
+CREATE INDEX idx_variant_sku ON product_variant (sku);
+CREATE INDEX idx_media_product_sort ON product_media (product_id, sort_order);
+CREATE INDEX idx_collection_product_sort ON collection_product (collection_id, sort_order);
+CREATE INDEX idx_pcm_product ON product_class_membership (product_id);
+CREATE INDEX idx_pcm_class ON product_class_membership (product_class_id);
+CREATE INDEX idx_kit_req_kit ON kit_class_requirement (kit_definition_id);
+
+-- 5.3 Inventory
+CREATE INDEX idx_balance_variant ON inventory_balance (variant_id);
+CREATE INDEX idx_balance_low_stock ON inventory_balance (variant_id, location_id) WHERE available &lt;= safety_stock;
+CREATE INDEX idx_reservation_active_expires ON inventory_reservation (expires_at) WHERE status = 'active';
+CREATE INDEX idx_reservation_order ON inventory_reservation (order_id) WHERE order_id IS NOT NULL;
+CREATE INDEX idx_reservation_cart ON inventory_reservation (cart_id) WHERE cart_id IS NOT NULL;
+CREATE INDEX idx_movement_variant ON inventory_movement (variant_id, created_at DESC);
+CREATE INDEX idx_adjustment_variant ON inventory_adjustment (variant_id, created_at DESC);
+
+-- 5.4 Cart
+CREATE INDEX idx_cart_customer ON cart (customer_id) WHERE customer_id IS NOT NULL;
+CREATE INDEX idx_cart_active_expires ON cart (expires_at) WHERE status = 'active';
+CREATE INDEX idx_cart_line_cart ON cart_line (cart_id);
+CREATE INDEX idx_kit_selection_cart_line ON cart_kit_selection (cart_line_id);
+
+-- 5.5 Orders
+CREATE INDEX idx_order_status ON "order" (status, placed_at DESC);
+CREATE INDEX idx_order_payment_status ON "order" (payment_status) WHERE payment_status IN ('processing', 'disputed');
+CREATE INDEX idx_order_fulfillment_status ON "order" (fulfillment_status) WHERE fulfillment_status NOT IN ('fulfilled', 'canceled');
+CREATE INDEX idx_order_shipping_status ON "order" (shipping_status) WHERE shipping_status NOT IN ('delivered', 'canceled');
+CREATE INDEX idx_order_customer ON "order" (customer_id, placed_at DESC);
+CREATE INDEX idx_order_number ON "order" (order_number);
+CREATE INDEX idx_order_email ON "order" (email) WHERE customer_id IS NULL;
+CREATE INDEX idx_order_line_order ON order_line (order_id);
+CREATE INDEX idx_order_status_history ON order_status_history (order_id, created_at DESC);
+
+-- 5.6 Payments and Disputes
+CREATE INDEX idx_payment_order ON payment (order_id);
+CREATE INDEX idx_payment_event_payment ON payment_event (payment_id, created_at DESC);
+CREATE INDEX idx_refund_order ON refund (order_id);
+CREATE INDEX idx_dispute_status ON dispute (status) WHERE status NOT IN ('closed');
+CREATE INDEX idx_dispute_due_by ON dispute (due_by ASC) WHERE status IN ('opened', 'evidence_gathering', 'ready_to_submit');
+CREATE INDEX idx_dispute_order ON dispute (order_id);
+
+-- 5.7 Shipping and Fulfillment
+CREATE INDEX idx_fulfillment_task_status ON fulfillment_task (status, priority, created_at);
+CREATE INDEX idx_fulfillment_task_order ON fulfillment_task (order_id);
+CREATE INDEX idx_shipment_order ON shipment (order_id);
+CREATE INDEX idx_shipment_line_shipment ON shipment_line (shipment_id);
+CREATE INDEX idx_shipment_line_order_line ON shipment_line (order_line_id);
+CREATE INDEX idx_shipment_event_shipment ON shipment_event (shipment_id, occurred_at DESC);
+
+-- 5.8 Support
+CREATE INDEX idx_ticket_status_priority ON support_ticket (status, priority, created_at DESC) WHERE status NOT IN ('closed', 'spam');
+CREATE INDEX idx_ticket_customer ON support_ticket (customer_id) WHERE customer_id IS NOT NULL;
+CREATE INDEX idx_ticket_order ON support_ticket (order_id) WHERE order_id IS NOT NULL;
+CREATE INDEX idx_ticket_message_ticket ON support_ticket_message (ticket_id, created_at);
+CREATE INDEX idx_ticket_attachment_ticket ON support_ticket_attachment (ticket_id);
+
+-- 5.9 Evidence and Policy
+CREATE INDEX idx_evidence_dispute ON evidence_record (dispute_id) WHERE dispute_id IS NOT NULL;
+CREATE INDEX idx_evidence_order ON evidence_record (order_id) WHERE order_id IS NOT NULL;
+CREATE INDEX idx_evidence_shipment ON evidence_record (shipment_id) WHERE shipment_id IS NOT NULL;
+CREATE INDEX idx_evidence_ticket ON evidence_record (support_ticket_id) WHERE support_ticket_id IS NOT NULL;
+CREATE INDEX idx_evidence_bundle_dispute ON evidence_bundle (dispute_id);
+CREATE INDEX idx_policy_type_effective ON policy_snapshot (policy_type, effective_at DESC);
+CREATE INDEX idx_acknowledgment_order ON order_policy_acknowledgment (order_id);
+
+-- 5.10 Contributor Program
+CREATE INDEX idx_contributor_github ON contributor (github_username);
+CREATE INDEX idx_design_contributor ON contributor_design (contributor_id);
+CREATE INDEX idx_design_product ON contributor_design (product_id);
+CREATE INDEX idx_royalty_contributor_status ON contributor_royalty (contributor_id, status);
+CREATE INDEX idx_royalty_order_line ON contributor_royalty (order_line_id);
+CREATE INDEX idx_milestone_contributor ON contributor_milestone (contributor_id);
+CREATE INDEX idx_tax_doc_contributor ON contributor_tax_document (contributor_id);
+CREATE INDEX idx_payout_contributor ON contributor_payout (contributor_id, initiated_at DESC);
+CREATE INDEX idx_donation_contributor ON contributor_donation (contributor_id, created_at DESC);
+
+        </sql>
+
+        <rollback>
+            <sql splitStatements="true" stripComments="true">
+-- Drop in reverse dependency order
+
+-- Indexes are dropped automatically with tables
+
+-- Contributor
+DROP TABLE IF EXISTS contributor_donation;
+DROP TABLE IF EXISTS contributor_payout;
+DROP TABLE IF EXISTS contributor_tax_document;
+DROP TABLE IF EXISTS contributor_milestone;
+DROP TABLE IF EXISTS contributor_royalty;
+DROP TABLE IF EXISTS contributor_design;
+DROP TABLE IF EXISTS contributor;
+
+-- Evidence and Policy
+DROP TABLE IF EXISTS order_policy_acknowledgment;
+DROP TABLE IF EXISTS policy_snapshot;
+DROP TABLE IF EXISTS evidence_bundle;
+DROP TABLE IF EXISTS evidence_record;
+
+-- Support
+DROP TABLE IF EXISTS support_ticket_status_history;
+DROP TABLE IF EXISTS support_ticket_attachment;
+DROP TABLE IF EXISTS support_ticket_message;
+DROP TABLE IF EXISTS support_ticket;
+
+-- Shipping and Fulfillment
+DROP TABLE IF EXISTS shipping_label_purchase;
+DROP TABLE IF EXISTS shipment_event;
+DROP TABLE IF EXISTS shipment_line;
+DROP TABLE IF EXISTS shipment_package;
+DROP TABLE IF EXISTS shipment;
+DROP TABLE IF EXISTS fulfillment_task;
+
+-- Payments and Disputes
+DROP TABLE IF EXISTS dispute;
+DROP TABLE IF EXISTS refund;
+DROP TABLE IF EXISTS payment_event;
+DROP TABLE IF EXISTS payment;
+
+-- Inventory (reservation, adjustment, movement)
+DROP TABLE IF EXISTS inventory_movement;
+DROP TABLE IF EXISTS inventory_adjustment;
+DROP TABLE IF EXISTS inventory_reservation;
+
+-- Order
+DROP TABLE IF EXISTS order_status_history;
+DROP TABLE IF EXISTS order_line;
+DROP TABLE IF EXISTS "order";
+
+-- Cart
+DROP TABLE IF EXISTS cart_kit_selection;
+DROP TABLE IF EXISTS cart_line;
+DROP TABLE IF EXISTS cart;
+
+-- Inventory (balance, location)
+DROP TABLE IF EXISTS inventory_balance;
+DROP TABLE IF EXISTS inventory_location;
+
+-- Product Classes and Kits
+DROP TABLE IF EXISTS kit_class_requirement;
+DROP TABLE IF EXISTS kit_definition;
+DROP TABLE IF EXISTS product_class_membership;
+DROP TABLE IF EXISTS product_class;
+
+-- Catalog
+DROP TABLE IF EXISTS collection_product;
+DROP TABLE IF EXISTS collection;
+DROP TABLE IF EXISTS product_media;
+DROP TABLE IF EXISTS product_variant;
+DROP TABLE IF EXISTS product;
+
+-- Customer
+DROP INDEX IF EXISTS uq_customer_address_default;
+DROP TABLE IF EXISTS customer_address;
+DROP TABLE IF EXISTS customer;
+
+-- Admin
+DROP TABLE IF EXISTS admin_audit_log;
+DROP TABLE IF EXISTS admin_user_role;
+DROP TABLE IF EXISTS admin_role;
+DROP TABLE IF EXISTS admin_user;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

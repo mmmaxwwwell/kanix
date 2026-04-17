@@ -91,7 +91,7 @@
 - [x] T025 Set up Liquibase with changelog structure [FR-101] [produces: IC-001]
   Done when: `api/migrations/changelog-master.xml` exists; `api/migrations/changesets/` directory with initial changeset; `pnpm db:migrate` runs Liquibase update; `pnpm db:rollback` runs Liquibase rollbackCount; Liquibase tracks applied changesets in databasechangelog table
 
-- [ ] T026 Create initial migration: all core entities from data-model.md [FR-032, FR-033]
+- [x] T026 Create initial migration: all core entities from data-model.md [FR-032, FR-033]
   Done when: changeset creates all tables from data-model.md; CHECK constraints: `available >= 0`, `reserved >= 0`, `on_hand >= 0`, `price_minor > 0`; unique constraints: `(variant_id, location_id)` on inventory_balance, `order_number` on order, `sku` on product_variant, `slug` on product; FK constraints with RESTRICT; migration runs clean against empty DB; rollback drops all tables
 
 - [ ] T027 Set up Drizzle ORM with schema introspection [FR-032] [consumes: IC-001]

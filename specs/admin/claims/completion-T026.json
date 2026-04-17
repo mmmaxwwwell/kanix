@@ -1,0 +1,20 @@
+{
+  "task_id": "T026",
+  "status": "complete",
+  "summary": "Created Liquibase migration changeset 002-core-entities.xml with all 51 tables from data-model.md, including CHECK constraints, UNIQUE constraints, FK constraints with RESTRICT, and all recommended indexes. Migration runs clean against empty DB and rollback drops all tables.",
+  "commands_run": [
+    {"command": "pnpm db:migrate", "exit_code": 0},
+    {"command": "pnpm db:rollback", "exit_code": 0},
+    {"command": "pnpm db:migrate", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/migrations/changesets/002-core-entities.xml",
+    "specs/admin/claims/completion-T026.json"
+  ],
+  "files_modified": [
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
