@@ -1,0 +1,39 @@
+{
+  "task_id": "T027",
+  "status": "complete",
+  "summary": "Set up Drizzle ORM with schema files for all 51 tables, DB connection module, typed queries (health check + product CRUD), and integration test",
+  "commands_run": [
+    {"command": "pnpm add drizzle-orm postgres", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/connection.ts",
+    "api/src/db/schema/index.ts",
+    "api/src/db/schema/admin.ts",
+    "api/src/db/schema/customer.ts",
+    "api/src/db/schema/catalog.ts",
+    "api/src/db/schema/product-class.ts",
+    "api/src/db/schema/inventory.ts",
+    "api/src/db/schema/cart.ts",
+    "api/src/db/schema/order.ts",
+    "api/src/db/schema/payment.ts",
+    "api/src/db/schema/fulfillment.ts",
+    "api/src/db/schema/support.ts",
+    "api/src/db/schema/evidence.ts",
+    "api/src/db/schema/contributor.ts",
+    "api/src/db/queries/index.ts",
+    "api/src/db/queries/health.ts",
+    "api/src/db/queries/product.ts",
+    "api/src/db/db.integration.test.ts"
+  ],
+  "files_modified": [
+    "api/package.json",
+    "api/pnpm-lock.yaml",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

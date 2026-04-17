@@ -94,7 +94,7 @@
 - [x] T026 Create initial migration: all core entities from data-model.md [FR-032, FR-033]
   Done when: changeset creates all tables from data-model.md; CHECK constraints: `available >= 0`, `reserved >= 0`, `on_hand >= 0`, `price_minor > 0`; unique constraints: `(variant_id, location_id)` on inventory_balance, `order_number` on order, `sku` on product_variant, `slug` on product; FK constraints with RESTRICT; migration runs clean against empty DB; rollback drops all tables
 
-- [ ] T027 Set up Drizzle ORM with schema introspection [FR-032] [consumes: IC-001]
+- [x] T027 Set up Drizzle ORM with schema introspection [FR-032] [consumes: IC-001]
   Done when: Drizzle schema files in `api/src/db/schema/` reflect all tables from migration; typed queries in `api/src/db/queries/`; `SELECT 1` query succeeds via Drizzle; integration test: insert and read a product row with type safety
 
 - [ ] T028 Create seed script with dev data [FR-101]

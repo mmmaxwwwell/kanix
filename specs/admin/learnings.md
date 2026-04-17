@@ -74,3 +74,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Liquibase XML `<sql>` with `splitStatements="true"` handles large multi-statement SQL blocks well — use `stripComments="true"` to avoid issues with `--` comment lines in SQL
 - The `<=` operator in SQL partial indexes must be escaped as `&lt;=` in Liquibase XML (e.g. `WHERE available &lt;= safety_stock`)
 - Table `order` is a reserved word in PostgreSQL — must be quoted as `"order"` in all DDL and index statements
+
+## T027 — Drizzle ORM with schema introspection
+- Drizzle ORM's `pg-core` exports `timestamp` not `timestamptz` — use `timestamp("col", { withTimezone: true })` for timestamptz columns
+- Drizzle's `postgres.js` driver (`postgres` package) works well with `drizzle-orm/postgres-js` — create connection with `postgres(url)` then `drizzle(sql)`
+- Integration tests with real DB should use `describe.skip` when `DATABASE_URL` is not set — `const describeWithDb = DATABASE_URL ? describe : describe.skip` pattern works cleanly
