@@ -24,6 +24,9 @@ function testConfig(overrides: Partial<Config> = {}): Config {
     EASYPOST_API_KEY: "test-key",
     GITHUB_OAUTH_CLIENT_ID: "test-id",
     GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
+    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
+    RATE_LIMIT_MAX: 100,
+    RATE_LIMIT_WINDOW_MS: 60000,
     ...overrides,
   };
 }

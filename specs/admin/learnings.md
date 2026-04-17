@@ -62,3 +62,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T016 — Fastify server skeleton
 - `createServer` registers shutdown signal handlers on `processRef` — in tests, MUST pass a fake `EventEmitter` process to avoid Vitest catching `process.exit(0)` calls as unhandled rejections during teardown
 - Fastify `app.inject()` is the right way to test endpoints without opening a real port — use `PORT: 0` in test config and `app.ready()` instead of `start()`
+
+## T017 — Security middleware (CORS, rate limiting, security headers)
+- Fastify hooks execute in registration order — register CORS/rate-limit hooks before route handlers so they can short-circuit with 403/429 before the handler runs
+- In-memory rate limiting with `Map<string, {count, resetTime}>` is sufficient for single-instance; use `setInterval` with `.unref()` for cleanup to avoid keeping the process alive
+- Security headers must use `onSend` hook (not `onRequest`) to ensure they appear on ALL responses including error responses

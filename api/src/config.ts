@@ -29,6 +29,11 @@ export interface Config {
   // GitHub OAuth
   readonly GITHUB_OAUTH_CLIENT_ID: string;
   readonly GITHUB_OAUTH_CLIENT_SECRET: string;
+
+  // Security middleware
+  readonly CORS_ALLOWED_ORIGINS: string[];
+  readonly RATE_LIMIT_MAX: number;
+  readonly RATE_LIMIT_WINDOW_MS: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -41,6 +46,9 @@ const DEFAULTS: Record<string, string> = {
   NODE_ENV: "development",
   SUPERTOKENS_CONNECTION_URI: "http://localhost:3567",
   STRIPE_TAX_ENABLED: "false",
+  CORS_ALLOWED_ORIGINS: "http://localhost:3000",
+  RATE_LIMIT_MAX: "100",
+  RATE_LIMIT_WINDOW_MS: "60000",
 };
 
 // ---------------------------------------------------------------------------
@@ -84,6 +92,9 @@ const REQUIRED_KEYS: readonly string[] = [
   "EASYPOST_API_KEY",
   "GITHUB_OAUTH_CLIENT_ID",
   "GITHUB_OAUTH_CLIENT_SECRET",
+  "CORS_ALLOWED_ORIGINS",
+  "RATE_LIMIT_MAX",
+  "RATE_LIMIT_WINDOW_MS",
 ];
 
 // ---------------------------------------------------------------------------
@@ -161,6 +172,28 @@ function validateRaw(raw: Record<string, string | undefined>): {
       key: "NODE_ENV",
       message: `invalid NODE_ENV: must be one of development, production, test, got "${nodeEnv}"`,
     });
+  }
+
+  const rateLimitMax = raw["RATE_LIMIT_MAX"];
+  if (rateLimitMax !== undefined && rateLimitMax !== "") {
+    const parsed = Number(rateLimitMax);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      errors.push({
+        key: "RATE_LIMIT_MAX",
+        message: `invalid RATE_LIMIT_MAX: must be a positive integer, got "${rateLimitMax}"`,
+      });
+    }
+  }
+
+  const rateLimitWindow = raw["RATE_LIMIT_WINDOW_MS"];
+  if (rateLimitWindow !== undefined && rateLimitWindow !== "") {
+    const parsed = Number(rateLimitWindow);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      errors.push({
+        key: "RATE_LIMIT_WINDOW_MS",
+        message: `invalid RATE_LIMIT_WINDOW_MS: must be a positive integer, got "${rateLimitWindow}"`,
+      });
+    }
   }
 
   const taxEnabled = raw["STRIPE_TAX_ENABLED"];
@@ -263,5 +296,11 @@ export function loadConfig(options: LoadConfigOptions = {}): Config {
     EASYPOST_API_KEY: get("EASYPOST_API_KEY"),
     GITHUB_OAUTH_CLIENT_ID: get("GITHUB_OAUTH_CLIENT_ID"),
     GITHUB_OAUTH_CLIENT_SECRET: get("GITHUB_OAUTH_CLIENT_SECRET"),
+    CORS_ALLOWED_ORIGINS: get("CORS_ALLOWED_ORIGINS")
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s !== ""),
+    RATE_LIMIT_MAX: Number(get("RATE_LIMIT_MAX")),
+    RATE_LIMIT_WINDOW_MS: Number(get("RATE_LIMIT_WINDOW_MS")),
   };
 }

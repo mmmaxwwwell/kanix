@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Config } from "./config.js";
 import { createLogger, generateCorrelationId, withCorrelationId } from "./logger.js";
+import { registerSecurityMiddleware, clearRateLimiterState } from "./security.js";
 import { createShutdownManager, isShuttingDown, type ShutdownManager } from "./shutdown.js";
 
 // ---------------------------------------------------------------------------
@@ -69,6 +70,12 @@ export function createServer(options: CreateServerOptions): ServerInstance {
   });
 
   // -------------------------------------------------------------------------
+  // Security middleware — CORS, rate limiting, security headers
+  // -------------------------------------------------------------------------
+
+  const { rateLimiter } = registerSecurityMiddleware(app, config);
+
+  // -------------------------------------------------------------------------
   // Correlation ID hook — attach to every request
   // -------------------------------------------------------------------------
 
@@ -117,6 +124,13 @@ export function createServer(options: CreateServerOptions): ServerInstance {
     name: "close Fastify server",
     fn: async () => {
       await app.close();
+    },
+  });
+
+  shutdownManager.register({
+    name: "clear rate limiter state",
+    fn: async () => {
+      clearRateLimiterState(rateLimiter);
     },
   });
 

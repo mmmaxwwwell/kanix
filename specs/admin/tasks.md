@@ -60,7 +60,7 @@
 - [x] T016 Implement Fastify server skeleton with health endpoints [FR-103]
   Done when: Fastify server boots on configured PORT; `GET /health` returns 200 with `{status, uptime, version, ready, dependencies}`; `GET /ready` returns 503 during startup (no DB), 200 when ready; JSON response matches spec format; integration test verifies both endpoints
 
-- [ ] T017 Implement security middleware: CORS, rate limiting, security headers [FR-108, FR-109, FR-110]
+- [x] T017 Implement security middleware: CORS, rate limiting, security headers [FR-108, FR-109, FR-110]
   Done when: CORS rejects requests from non-allowed origins (returns 403, not wildcard); rate limiter returns 429 with Retry-After header and X-RateLimit-Limit/Remaining/Reset headers; security headers present on every response: Strict-Transport-Security, Content-Security-Policy, X-Content-Type-Options=nosniff, X-Frame-Options=DENY, Referrer-Policy=strict-origin-when-cross-origin; integration tests verify each header and rate limit behavior
 
 - [ ] T018 Implement JSON schema validation plugin [FR-107]

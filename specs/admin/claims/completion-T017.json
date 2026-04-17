@@ -1,0 +1,24 @@
+{
+  "task_id": "T017",
+  "status": "complete",
+  "summary": "Implemented CORS, rate limiting, and security headers middleware with 16 integration tests",
+  "commands_run": [
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/security.ts",
+    "api/src/security.test.ts",
+    "specs/admin/claims/completion-T017.json"
+  ],
+  "files_modified": [
+    "api/src/config.ts",
+    "api/src/server.ts",
+    "api/src/server.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
