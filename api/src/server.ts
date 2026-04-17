@@ -64,6 +64,7 @@ import {
   findBalanceByVariantAndLocation,
   createInventoryAdjustment,
 } from "./db/queries/inventory.js";
+import { findActiveProductsWithDetails, findActiveProductBySlug } from "./db/queries/catalog.js";
 import {
   reserveInventory,
   consumeReservation,
@@ -1744,6 +1745,31 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         return reply.status(204).send();
       },
     );
+  }
+
+  // -------------------------------------------------------------------------
+  // Public catalog API — no auth required
+  // -------------------------------------------------------------------------
+
+  if (database) {
+    // GET /api/products — list active products with variants, media, availability
+    app.get("/api/products", async (_request, reply) => {
+      const products = await findActiveProductsWithDetails(database.db);
+      return reply.status(200).send({ products });
+    });
+
+    // GET /api/products/:slug — product detail by slug
+    app.get("/api/products/:slug", async (request, reply) => {
+      const { slug } = request.params as { slug: string };
+      const found = await findActiveProductBySlug(database.db, slug);
+      if (!found) {
+        return reply.status(404).send({
+          error: "ERR_NOT_FOUND",
+          message: "Product not found",
+        });
+      }
+      return reply.status(200).send({ product: found });
+    });
   }
 
   // -------------------------------------------------------------------------

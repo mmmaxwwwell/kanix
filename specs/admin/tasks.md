@@ -153,7 +153,7 @@
 - [x] T043 Implement low-stock alert [FR-038]
   Done when: when inventory adjustment or reservation causes available < safety_stock, notification queued; alert includes variant SKU, product title, available count, safety_stock threshold; integration test: set safety_stock=10 → adjust available to 5 → verify alert queued
 
-- [ ] T044 Implement public catalog API (no auth) [FR-001, FR-002] [produces: IC-009]
+- [x] T044 Implement public catalog API (no auth) [FR-001, FR-002] [produces: IC-009]
   Done when: GET /api/products returns active products with variants, media, pricing, availability; GET /api/products/:slug returns product detail with variant availability; response shape matches spec section 4; no auth required; products with status != active are excluded; integration tests: list products (only active), product detail with variants, out-of-stock variant flagged
 
 - [ ] T045 Implement customer address CRUD API [FR-067]

@@ -66,3 +66,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The adjustment flow already returns a `lowStock` boolean from `createInventoryAdjustment()`, so the alert trigger piggybacks on that flag — no extra DB query needed for adjustments
 - For reservations, `reserveInventory()` doesn't return the updated balance — call `findBalanceByVariantAndLocation()` after to check `available < safetyStock` and trigger the alert
 - The `LowStockAlertService` uses an in-memory queue exposed via `ServerInstance.lowStockAlertService` — tests access it directly to verify alerts were queued without needing a notification backend
+
+## T044 — Implement public catalog API
+- Public catalog routes go in server.ts without any auth middleware — they're just `app.get("/api/products", ...)` inside the `if (database)` guard, placed before the shutdown manager section
+- Inventory availability for the public API is computed by summing `inventoryBalance.available` across all locations per variant — for V1 there's only one location, but the query handles multiple
+- The `adminUser` schema uses `name` (not `displayName`) — check the actual Drizzle schema column names before writing test setup code

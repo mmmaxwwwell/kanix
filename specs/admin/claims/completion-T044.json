@@ -1,0 +1,23 @@
+{
+  "task_id": "T044",
+  "status": "complete",
+  "summary": "Implemented public catalog API: GET /api/products (list active products with variants, media, availability) and GET /api/products/:slug (product detail by slug) — no auth required, only active products/variants returned, out-of-stock flagged via inStock boolean",
+  "commands_run": [
+    {"command": "npx tsc --noEmit", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/catalog.ts",
+    "api/src/public-catalog.integration.test.ts",
+    "specs/admin/claims/completion-T044.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/index.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
