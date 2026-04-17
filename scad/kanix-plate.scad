@@ -10,7 +10,7 @@ belt_height = 51;      // mm (2" duty belt)
 belt_thickness = 6.5;  // mm
 
 // Plate dimensions
-plate_size = 51;       // mm, square mounting_plate
+plate_size = 52;       // mm, square mounting_plate
 plate_thickness = 5;   // mm
 
 // M5 clearance hole (5.5mm clears M5 threads without interference)
@@ -41,8 +41,8 @@ rx_wall_width = 2;
 tx_tip_cutoff = 1.5;
 
 module plate_body() {
-    translate([-plate_size/2, -plate_size/2, 0])
-        cube([plate_size, plate_size, plate_thickness]);
+    translate([0, 0, plate_thickness/2])
+    cube([plate_size, plate_size + 1, plate_thickness], center = true);
 }
 
 module bolt_hole() {
@@ -203,8 +203,8 @@ module latch_block_rx(){
             translate([-tx_tip_cutoff/2,0,-belt_thickness/4])
             cube([
                     side_locking_tab_depth - tx_tip_cutoff,
-                    bottom_block_length - rx_wall_width * 2,
-                    belt_thickness/2 + hinge_gap
+                    bottom_block_length - rx_wall_width * 2 + 1,
+                    belt_thickness/2 + hinge_gap+1
                 ],
                 center = true
             );
