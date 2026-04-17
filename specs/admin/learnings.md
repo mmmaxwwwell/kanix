@@ -82,3 +82,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Adding a method to `PaymentAdapter` interface requires updating all stub implementations across test files — the TypeScript compiler will catch missing methods but this creates cross-test-file changes
 - Use `COALESCE(SUM(...), 0)` when calculating total refunded to handle the case where no refunds exist yet — without COALESCE, the sum returns null which breaks the comparison
 - The refund `processRefund` function takes a `createStripeRefund` callback instead of the full adapter — this keeps the query layer decoupled from the adapter interface and makes unit testing easier
+
+## T053 — Implement order cancellation API (admin)
+- "Shipped" validation must check multiple shipping statuses beyond just "shipped" — `in_transit`, `out_for_delivery`, `delivered`, `delivery_exception`, and `returned` all indicate the order has left the warehouse
+- The cancel function passes the `PaymentAdapter` through the input rather than importing it at the query layer — this follows the existing DI pattern and keeps the query module testable without service-level dependencies
+- When an auto-formatter or linter runs on save, it can strip newly added imports if the code using them hasn't been saved yet — always add the import and its usage in the same edit to avoid this race condition

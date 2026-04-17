@@ -1046,6 +1046,78 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     );
 
     // -----------------------------------------------------------------------
+    // Order Cancellation
+    // -----------------------------------------------------------------------
+
+    // Cancel an order (admin)
+    app.post(
+      "/api/admin/orders/:id/cancel",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.ORDERS_CANCEL)],
+        schema: {
+          body: {
+            type: "object",
+            required: ["reason"],
+            properties: {
+              reason: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id: orderId } = request.params as { id: string };
+        const body = request.body as { reason: string };
+
+        const actorAdminUserId = request.adminContext?.adminUserId ?? "";
+
+        try {
+          const result = await cancelOrder(database.db, {
+            orderId,
+            reason: body.reason,
+            actorAdminUserId,
+            paymentAdapter,
+          });
+
+          // Set audit context for automatic audit logging
+          request.auditContext = {
+            action: "order.cancel",
+            entityType: "order",
+            entityId: orderId,
+            afterJson: {
+              reason: body.reason,
+              reservationsReleased: result.reservationsReleased,
+              refundInitiated: result.refundInitiated,
+              refundId: result.refundId,
+            },
+          };
+
+          return { ...result };
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_ORDER_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_ORDER_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_ORDER_ALREADY_SHIPPED") {
+            return reply.status(400).send({
+              error: "ERR_ORDER_ALREADY_SHIPPED",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_INVALID_TRANSITION") {
+            return reply.status(400).send({
+              error: "ERR_INVALID_TRANSITION",
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // -----------------------------------------------------------------------
     // Inventory Balances + Adjustments
     // -----------------------------------------------------------------------
 

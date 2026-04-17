@@ -1,0 +1,26 @@
+{
+  "task_id": "T053",
+  "status": "complete",
+  "summary": "Implemented POST /api/admin/orders/:id/cancel with shipped validation, reservation release, conditional refund, status transition, and audit logging",
+  "commands_run": [
+    {"command": "npx tsc --noEmit", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "npx vitest run src/order-state-machine.test.ts", "exit_code": 0},
+    {"command": "npx vitest run src/order-cancel.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/order-cancel.ts",
+    "api/src/order-cancel.integration.test.ts",
+    "specs/admin/claims/completion-T053.json"
+  ],
+  "files_modified": [
+    "api/src/server.ts",
+    "api/src/db/queries/index.ts",
+    "api/src/checkout.integration.test.ts",
+    "api/src/webhook.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

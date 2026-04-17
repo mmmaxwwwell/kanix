@@ -187,7 +187,7 @@
 - [x] T052 Implement refund API (admin) [FR-030] [P]
   Done when: POST /admin/orders/:id/refunds with amount + reason; validates amount <= remaining refundable; creates Stripe refund; updates payment_status (paid→partially_refunded or refunded); audit log with actor; integration tests: full refund; partial refund; over-refund rejected with ERR_REFUND_EXCEEDS_PAYMENT
 
-- [ ] T053 Implement order cancellation API (admin) [FR-024] [P]
+- [x] T053 Implement order cancellation API (admin) [FR-024] [P]
   Done when: POST /admin/orders/:id/cancel with reason; validates: not shipped (ERR_ORDER_ALREADY_SHIPPED); releases inventory reservations; initiates full refund if paid; order.status → canceled; audit log; integration tests: cancel unpaid → reservations released; cancel paid → refund + reservations released; cancel shipped → rejected
 
 - [ ] T054 Implement policy acknowledgment [FR-062, FR-063]
