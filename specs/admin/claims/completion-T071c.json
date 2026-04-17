@@ -1,0 +1,28 @@
+{
+  "task_id": "T071c",
+  "status": "complete",
+  "summary": "Implemented admin shipping settings APIs with GET/PATCH endpoints, admin_setting table, admin.settings.manage capability, and integration tests",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/migrations/changesets/010-admin-settings.xml",
+    "api/src/db/schema/setting.ts",
+    "api/src/db/queries/setting.ts",
+    "api/src/admin-settings.integration.test.ts",
+    "specs/admin/claims/completion-T071c.json"
+  ],
+  "files_modified": [
+    "api/src/auth/admin.ts",
+    "api/src/db/schema/index.ts",
+    "api/src/db/queries/index.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

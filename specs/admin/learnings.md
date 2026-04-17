@@ -38,3 +38,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Drizzle's `ilike` (from `drizzle-orm`) works for case-insensitive search on PostgreSQL — use `or(ilike(col1, pattern), ilike(col2, pattern))` for multi-column text search
 - Sub-resource endpoints (e.g., `/customers/:id/orders`) should check that the parent exists first and return 404 if not, rather than returning an empty array for a non-existent customer
 - The `listCustomers` query combines `sql.join(conditions, sql` AND `)` for the WHERE clause since conditions mix Drizzle helpers (eq, ilike, or) — this avoids needing `and()` with a spread of potentially undefined OR conditions
+
+## T071c — Implement admin settings APIs
+- No `admin_setting` table existed in the data model — created a generic key-value table (`key` TEXT PK, `value_json` JSONB, `updated_at`) to store settings like shipping config; this pattern supports future settings keys without schema changes
+- `ROLE_CAPABILITIES.super_admin` uses `Object.values(CAPABILITIES)` so new capability constants (like `SETTINGS_MANAGE`) are automatically included — no need to manually add them to the super_admin role
+- Drizzle's `onConflictDoUpdate` with `target: adminSetting.key` provides upsert for settings — first GET returns defaults from code (no row needed), first PATCH creates the row via upsert

@@ -10,4 +10,5 @@ export * from "./fulfillment.js";
 export * from "./support.js";
 export * from "./evidence.js";
 export * from "./contributor.js";
+export * from "./setting.js";
 // Note: policySnapshot and orderPolicyAcknowledgment are exported from evidence.js

@@ -214,3 +214,5 @@ export type {
   LinkDesignInput,
   SalesTrackingResult,
 } from "./contributor.js";
+export { getShippingSettings, updateShippingSettings } from "./setting.js";
+export type { ShippingSettings } from "./setting.js";

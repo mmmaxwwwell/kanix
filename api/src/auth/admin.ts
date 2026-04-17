@@ -192,6 +192,9 @@ export const CAPABILITIES = {
   // Admin management
   ADMIN_USERS_READ: "admin.users.read",
   ADMIN_USERS_MANAGE: "admin.users.manage",
+
+  // Settings
+  SETTINGS_MANAGE: "admin.settings.manage",
 } as const;
 
 // ---------------------------------------------------------------------------

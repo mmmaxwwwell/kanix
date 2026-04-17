@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="010-admin-settings" author="kanix">
+        <comment>
+            Create admin_setting table for key-value admin configuration.
+            Used for shipping settings and future admin-configurable options.
+        </comment>
+
+        <createTable tableName="admin_setting">
+            <column name="key" type="text">
+                <constraints primaryKey="true" nullable="false" />
+            </column>
+            <column name="value_json" type="jsonb">
+                <constraints nullable="false" />
+            </column>
+            <column name="updated_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false" />
+            </column>
+        </createTable>
+
+        <rollback>
+            <dropTable tableName="admin_setting" />
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

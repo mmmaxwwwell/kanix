@@ -310,7 +310,7 @@
 - [x] T071b Implement admin customer detail APIs
   Done when: GET /admin/customers with search/filter; GET /admin/customers/:id returns profile + stats; GET /admin/customers/:id/orders returns customer's orders; GET /admin/customers/:id/tickets returns customer's tickets; integration tests: create customer with orders and tickets → verify all sub-resource endpoints return correct data
 
-- [ ] T071c Implement admin settings APIs [P]
+- [x] T071c Implement admin settings APIs [P]
   Done when: GET /admin/settings/shipping returns shipping config (default carrier, service levels, label settings); PATCH /admin/settings/shipping updates config; permission: `admin.settings.manage`; integration test: read → update → read → verify change persisted
 
 - [ ] T072 Implement WebSocket server with auth [FR-081, FR-082, FR-083] [produces: IC-008]

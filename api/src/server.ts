@@ -222,6 +222,8 @@ import {
   getCustomerOrders,
   getCustomerTickets,
 } from "./db/queries/customer.js";
+import { getShippingSettings, updateShippingSettings } from "./db/queries/setting.js";
+import type { ShippingSettings } from "./db/queries/setting.js";
 import Stripe from "stripe";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { randomUUID } from "node:crypto";
@@ -6606,6 +6608,54 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         }
         const tickets = await getCustomerTickets(db, request.params.id);
         return { tickets };
+      },
+    );
+
+    // -----------------------------------------------------------------------
+    // Admin settings routes [T071c]
+    // -----------------------------------------------------------------------
+
+    // GET /api/admin/settings/shipping
+    app.get(
+      "/api/admin/settings/shipping",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SETTINGS_MANAGE)],
+      },
+      async () => {
+        return getShippingSettings(db);
+      },
+    );
+
+    // PATCH /api/admin/settings/shipping
+    app.patch(
+      "/api/admin/settings/shipping",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SETTINGS_MANAGE)],
+        schema: {
+          body: {
+            type: "object",
+            properties: {
+              defaultCarrier: { type: "string" },
+              serviceLevels: { type: "array", items: { type: "string" } },
+              labelFormat: { type: "string" },
+              labelSize: { type: "string" },
+              requireSignature: { type: "boolean" },
+            },
+            additionalProperties: false,
+          },
+        },
+      },
+      async (request) => {
+        const updates = request.body as Partial<ShippingSettings>;
+        const updated = await updateShippingSettings(db, updates);
+        request.auditContext = {
+          action: "settings_updated",
+          entityType: "setting",
+          entityId: "00000000-0000-0000-0000-000000000000",
+          beforeJson: null,
+          afterJson: updated,
+        };
+        return updated;
       },
     );
   }
