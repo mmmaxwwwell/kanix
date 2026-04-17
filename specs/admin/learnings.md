@@ -108,3 +108,6 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The `trackerId` needed for `adapter.getTracking()` is stored in `shippingLabelPurchase.rawPayloadJson` (the full `BuyLabelResult` object) — extract via `rawPayload.trackerId` rather than adding a new column
 - Use deterministic provider event IDs (`refresh-${occurredAt}-${status}`) for idempotency on refresh — this prevents duplicate events when refresh is called multiple times with the same tracking data
 - The refresh endpoint reuses `handleTrackingUpdate()` from the webhook handler to propagate status changes to both shipment and order — avoids duplicating the transition logic
+
+## T059c — Implement shipment mark-shipped API
+- The `transitionShipmentStatus` already sets `shippedAt` on transition to "shipped" — for a dedicated mark-shipped endpoint, a standalone `markShipmentShipped` function with explicit `ready`-only validation is cleaner than reusing the generic transition and gives better error messages
