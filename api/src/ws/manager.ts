@@ -285,10 +285,11 @@ export async function registerWebSocket(options: RegisterWsOptions): Promise<WsM
         };
 
         if (msg.action === "subscribe" && msg.entity && msg.entityId) {
-          if (role === "admin" || role === "customer") {
+          if (role === "admin") {
+            // Admins can subscribe to any channel
             conn.channels.add(`${msg.entity}:${msg.entityId}`);
           }
-          // Guests cannot dynamically subscribe
+          // Customers and guests cannot dynamically subscribe to arbitrary channels
         }
       } catch {
         // Ignore invalid messages
