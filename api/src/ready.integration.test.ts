@@ -5,6 +5,7 @@ import { createDatabaseConnection, type DatabaseConnection } from "./db/connecti
 import type { Config } from "./config.js";
 
 const DATABASE_URL = process.env["DATABASE_URL"];
+const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
@@ -16,7 +17,7 @@ function testConfig(overrides: Partial<Config> = {}): Config {
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     STRIPE_TAX_ENABLED: false,
     SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: "http://localhost:3567",
+    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
     EASYPOST_API_KEY: "test-key",
     GITHUB_OAUTH_CLIENT_ID: "test-id",
     GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
@@ -34,7 +35,7 @@ function createFakeProcess(): EventEmitter {
 // Skip integration tests when no database is available
 const describeWithDb = DATABASE_URL ? describe : describe.skip;
 
-describeWithDb("/ready endpoint with Postgres connectivity", () => {
+describeWithDb("/ready endpoint with Postgres and SuperTokens connectivity", () => {
   let serverClose: (() => Promise<void>) | undefined;
   let dbConn: DatabaseConnection | undefined;
   vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
@@ -51,7 +52,7 @@ describeWithDb("/ready endpoint with Postgres connectivity", () => {
     markNotReady();
   });
 
-  it("returns 200 when Postgres is connected", async () => {
+  it("returns 200 when Postgres and SuperTokens are connected", async () => {
     dbConn = createDatabaseConnection(DATABASE_URL ?? "");
     const fakeProcess = createFakeProcess();
     const server = await createServer({
@@ -73,7 +74,7 @@ describeWithDb("/ready endpoint with Postgres connectivity", () => {
     expect(body.status).toBe("ready");
   });
 
-  it("returns 503 with {dependencies: {database: 'down'}} when Postgres is unreachable", async () => {
+  it("returns 503 with database down when Postgres is unreachable", async () => {
     // Create a connection to a bogus URL that will fail connectivity checks
     dbConn = createDatabaseConnection("postgres://localhost:19999/nonexistent");
     const fakeProcess = createFakeProcess();
@@ -94,6 +95,31 @@ describeWithDb("/ready endpoint with Postgres connectivity", () => {
 
     const body = (await res.json()) as ReadyResponse;
     expect(body.status).toBe("not_ready");
-    expect(body.dependencies).toEqual({ database: "down" });
+    expect(body.dependencies?.database).toBe("down");
+  });
+
+  it("returns 503 with supertokens down when SuperTokens is unreachable", async () => {
+    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    const fakeProcess = createFakeProcess();
+    const server = await createServer({
+      config: testConfig({
+        SUPERTOKENS_CONNECTION_URI: "http://localhost:19999",
+      }),
+      processRef: fakeProcess as unknown as NodeJS.Process,
+      database: dbConn,
+    });
+
+    const address = await server.start();
+    serverClose = async () => {
+      await server.app.close();
+    };
+    markReady();
+
+    const res = await fetch(`${address}/ready`);
+    expect(res.status).toBe(503);
+
+    const body = (await res.json()) as ReadyResponse;
+    expect(body.status).toBe("not_ready");
+    expect(body.dependencies?.supertokens).toBe("down");
   });
 });

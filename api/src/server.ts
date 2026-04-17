@@ -18,6 +18,7 @@ import {
   createRequireAdmin,
   requireCapability,
   registerAdminAuditLog,
+  checkSuperTokensConnectivity,
   CAPABILITIES,
 } from "./auth/index.js";
 import type { GitHubUserFetcher } from "./auth/index.js";
@@ -41,7 +42,8 @@ export interface HealthResponse {
 export interface ReadyResponse {
   status: "ready" | "not_ready";
   dependencies?: {
-    database: "up" | "down";
+    database?: "up" | "down";
+    supertokens?: "up" | "down";
   };
 }
 
@@ -169,11 +171,18 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       return reply.status(503).send(response);
     }
 
-    const dbConnected = database ? await checkDatabaseConnectivity(database.db) : false;
-    if (!dbConnected) {
+    const [dbConnected, stConnected] = await Promise.all([
+      database ? checkDatabaseConnectivity(database.db) : Promise.resolve(false),
+      checkSuperTokensConnectivity(config.SUPERTOKENS_CONNECTION_URI),
+    ]);
+
+    if (!dbConnected || !stConnected) {
       const response: ReadyResponse = {
         status: "not_ready",
-        dependencies: { database: "down" },
+        dependencies: {
+          database: dbConnected ? "up" : "down",
+          supertokens: stConnected ? "up" : "down",
+        },
       };
       return reply.status(503).send(response);
     }

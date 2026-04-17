@@ -19,3 +19,4 @@ export {
 export type { AdminContext } from "./admin.js";
 export { registerAdminAuditLog } from "./audit-log.js";
 export type { AuditContext } from "./audit-log.js";
+export { checkSuperTokensConnectivity } from "./health.js";

@@ -128,7 +128,7 @@
 - [x] T036 Implement guest order → account linking [FR-066]
   Done when: on email verification, query orders by `order.email` column (where customer_id IS NULL) and set customer_id to the new account; integration test: create 3 guest orders with email `jane@example.com` → create account with same email → verify email → all 3 orders appear in customer's order list; orders now have customer_id set
 
-- [ ] T037 Update /ready to check SuperTokens connectivity [FR-103]
+- [x] T037 Update /ready to check SuperTokens connectivity [FR-103]
   Done when: /ready checks SuperTokens health endpoint; returns 503 if SuperTokens is down; integration test verifies
 
 ---

@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import {
   createServer,
@@ -9,6 +9,11 @@ import {
 } from "./server.js";
 import type { Config } from "./config.js";
 import type { DatabaseConnection } from "./db/connection.js";
+
+// Mock the SuperTokens health check for unit tests (no real SuperTokens running)
+vi.mock("./auth/health.js", () => ({
+  checkSuperTokensConnectivity: vi.fn().mockResolvedValue(true),
+}));
 
 /** Minimal config for testing — secrets don't matter for server skeleton. */
 function testConfig(overrides: Partial<Config> = {}): Config {
@@ -152,7 +157,7 @@ describe("server", () => {
 
       const body = response.json<ReadyResponse>();
       expect(body.status).toBe("not_ready");
-      expect(body.dependencies).toEqual({ database: "down" });
+      expect(body.dependencies).toEqual({ database: "down", supertokens: "up" });
     });
 
     it("returns 200 when marked ready and DB is connected", async () => {
@@ -168,6 +173,25 @@ describe("server", () => {
 
       const body = response.json<ReadyResponse>();
       expect(body.status).toBe("ready");
+    });
+
+    it("returns 503 with supertokens down when SuperTokens is unreachable", async () => {
+      const { checkSuperTokensConnectivity } = await import("./auth/health.js");
+      vi.mocked(checkSuperTokensConnectivity).mockResolvedValueOnce(false);
+
+      const { app } = await startServer({}, createFakeDatabase());
+      markReady();
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/ready",
+      });
+
+      expect(response.statusCode).toBe(503);
+
+      const body = response.json<ReadyResponse>();
+      expect(body.status).toBe("not_ready");
+      expect(body.dependencies).toEqual({ database: "up", supertokens: "down" });
     });
   });
 

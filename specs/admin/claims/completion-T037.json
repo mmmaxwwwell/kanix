@@ -1,0 +1,24 @@
+{
+  "task_id": "T037",
+  "status": "complete",
+  "summary": "Added SuperTokens connectivity check to /ready endpoint; returns 503 with {supertokens: 'down'} when SuperTokens is unreachable; unit and integration tests verify",
+  "commands_run": [
+    {"command": "pnpm test -- --run server.test.ts", "exit_code": 0},
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/auth/health.ts",
+    "specs/admin/claims/completion-T037.json"
+  ],
+  "files_modified": [
+    "api/src/auth/index.ts",
+    "api/src/server.ts",
+    "api/src/server.test.ts",
+    "api/src/ready.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

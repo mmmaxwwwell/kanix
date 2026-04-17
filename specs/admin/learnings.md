@@ -63,3 +63,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T036 — Implement guest order → account linking
 - SuperTokens `EmailVerification.init()` supports `override.apis.verifyEmailPOST` — use this to hook into the email verification flow and trigger guest order linking (the override only fires on HTTP API calls, not on `verifyEmailUsingToken` called directly)
 - To test email verification overrides in integration tests, create the verification token via `EmailVerification.createEmailVerificationToken()` then POST it to `/auth/user/email/verify` (the HTTP endpoint) — calling `verifyEmailUsingToken()` directly bypasses the API override
+
+## T037 — Update /ready to check SuperTokens connectivity
+- SuperTokens core exposes a `/hello` endpoint for health checks — use `fetch(connectionUri + "/hello")` with `AbortSignal.timeout(3000)` for a non-blocking connectivity check
+- When adding a new dependency check to `/ready`, unit tests that mock one dependency (e.g. DB) must also mock the new one — use `vi.mock("./auth/health.js")` to stub `checkSuperTokensConnectivity` in unit tests that don't have SuperTokens running
