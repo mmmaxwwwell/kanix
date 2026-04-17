@@ -87,3 +87,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T029 — Update /ready to check Postgres connectivity
 - When adding DB connectivity check to `/ready`, existing unit tests that don't provide a database connection will fail — use a fake `DatabaseConnection` with a mock `db.execute` to simulate a healthy DB in unit tests
 - The `checkDatabaseConnectivity` helper from `db/queries/health.ts` is reusable in both `/ready` and `/health` endpoints — no need to duplicate the `SELECT 1` logic
+
+## T030 — Critical path checkpoint (Phase 3)
+- Shutdown hooks close the DB connection, so the integration test must set `dbConn = undefined` after SIGTERM to avoid double-close in `afterEach`
+- The seed script sets product status to `"active"` — test assertions on seed data should check for `"active"` not `"draft"`

@@ -1,0 +1,14 @@
+{
+  "task_id": "T030",
+  "status": "complete",
+  "summary": "Integration test verifying full Phase 3 critical path: server boots, /health 200 (DB connected), /ready 200, seed data queryable via Drizzle, graceful SIGTERM shutdown",
+  "commands_run": [
+    {"command": "pnpm test -- --reporter=verbose src/critical-path.integration.test.ts", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm typecheck", "exit_code": 0}
+  ],
+  "files_created": ["api/src/critical-path.integration.test.ts", "specs/admin/claims/completion-T030.json"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

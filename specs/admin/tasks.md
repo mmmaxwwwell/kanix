@@ -103,7 +103,7 @@
 - [x] T029 Update /ready to check Postgres connectivity [FR-103]
   Done when: `GET /ready` returns 200 when Postgres is connected; returns 503 with `{dependencies: {database: "down"}}` when Postgres is unreachable; integration test verifies both states
 
-- [ ] T030 Critical path checkpoint (Phase 3) [Critical Path]
+- [x] T030 Critical path checkpoint (Phase 3) [Critical Path]
   Done when: integration test verifies: server boots → /health 200 → /ready 200 (DB connected) → seed data queryable via Drizzle → server shuts down cleanly
 
 ---
