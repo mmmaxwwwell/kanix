@@ -32,3 +32,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T077 — Implement admin dashboard screen
 - `FutureProvider.autoDispose` with `.overrideWith((_) => Future.value(data))` is the clean way to mock async data in widget tests — avoids Dio's pending timers which fail `flutter_test`'s invariant checks
 - Flutter test default surface is 800x600; with padding and grid layout, card cells can be as small as ~200x80 — use `mainAxisSize: MainAxisSize.min` and compact text styles (`bodySmall` not `titleSmall`) to avoid RenderFlex overflow in tests
+
+## T078 — Implement admin order management screens
+- For complex screens with TabBar, DataTable, and dialogs, set `tester.view.physicalSize = Size(1920, 1080)` and `devicePixelRatio = 1.0` in widget tests to avoid RenderFlex overflow on the default 800x600 surface — always call `addTearDown(() => tester.view.resetPhysicalSize())`
+- `DropdownButtonFormField` requires a `Material` ancestor — when testing screens that use it outside the app's `Scaffold` shell, wrap in `Scaffold(body: ...)` in the test
+- `FutureProvider.autoDispose.family` providers can be overridden per-key in tests: `orderDetailProvider('order-1').overrideWith((_) => Future.value(order))` — useful for testing detail screens with specific IDs

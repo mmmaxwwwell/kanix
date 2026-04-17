@@ -1,0 +1,27 @@
+{
+  "task_id": "T078",
+  "status": "complete",
+  "summary": "Implemented admin order management screens with list/filters, detail with 8 tabs, refund/cancel dialogs, WebSocket real-time updates, and 17 widget tests",
+  "commands_run": [
+    {"command": "flutter pub get", "exit_code": 0},
+    {"command": "flutter analyze", "exit_code": 0},
+    {"command": "FLUTTER_ROOT=.flutter-patched flutter test", "exit_code": 0}
+  ],
+  "files_created": [
+    "admin/lib/models/order.dart",
+    "admin/lib/providers/order_provider.dart",
+    "admin/lib/providers/websocket_provider.dart",
+    "admin/lib/screens/order_detail_screen.dart",
+    "admin/test/orders_screen_test.dart",
+    "admin/test/order_detail_screen_test.dart",
+    "specs/admin/claims/completion-T078.json"
+  ],
+  "files_modified": [
+    "admin/lib/config/router.dart",
+    "admin/lib/screens/orders_screen.dart",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

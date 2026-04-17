@@ -335,7 +335,7 @@
 - [x] T077 Implement admin dashboard screen
   Done when: dashboard shows operational counts (orders awaiting fulfillment, open tickets, low stock variants, open disputes, shipment exceptions); counts fetched from GET /admin/dashboard/summary; quick links to filtered views; widget tests verify layout and data display
 
-- [ ] T078 Implement admin order management screens
+- [x] T078 Implement admin order management screens
   Done when: order list with filters (status, payment, fulfillment, shipping, date range, search); order detail with tabs (summary, items, payment, fulfillment, shipping, support, evidence, audit); refund and cancel actions with confirmation dialogs; real-time updates via WebSocket; widget tests for list and detail
 
 - [ ] T079 Implement admin fulfillment + shipment screens
