@@ -76,3 +76,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Liquibase `splitStatements="true"` chokes on PL/pgSQL `$$` delimiters — use `splitStatements="false" stripComments="false"` for each `CREATE FUNCTION` block, then a separate `<sql>` block with `splitStatements="true"` for `CREATE TRIGGER` statements
 - Evidence auto-collection hooks are best placed inside existing query functions (e.g. `storeShipmentEvent`, `createTicketMessage`, `storePaymentEvent`, `createPolicyAcknowledgment`) wrapped in try/catch so they're non-fatal — this ensures all code paths that create these records automatically generate evidence without requiring callers to remember
 - The `evidenceRecord` table's `textContent` stores a JSON string (not raw text) for structured evidence data; `metadataJson` stores cross-reference IDs (e.g. `shipmentEventId`, `messageId`) for linking back to source records
+
+## T066 — Implement evidence bundle generation
+- The `evidenceBundle` schema already existed in `evidence.ts` — only the query functions (`generateEvidenceBundle`, `computeReadinessSummary`, `findDisputeById`), routes, and tests needed to be created
+- Bundle generation uses a two-layer pattern: the query layer creates the DB record and returns `_content`, then the route layer stores the content via `storageAdapter.put()` — this keeps the query layer storage-agnostic
+- Evidence completeness check uses all 5 `EVIDENCE_TYPES` as a hard requirement — the bundle generation rejects with `ERR_EVIDENCE_INCOMPLETE` and returns the readiness summary showing which types are missing

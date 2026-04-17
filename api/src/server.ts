@@ -179,6 +179,12 @@ import {
   MAX_ATTACHMENT_SIZE_BYTES,
 } from "./db/queries/support-ticket.js";
 import { createStorageAdapter, type StorageAdapter } from "./services/storage-adapter.js";
+import {
+  findEvidenceByOrderId,
+  computeReadinessSummary,
+  findDisputeById,
+  generateEvidenceBundle,
+} from "./db/queries/evidence.js";
 import Stripe from "stripe";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { randomUUID } from "node:crypto";
@@ -2771,6 +2777,100 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           }
           throw err;
         }
+      },
+    );
+
+    // -----------------------------------------------------------------------
+    // Dispute Evidence Bundle (T066 — FR-060, FR-061)
+    // -----------------------------------------------------------------------
+
+    // POST /api/admin/disputes/:id/generate-bundle — generate evidence bundle
+    app.post(
+      "/api/admin/disputes/:id/generate-bundle",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.DISPUTES_MANAGE)],
+      },
+      async (request, reply) => {
+        const { id: disputeId } = request.params as { id: string };
+
+        try {
+          const result = (await generateEvidenceBundle(database.db, disputeId)) as {
+            bundleId: string;
+            disputeId: string;
+            readiness: {
+              tracking_history_present: boolean;
+              delivery_proof_present: boolean;
+              customer_communication_present: boolean;
+              policy_acceptance_present: boolean;
+              payment_receipt_present: boolean;
+              complete: boolean;
+              missing_types: string[];
+            };
+            evidenceCount: number;
+            storageKey: string;
+            _content: unknown;
+          };
+
+          // Store the bundle content via storage adapter
+          const bundleBuffer = Buffer.from(JSON.stringify(result._content, null, 2), "utf-8");
+          await storageAdapter.put(result.storageKey, bundleBuffer, "application/json");
+
+          request.auditContext = {
+            action: "dispute.generate_bundle",
+            entityType: "dispute",
+            entityId: disputeId,
+            afterJson: {
+              bundleId: result.bundleId,
+              evidenceCount: result.evidenceCount,
+              storageKey: result.storageKey,
+            },
+          };
+
+          return {
+            bundle_id: result.bundleId,
+            dispute_id: result.disputeId,
+            evidence_count: result.evidenceCount,
+            storage_key: result.storageKey,
+            readiness: result.readiness,
+          };
+        } catch (err) {
+          const errObj = err as { code?: string; message?: string; readiness?: unknown };
+          if (errObj.code === "ERR_DISPUTE_NOT_FOUND") {
+            return reply.status(404).send({ error: errObj.code, message: errObj.message });
+          }
+          if (errObj.code === "ERR_EVIDENCE_INCOMPLETE") {
+            return reply.status(422).send({
+              error: errObj.code,
+              message: errObj.message,
+              readiness: errObj.readiness,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // GET /api/admin/disputes/:id/readiness — get evidence readiness summary
+    app.get(
+      "/api/admin/disputes/:id/readiness",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.DISPUTES_READ)],
+      },
+      async (request, reply) => {
+        const { id: disputeId } = request.params as { id: string };
+
+        const disputeRow = await findDisputeById(database.db, disputeId);
+        if (!disputeRow) {
+          return reply.status(404).send({
+            error: "ERR_DISPUTE_NOT_FOUND",
+            message: `Dispute ${disputeId} not found`,
+          });
+        }
+
+        const records = await findEvidenceByOrderId(database.db, disputeRow.orderId);
+        const readiness = computeReadinessSummary(records);
+
+        return { dispute_id: disputeId, readiness };
       },
     );
 

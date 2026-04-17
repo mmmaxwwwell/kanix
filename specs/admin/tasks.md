@@ -264,7 +264,7 @@
 - [x] T065 Implement evidence auto-collection [FR-058, FR-059, FR-062]
   Done when: on shipment tracking event → evidence_record (type=`tracking_history`); on shipment delivery confirmation → evidence_record (type=`delivery_proof`); on support_ticket_message creation → evidence_record (type=`customer_communication`); on payment_event creation → evidence_record (type=`payment_receipt`); on order_policy_acknowledgment creation → evidence_record (type=`policy_acceptance`); evidence_record table: no UPDATE/DELETE grants for app user (immutability enforced at DB level); integration test: complete order lifecycle → verify all 5 evidence types created; attempt UPDATE on evidence_record → fails
 
-- [ ] T066 Implement evidence bundle generation [FR-060, FR-061]
+- [x] T066 Implement evidence bundle generation [FR-060, FR-061]
   Done when: POST /admin/disputes/:id/generate-bundle compiles all evidence_record entries for the dispute's order into a downloadable package; dispute_readiness_summary computed: `tracking_history_present`, `delivery_proof_present`, `customer_communication_present`, `policy_acceptance_present`, `payment_receipt_present`; bundle cannot be generated if readiness is incomplete (missing types flagged); integration tests: complete evidence → bundle generated; incomplete evidence → readiness summary shows gaps
 
 ---

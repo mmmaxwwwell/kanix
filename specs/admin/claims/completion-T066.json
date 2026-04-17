@@ -1,0 +1,23 @@
+{
+  "task_id": "T066",
+  "status": "complete",
+  "summary": "Implemented evidence bundle generation with readiness summary computation, POST /admin/disputes/:id/generate-bundle route, GET /admin/disputes/:id/readiness route, and integration tests",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/evidence-bundle.integration.test.ts",
+    "specs/admin/claims/completion-T066.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/evidence.ts",
+    "api/src/server.ts",
+    "specs/admin/learnings.md",
+    "specs/admin/tasks.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
