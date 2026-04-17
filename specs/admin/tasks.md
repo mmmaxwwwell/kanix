@@ -332,7 +332,7 @@
 - [x] T076 Initialize Flutter admin app with Riverpod + Dio + GoRouter [P]
   Done when: `flutter run` launches admin app; GoRouter configured with route groups from spec (dashboard, orders, fulfillment, shipments, inventory, products, support, disputes, customers, settings); Riverpod providers for auth state; Dio configured with base URL + auth interceptor; admin login screen works against SuperTokens
 
-- [ ] T077 Implement admin dashboard screen
+- [x] T077 Implement admin dashboard screen
   Done when: dashboard shows operational counts (orders awaiting fulfillment, open tickets, low stock variants, open disputes, shipment exceptions); counts fetched from GET /admin/dashboard/summary; quick links to filtered views; widget tests verify layout and data display
 
 - [ ] T078 Implement admin order management screens

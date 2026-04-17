@@ -1,0 +1,21 @@
+{
+  "task_id": "T077",
+  "status": "complete",
+  "summary": "Implemented admin dashboard screen with 5 operational count cards (orders awaiting fulfillment, open tickets, low stock variants, open disputes, shipment exceptions) fetched from GET /admin/dashboard/summary, with quick links to filtered views and widget tests verifying layout and data display",
+  "commands_run": [
+    {"command": "flutter pub get", "exit_code": 0},
+    {"command": "FLUTTER_ROOT=.flutter-patched flutter test", "exit_code": 0}
+  ],
+  "files_created": [
+    "admin/lib/providers/dashboard_provider.dart",
+    "admin/test/dashboard_screen_test.dart",
+    "specs/admin/claims/completion-T077.json"
+  ],
+  "files_modified": [
+    "admin/lib/screens/dashboard_screen.dart",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
