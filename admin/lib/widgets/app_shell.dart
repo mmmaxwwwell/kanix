@@ -138,8 +138,13 @@ class AppShell extends ConsumerWidget {
 
   int _selectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
+    // Exact match first, then prefix match for detail routes (e.g. /orders/123)
     final index = _routes.indexOf(location);
-    return index >= 0 ? index : 0;
+    if (index >= 0) return index;
+    for (var i = 0; i < _routes.length; i++) {
+      if (location.startsWith('${_routes[i]}/')) return i;
+    }
+    return 0;
   }
 
   void _onDestinationSelected(BuildContext context, int index) {

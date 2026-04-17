@@ -871,6 +871,27 @@ class _MediaSection extends ConsumerWidget {
 
   Future<void> _deleteMedia(
       BuildContext context, WidgetRef ref, String mediaId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove Media'),
+        content: const Text('Are you sure you want to remove this media?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
     try {
       final dio = ref.read(dioProvider);
       await dio.delete(
