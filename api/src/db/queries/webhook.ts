@@ -6,6 +6,10 @@ import { transitionOrderStatus } from "./order-state-machine.js";
 import { consumeReservation, releaseReservation, reserveInventory } from "./reservation.js";
 import type { AdminAlertService } from "../../services/admin-alert.js";
 
+function isTransitionError(err: unknown): boolean {
+  return (err as { code?: string })?.code === "ERR_INVALID_TRANSITION";
+}
+
 // ---------------------------------------------------------------------------
 // Idempotency check
 // ---------------------------------------------------------------------------
@@ -128,7 +132,8 @@ export async function handlePaymentSucceeded(
       newValue: "processing",
       reason: "Payment processing (webhook: payment_intent.succeeded)",
     });
-  } catch {
+  } catch (err: unknown) {
+    if (!isTransitionError(err)) throw err;
     // Already in processing or paid — continue
   }
 
@@ -139,7 +144,8 @@ export async function handlePaymentSucceeded(
       newValue: "paid",
       reason: "Payment succeeded (webhook: payment_intent.succeeded)",
     });
-  } catch {
+  } catch (err: unknown) {
+    if (!isTransitionError(err)) throw err;
     // Already paid — idempotent
   }
 
@@ -162,7 +168,8 @@ export async function handlePaymentSucceeded(
   for (const res of activeReservations) {
     try {
       await consumeReservation(db, res.id);
-    } catch {
+    } catch (err: unknown) {
+      if (!isTransitionError(err)) throw err;
       // Already consumed — idempotent
     }
   }
@@ -225,7 +232,8 @@ export async function handlePaymentSucceeded(
     for (const rid of newReservationIds) {
       try {
         await consumeReservation(db, rid);
-      } catch {
+      } catch (err: unknown) {
+        if (!isTransitionError(err)) throw err;
         // Already consumed — idempotent
       }
     }
@@ -239,7 +247,8 @@ export async function handlePaymentSucceeded(
       newValue: "confirmed",
       reason: "Payment confirmed (webhook: payment_intent.succeeded)",
     });
-  } catch {
+  } catch (err: unknown) {
+    if (!isTransitionError(err)) throw err;
     // Already confirmed — idempotent
   }
 }
@@ -267,7 +276,8 @@ export async function handlePaymentFailed(
       newValue: "processing",
       reason: "Payment attempted (webhook: payment_intent.payment_failed)",
     });
-  } catch {
+  } catch (err: unknown) {
+    if (!isTransitionError(err)) throw err;
     // Already in processing or failed — continue
   }
 
@@ -278,7 +288,8 @@ export async function handlePaymentFailed(
       newValue: "failed",
       reason: "Payment failed (webhook: payment_intent.payment_failed)",
     });
-  } catch {
+  } catch (err: unknown) {
+    if (!isTransitionError(err)) throw err;
     // Already failed — idempotent
   }
 
@@ -296,7 +307,8 @@ export async function handlePaymentFailed(
   for (const res of reservations) {
     try {
       await releaseReservation(db, res.id);
-    } catch {
+    } catch (err: unknown) {
+      if (!isTransitionError(err)) throw err;
       // Already released — idempotent
     }
   }
@@ -322,7 +334,8 @@ export async function handleChargeRefunded(
       newValue: newStatus,
       reason: `Refund processed: ${refundAmountMinor} cents (webhook: charge.refunded)`,
     });
-  } catch {
+  } catch (err: unknown) {
+    if (!isTransitionError(err)) throw err;
     // Already in target state — idempotent
   }
 }
@@ -364,7 +377,8 @@ export async function handleDisputeCreated(
       newValue: "disputed",
       reason: `Dispute opened: ${disputeData.providerDisputeId} (webhook: charge.dispute.created)`,
     });
-  } catch {
+  } catch (err: unknown) {
+    if (!isTransitionError(err)) throw err;
     // Already disputed — idempotent
   }
 }

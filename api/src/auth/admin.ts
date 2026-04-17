@@ -161,6 +161,7 @@ export function requireCapability(capability: string) {
 export const CAPABILITIES = {
   // Orders
   ORDERS_READ: "orders.read",
+  ORDERS_MANAGE: "orders.manage",
   ORDERS_REFUND: "orders.refund",
   ORDERS_CANCEL: "orders.cancel",
 

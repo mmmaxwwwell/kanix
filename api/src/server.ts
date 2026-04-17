@@ -876,7 +876,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     app.post(
       "/api/admin/orders/:id/transition",
       {
-        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.ORDERS_READ)],
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.ORDERS_MANAGE)],
         schema: {
           body: {
             type: "object",
@@ -900,11 +900,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           reason?: string;
         };
 
-        // Resolve admin user ID from request context
-        const adminContext = (request as unknown as Record<string, unknown>).adminContext as
-          | { adminUser: { id: string } }
-          | undefined;
-        const actorAdminUserId = adminContext?.adminUser?.id;
+        const actorAdminUserId = request.adminContext?.adminUserId ?? "";
 
         try {
           const result = await transitionOrderStatus(database.db, {

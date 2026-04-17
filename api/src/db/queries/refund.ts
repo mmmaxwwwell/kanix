@@ -169,7 +169,9 @@ export async function processRefund(
       reason: `Admin refund: ${input.amountMinor} cents — ${input.reason}`,
       actorAdminUserId: input.actorAdminUserId,
     });
-  } catch {
+  } catch (err: unknown) {
+    const e = err as { code?: string };
+    if (e?.code !== "ERR_INVALID_TRANSITION") throw err;
     // Already in target state — idempotent
   }
 
