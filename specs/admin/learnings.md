@@ -96,3 +96,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The `blocked → canceled` transition was not in the original state machine (`blocked` only allowed recovery to ACTIVE_STATES) — added `canceled` to blocked transitions since tasks should be cancelable from blocked state
 - The `fulfillment_task.assigned_admin_user_id` and `inventory_adjustment.actor_admin_user_id` both have real FK constraints to `admin_user` — test code must insert a real `admin_user` record rather than using fake UUIDs like `00000000-...01`
 - `POST_PICKING_STATES` (picked, packing, packed, shipment_pending) determines whether auto-inventory return happens on cancel — `picking` state itself is excluded since items haven't been fully picked yet
+
+## T066d — Implement shipping edge cases
+- `buyShipmentLabel` transitions to `label_pending` before calling `adapter.buyLabel()` — wrapping the adapter call in try/catch with `ERR_LABEL_PURCHASE_FAILED` keeps shipment in `label_pending` on failure without needing rollback
+- `handleTrackingUpdate` accepts an optional `AdminAlertService` parameter — all callers (webhook handler, refreshShipmentTracking, transition route) must pass it through for delivery exception alerts to fire
+- The `exception → in_transit` recovery transition was already in the state machine from T058 — no schema or state machine changes needed, just test coverage

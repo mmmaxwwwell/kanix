@@ -1815,6 +1815,13 @@ export async function createServer(options: CreateServerOptions): Promise<Server
               message: error.message,
             });
           }
+          if (error.code === "ERR_LABEL_PURCHASE_FAILED") {
+            return reply.status(502).send({
+              error: "ERR_LABEL_PURCHASE_FAILED",
+              message: error.message,
+              shipmentStatus: (err as { shipmentStatus?: string }).shipmentStatus,
+            });
+          }
           throw err;
         }
       },
@@ -1844,6 +1851,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
               status: result.shipment.status,
               refunded: result.refunded,
               refundedCostMinor: result.refundedCostMinor,
+              labelCostCredited: result.labelCostCredited,
             },
           };
 
@@ -1937,7 +1945,12 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         const { id } = request.params as { id: string };
 
         try {
-          const result = await refreshShipmentTracking(database.db, id, shippingAdapter);
+          const result = await refreshShipmentTracking(
+            database.db,
+            id,
+            shippingAdapter,
+            adminAlertService,
+          );
 
           request.auditContext = {
             action: "shipment.refresh_tracking",
@@ -5859,7 +5872,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         });
 
         // Update shipment and order status
-        await handleTrackingUpdate(db, shipmentRecord, tracker.status);
+        await handleTrackingUpdate(db, shipmentRecord, tracker.status, adminAlertService);
 
         return reply.status(200).send({ received: true });
       },

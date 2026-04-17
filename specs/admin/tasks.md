@@ -278,7 +278,7 @@
 - [x] T066c Implement fulfillment edge case handling [FR-E013, FR-E023, FR-E024]
   Done when: fulfillment_task.status `blocked` transition available from any active state with required `reason` field; unblock transitions back to previous active state; if inventory discrepancy found during picking, admin can block task and trigger inventory adjustment; if task canceled after picking, auto-create inventory adjustment to return picked items to available stock; integration tests: picking → blocked (reason: missing_inventory) → adjustment → unblock → picking; cancel after picking → verify auto-adjustment returns items to available
 
-- [ ] T066d Implement shipping edge cases [FR-E025, FR-E026, FR-E027]
+- [x] T066d Implement shipping edge cases [FR-E025, FR-E026, FR-E027]
   Done when: EasyPost label purchase failure returns clear error and shipment remains in `label_pending`; delivery_exception shipment_event creates admin alert; exception → in_transit recovery transition supported; void-label refunds/credits label cost if applicable; integration tests: simulate label failure → verify error + no status change; delivery exception → alert fired; exception recovery; void → cost credited
 
 ---

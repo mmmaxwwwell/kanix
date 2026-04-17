@@ -1,0 +1,23 @@
+{
+  "task_id": "T066d",
+  "status": "complete",
+  "summary": "Implement shipping edge cases: label purchase failure handling (ERR_LABEL_PURCHASE_FAILED keeps shipment in label_pending), delivery exception admin alerts via AdminAlertService, exception→in_transit recovery transition support, and void-label cost credit (labelCostCredited field)",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/shipping-edge-cases.integration.test.ts",
+    "specs/admin/claims/completion-T066d.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/shipment.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

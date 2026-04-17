@@ -15,6 +15,7 @@ import type {
 } from "../../services/shipping-adapter.js";
 import { transitionOrderStatus, findOrderById } from "./order-state-machine.js";
 import { createEvidenceRecord } from "./evidence.js";
+import type { AdminAlertService } from "../../services/admin-alert.js";
 
 // ---------------------------------------------------------------------------
 // Shipment status values and state machine (6.E)
@@ -297,7 +298,19 @@ export async function buyShipmentLabel(
   }
 
   // Buy the label via the shipping adapter
-  const labelResult = await adapter.buyLabel(input.providerShipmentId, input.rateId);
+  let labelResult: BuyLabelResult;
+  try {
+    labelResult = await adapter.buyLabel(input.providerShipmentId, input.rateId);
+  } catch (adapterErr: unknown) {
+    // Label purchase failed — shipment stays in label_pending
+    const msg = adapterErr instanceof Error ? adapterErr.message : "Label purchase failed";
+    throw {
+      code: "ERR_LABEL_PURCHASE_FAILED",
+      message: msg,
+      shipmentId: input.shipmentId,
+      shipmentStatus: "label_pending",
+    };
+  }
 
   // Record the purchase and update shipment in a transaction
   return db.transaction(async (tx) => {
@@ -381,6 +394,7 @@ export async function voidShipmentLabel(
   shipment: ShipmentRecord;
   refunded: boolean;
   refundedCostMinor: number | null;
+  labelCostCredited: boolean;
 }> {
   // Look up the shipment
   const [current] = await db
@@ -454,6 +468,7 @@ export async function voidShipmentLabel(
     shipment: updated,
     refunded,
     refundedCostMinor,
+    labelCostCredited: refunded && refundedCostMinor != null && refundedCostMinor > 0,
   };
 }
 
@@ -832,6 +847,7 @@ export async function handleTrackingUpdate(
   db: PostgresJsDatabase,
   shipmentRecord: ShipmentRecord,
   easypostStatus: string,
+  adminAlertService?: AdminAlertService,
 ): Promise<{ shipmentTransitioned: boolean; orderTransitioned: boolean; orderCompleted: boolean }> {
   let shipmentTransitioned = false;
   let orderTransitioned = false;
@@ -846,6 +862,21 @@ export async function handleTrackingUpdate(
       if (!isTransitionError(err)) throw err;
       // Already in target state or invalid transition — skip
     }
+  }
+
+  // 1b. Fire admin alert on delivery exception
+  if (newShipmentStatus === "exception" && shipmentTransitioned && adminAlertService) {
+    adminAlertService.queue({
+      type: "delivery_exception",
+      orderId: shipmentRecord.orderId,
+      message: `Delivery exception for shipment ${shipmentRecord.shipmentNumber} (tracking: ${shipmentRecord.trackingNumber ?? "unknown"})`,
+      details: {
+        shipmentId: shipmentRecord.id,
+        shipmentNumber: shipmentRecord.shipmentNumber,
+        trackingNumber: shipmentRecord.trackingNumber,
+        easypostStatus,
+      },
+    });
   }
 
   // 2. Propagate to order.shipping_status (non-delivered events use direct transition)
@@ -888,6 +919,7 @@ export async function refreshShipmentTracking(
   db: PostgresJsDatabase,
   shipmentId: string,
   adapter: ShippingAdapter,
+  adminAlertService?: AdminAlertService,
 ): Promise<{
   shipment: ShipmentRecord;
   tracking: TrackingResult;
@@ -979,7 +1011,12 @@ export async function refreshShipmentTracking(
   let orderTransitioned = false;
 
   if (tracking.status && tracking.status !== "unknown") {
-    const result = await handleTrackingUpdate(db, shipmentRecord, tracking.status);
+    const result = await handleTrackingUpdate(
+      db,
+      shipmentRecord,
+      tracking.status,
+      adminAlertService,
+    );
     shipmentTransitioned = result.shipmentTransitioned;
     orderTransitioned = result.orderTransitioned;
   }
