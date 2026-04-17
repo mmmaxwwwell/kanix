@@ -307,7 +307,7 @@
 - [x] T071a Implement admin dashboard summary API
   Done when: GET /admin/dashboard/summary returns `{ordersAwaitingFulfillment, openSupportTickets, lowStockVariants, openDisputes, shipmentsWithExceptions}`; counts computed from current DB state; GET /admin/dashboard/alerts returns actionable alerts (expiring reservations, disputes nearing due_by, cert expiry warnings); integration tests: seed data with known counts → verify summary matches
 
-- [ ] T071b Implement admin customer detail APIs
+- [x] T071b Implement admin customer detail APIs
   Done when: GET /admin/customers with search/filter; GET /admin/customers/:id returns profile + stats; GET /admin/customers/:id/orders returns customer's orders; GET /admin/customers/:id/tickets returns customer's tickets; integration tests: create customer with orders and tickets → verify all sub-resource endpoints return correct data
 
 - [ ] T071c Implement admin settings APIs [P]

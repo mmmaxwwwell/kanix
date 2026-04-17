@@ -33,3 +33,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Dashboard routes don't need a specific capability — any authenticated admin can view them (using `[verifySession, requireAdmin]` without `requireCapability`)
 - The `dispute` table lives in `payment.ts` schema (not a separate `dispute.ts`), and `shipment` lives in `fulfillment.ts` — these were the two schemas that differed from the expected file naming pattern
 - Fastify route handlers with no request/reply usage should use `async () =>` (not `async (_request, _reply) =>`) to avoid ESLint `no-unused-vars` errors
+
+## T071b — Implement admin customer detail APIs
+- Drizzle's `ilike` (from `drizzle-orm`) works for case-insensitive search on PostgreSQL — use `or(ilike(col1, pattern), ilike(col2, pattern))` for multi-column text search
+- Sub-resource endpoints (e.g., `/customers/:id/orders`) should check that the parent exists first and return 404 if not, rather than returning an empty array for a non-existent customer
+- The `listCustomers` query combines `sql.join(conditions, sql` AND `)` for the WHERE clause since conditions mix Drizzle helpers (eq, ilike, or) — this avoids needing `and()` with a spread of potentially undefined OR conditions

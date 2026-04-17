@@ -216,6 +216,12 @@ import {
   MILESTONE_TYPES,
 } from "./db/queries/contributor.js";
 import { getDashboardSummary, getDashboardAlerts } from "./db/queries/dashboard.js";
+import {
+  listCustomers,
+  getCustomerDetail,
+  getCustomerOrders,
+  getCustomerTickets,
+} from "./db/queries/customer.js";
 import Stripe from "stripe";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { randomUUID } from "node:crypto";
@@ -6525,6 +6531,81 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       async () => {
         const alerts = await getDashboardAlerts(db);
         return { alerts };
+      },
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Admin customer detail routes [T071b]
+  // -------------------------------------------------------------------------
+
+  if (database) {
+    const db = database.db;
+    const requireAdmin = createRequireAdmin(db);
+
+    // GET /api/admin/customers
+    app.get<{
+      Querystring: { search?: string; status?: string; limit?: string; offset?: string };
+    }>(
+      "/api/admin/customers",
+      {
+        preHandler: [verifySession, requireAdmin],
+      },
+      async (request) => {
+        const { search, status, limit, offset } = request.query;
+        return listCustomers(db, {
+          search,
+          status,
+          limit: limit ? parseInt(limit, 10) : undefined,
+          offset: offset ? parseInt(offset, 10) : undefined,
+        });
+      },
+    );
+
+    // GET /api/admin/customers/:id
+    app.get<{ Params: { id: string } }>(
+      "/api/admin/customers/:id",
+      {
+        preHandler: [verifySession, requireAdmin],
+      },
+      async (request, reply) => {
+        const detail = await getCustomerDetail(db, request.params.id);
+        if (!detail) {
+          return reply.status(404).send({ error: "Customer not found" });
+        }
+        return detail;
+      },
+    );
+
+    // GET /api/admin/customers/:id/orders
+    app.get<{ Params: { id: string } }>(
+      "/api/admin/customers/:id/orders",
+      {
+        preHandler: [verifySession, requireAdmin],
+      },
+      async (request, reply) => {
+        const detail = await getCustomerDetail(db, request.params.id);
+        if (!detail) {
+          return reply.status(404).send({ error: "Customer not found" });
+        }
+        const orders = await getCustomerOrders(db, request.params.id);
+        return { orders };
+      },
+    );
+
+    // GET /api/admin/customers/:id/tickets
+    app.get<{ Params: { id: string } }>(
+      "/api/admin/customers/:id/tickets",
+      {
+        preHandler: [verifySession, requireAdmin],
+      },
+      async (request, reply) => {
+        const detail = await getCustomerDetail(db, request.params.id);
+        if (!detail) {
+          return reply.status(404).send({ error: "Customer not found" });
+        }
+        const tickets = await getCustomerTickets(db, request.params.id);
+        return { tickets };
       },
     );
   }

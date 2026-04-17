@@ -1,0 +1,22 @@
+{
+  "task_id": "T071b",
+  "status": "complete",
+  "summary": "Implemented admin customer detail APIs: GET /admin/customers (search/filter/paginate), GET /admin/customers/:id (profile + stats), GET /admin/customers/:id/orders, GET /admin/customers/:id/tickets with integration tests",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm test -- --run --exclude '**/*.integration.test.ts'", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/customer.ts",
+    "api/src/admin-customers.integration.test.ts",
+    "specs/admin/claims/completion-T071b.json"
+  ],
+  "files_modified": [
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
