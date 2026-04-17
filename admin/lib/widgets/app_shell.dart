@@ -107,7 +107,7 @@ class AppShell extends ConsumerWidget {
               NavigationRailDestination(
                 icon: Icon(Icons.people_outlined),
                 selectedIcon: Icon(Icons.people),
-                label: Text('Customers'),
+                label: Text('Contributors'),
               ),
               NavigationRailDestination(
                 icon: Icon(Icons.settings_outlined),
@@ -132,7 +132,7 @@ class AppShell extends ConsumerWidget {
     '/products',
     '/support',
     '/disputes',
-    '/customers',
+    '/contributors',
     '/settings',
   ];
 

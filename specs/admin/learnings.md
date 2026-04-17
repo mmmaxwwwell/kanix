@@ -52,3 +52,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - DataTable with 7+ columns overflows on 800x600 test surface — set `tester.view.physicalSize = Size(1920, 1080)` for all tests that render data rows (not just detail screens)
 - Dart 3.x `unnecessary_underscores` lint: use `(_, _)` not `(_, __)` for unused parameters — double underscore is no longer needed for disambiguation
 - `ListView.separated` in a message thread needs an `Expanded` parent to get unbounded height constraints — without it, the ListView will throw "Vertical viewport was given unbounded height"
+
+## T082 — Implement admin settings + contributor management screens
+- `DefaultTabController` with `TabBar` + `TabBarView` works well for settings screens with multiple sections — wrap in `Column` with `Expanded` around `TabBarView` to avoid unbounded height
+- When replacing a placeholder screen (e.g. `CustomersScreen` → `ContributorsScreen`), update all three: the router import/route, the `AppShell` navigation label, and the `_routes` list for index mapping

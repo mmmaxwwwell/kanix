@@ -19,7 +19,8 @@ import '../screens/support_screen.dart'
     show SupportScreen, SupportDetailScreen;
 import '../screens/disputes_screen.dart'
     show DisputesScreen, DisputeDetailScreen;
-import '../screens/customers_screen.dart';
+import '../screens/contributors_screen.dart'
+    show ContributorsScreen, ContributorDetailScreen;
 import '../screens/settings_screen.dart';
 import '../widgets/app_shell.dart';
 
@@ -142,8 +143,16 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           GoRoute(
-            path: '/customers',
-            builder: (context, state) => const CustomersScreen(),
+            path: '/contributors',
+            builder: (context, state) => const ContributorsScreen(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (context, state) => ContributorDetailScreen(
+                  contributorId: state.pathParameters['id']!,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: '/settings',

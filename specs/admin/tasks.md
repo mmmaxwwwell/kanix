@@ -347,7 +347,7 @@
 - [x] T081 Implement admin support + dispute screens
   Done when: ticket queue with filters; ticket detail with message thread + internal notes; dispute detail with evidence readiness, bundle generation; widget tests
 
-- [ ] T082 Implement admin settings + contributor management screens
+- [x] T082 Implement admin settings + contributor management screens
   Done when: admin user management; role/permission configuration; contributor list with royalty status; widget tests
 
 ---
