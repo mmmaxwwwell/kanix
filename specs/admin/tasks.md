@@ -291,7 +291,7 @@
 - [x] T068 Implement per-design sales tracking [FR-070]
   Done when: on order completion (order.status → completed), for each order_line, find contributor_design by product_id; increment sales count; create contributor_royalty entry with status=accrued if contributor has crossed 25-unit threshold; integration test: complete order with contributor-designed product → sales count incremented
 
-- [ ] T069 Implement royalty calculation engine [FR-071, FR-072, FR-076]
+- [x] T069 Implement royalty calculation engine [FR-071, FR-072, FR-076]
   Done when: when a contributor's cumulative sales for a design cross 25 units, royalty entries are created retroactively for units 1-25 at 10% of unit_price_minor; subsequent sales auto-create royalty entries; 501(c)(3) donation option at 2x rate (20%) with charity_name and charity_ein; refund clawback: contributor_royalty status → clawed_back; integration tests: 25th sale triggers retroactive royalty for 1-25; 26th sale creates single royalty; refund → clawback; donation at 20%
 
 - [ ] T070 Implement milestone tracking + tax documents [FR-073, FR-074]

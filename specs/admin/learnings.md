@@ -68,3 +68,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The `contributor_design` table needed a `sales_count` column (migration 008) — the data-model.md doesn't specify it, but the task requires "increment sales count" which implies a mutable counter
 - `processOrderCompletionSales` resolves product_id via `order_line.variant_id → product_variant.product_id → contributor_design.product_id`; the `order_line` table doesn't store product_id directly
 - The contributor.ts query file was pre-populated with imports for `order`, `orderLine`, `productVariant`, `sql`, `sum` from T067 — these were set up in anticipation of T068's sales tracking needs
+
+## T069 — Implement royalty calculation engine
+- Retroactive royalties must include the current order line (the one that crosses the threshold) since the order is already "completed" when `processOrderCompletionSales` runs — attempting a separate insert for the current line after `createRetroactiveRoyalties` causes a UNIQUE constraint violation on `order_line_id`
+- The 501(c)(3) donation option is stored as `charity_name` + `charity_ein` on the `contributor` table (migration 009); when both are non-null, `getRoyaltyRate()` returns `DONATION_RATE` (20%) instead of `ROYALTY_RATE` (10%)
+- The `contributor_royalty.order_line_id` UNIQUE constraint means royalty entries are strictly 1:1 with order lines — the `clawbackRoyaltyByOrderLine` function is the natural way to handle refunds since each order line maps to exactly one royalty

@@ -200,8 +200,12 @@ export {
   listDesignsByContributor,
   getDesignSalesCount,
   processOrderCompletionSales,
+  clawbackRoyaltyByOrderLine,
+  clawbackRoyaltiesByOrderId,
+  setContributorDonation,
   ROYALTY_ACTIVATION_THRESHOLD,
   ROYALTY_RATE,
+  DONATION_RATE,
 } from "./contributor.js";
 export type {
   CreateContributorInput,

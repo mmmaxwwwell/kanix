@@ -14,6 +14,8 @@ export const contributor = pgTable("contributor", {
   customerId: uuid("customer_id").references(() => customer.id),
   claAcceptedAt: timestamp("cla_accepted_at", { withTimezone: true }),
   status: text().notNull().default("pending"),
+  charityName: text("charity_name"),
+  charityEin: text("charity_ein"),
 });
 
 // ---------------------------------------------------------------------------

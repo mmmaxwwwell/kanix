@@ -1,0 +1,25 @@
+{
+  "task_id": "T069",
+  "status": "complete",
+  "summary": "Implemented royalty calculation engine with retroactive royalty creation on 25-unit threshold crossing, 501(c)(3) donation option at 20% rate, and refund clawback functionality",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm db:migrate", "exit_code": 0},
+    {"command": "npx vitest run src/royalty-engine.integration.test.ts", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/migrations/changesets/009-contributor-donation-fields.xml",
+    "api/src/royalty-engine.integration.test.ts"
+  ],
+  "files_modified": [
+    "api/src/db/schema/contributor.ts",
+    "api/src/db/queries/contributor.ts",
+    "api/src/db/queries/index.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

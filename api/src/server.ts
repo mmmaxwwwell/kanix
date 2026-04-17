@@ -198,6 +198,9 @@ import {
   linkContributorDesign,
   listDesignsByContributor,
   processOrderCompletionSales,
+  clawbackRoyaltyByOrderLine,
+  clawbackRoyaltiesByOrderId,
+  setContributorDonation,
 } from "./db/queries/contributor.js";
 import Stripe from "stripe";
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -6053,6 +6056,133 @@ export async function createServer(options: CreateServerOptions): Promise<Server
 
         const designs = await listDesignsByContributor(db, id);
         return { designs };
+      },
+    );
+
+    // PUT /api/admin/contributors/:id/donation — configure 501(c)(3) donation [FR-076]
+    app.put(
+      "/api/admin/contributors/:id/donation",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.CONTRIBUTORS_MANAGE),
+        ],
+        schema: {
+          body: {
+            type: "object",
+            required: ["charity_name", "charity_ein"],
+            properties: {
+              charity_name: { type: "string" },
+              charity_ein: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { charity_name: string; charity_ein: string };
+
+        const contrib = await findContributorById(db, id);
+        if (!contrib) {
+          return reply.status(404).send({ error: "Contributor not found" });
+        }
+
+        const updated = await setContributorDonation(db, id, body.charity_name, body.charity_ein);
+
+        request.auditContext = {
+          action: "contributor.donation.configure",
+          entityType: "contributor",
+          entityId: id,
+          afterJson: { charityName: body.charity_name, charityEin: body.charity_ein },
+        };
+
+        return { contributor: updated };
+      },
+    );
+
+    // DELETE /api/admin/contributors/:id/donation — clear donation preference
+    app.delete(
+      "/api/admin/contributors/:id/donation",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.CONTRIBUTORS_MANAGE),
+        ],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+
+        const contrib = await findContributorById(db, id);
+        if (!contrib) {
+          return reply.status(404).send({ error: "Contributor not found" });
+        }
+
+        const updated = await setContributorDonation(db, id, null, null);
+
+        request.auditContext = {
+          action: "contributor.donation.clear",
+          entityType: "contributor",
+          entityId: id,
+        };
+
+        return { contributor: updated };
+      },
+    );
+
+    // POST /api/admin/contributors/royalties/clawback — clawback royalty by order line [FR-072]
+    app.post(
+      "/api/admin/contributors/royalties/clawback",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.CONTRIBUTORS_MANAGE),
+        ],
+        schema: {
+          body: {
+            type: "object",
+            properties: {
+              order_line_id: { type: "string" },
+              order_id: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const body = request.body as { order_line_id?: string; order_id?: string };
+
+        if (body.order_line_id) {
+          const result = await clawbackRoyaltyByOrderLine(db, body.order_line_id);
+          if (!result) {
+            return reply.status(404).send({ error: "No royalty found for this order line" });
+          }
+
+          request.auditContext = {
+            action: "contributor.royalty.clawback",
+            entityType: "contributor_royalty",
+            entityId: result.id,
+            afterJson: { status: "clawed_back", amountMinor: result.amountMinor },
+          };
+
+          return { royalty: result };
+        }
+
+        if (body.order_id) {
+          const result = await clawbackRoyaltiesByOrderId(db, body.order_id);
+
+          request.auditContext = {
+            action: "contributor.royalty.clawback_order",
+            entityType: "order",
+            entityId: body.order_id,
+            afterJson: { clawedBack: result.clawedBack },
+          };
+
+          return result;
+        }
+
+        return reply.status(400).send({ error: "Either order_line_id or order_id is required" });
       },
     );
   }
