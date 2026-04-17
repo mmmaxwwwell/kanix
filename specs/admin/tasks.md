@@ -125,7 +125,7 @@
 - [x] T035 Implement admin_audit_log middleware [FR-079]
   Done when: Fastify hook on admin routes auto-creates audit_log entries with: actor_admin_user_id, action, entity_type, entity_id, before_json, after_json, ip_address, created_at; integration test: admin creates a product → audit log entry exists with correct before (null) and after (product JSON)
 
-- [ ] T036 Implement guest order → account linking [FR-066]
+- [x] T036 Implement guest order → account linking [FR-066]
   Done when: on email verification, query orders by `order.email` column (where customer_id IS NULL) and set customer_id to the new account; integration test: create 3 guest orders with email `jane@example.com` → create account with same email → verify email → all 3 orders appear in customer's order list; orders now have customer_id set
 
 - [ ] T037 Update /ready to check SuperTokens connectivity [FR-103]

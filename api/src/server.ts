@@ -22,6 +22,7 @@ import {
 } from "./auth/index.js";
 import type { GitHubUserFetcher } from "./auth/index.js";
 import { insertProduct } from "./db/queries/product.js";
+import { findOrdersByCustomerId } from "./db/queries/order.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -297,6 +298,43 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           github_user_id: updated.githubUserId,
         },
       };
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // Customer orders endpoint — requires verified email
+  // -------------------------------------------------------------------------
+
+  app.get(
+    "/api/customer/orders",
+    { preHandler: [verifySession, requireVerifiedEmail] },
+    async (request, reply) => {
+      const session = request.session;
+      if (!session) {
+        return reply.status(401).send({
+          error: "ERR_AUTHENTICATION_FAILED",
+          message: "Authentication required",
+        });
+      }
+
+      if (!database) {
+        return reply.status(503).send({
+          error: "ERR_SERVICE_UNAVAILABLE",
+          message: "Database not available",
+        });
+      }
+
+      const userId = session.getUserId();
+      const cust = await getCustomerByAuthSubject(database.db, userId);
+      if (!cust) {
+        return reply.status(404).send({
+          error: "ERR_NOT_FOUND",
+          message: "Customer record not found",
+        });
+      }
+
+      const orders = await findOrdersByCustomerId(database.db, cust.id);
+      return { orders };
     },
   );
 

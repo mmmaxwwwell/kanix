@@ -1,0 +1,24 @@
+{
+  "task_id": "T036",
+  "status": "complete",
+  "summary": "Implemented guest order → account linking on email verification with customer orders endpoint and integration test",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/order.ts",
+    "api/src/auth/guest-order-link.integration.test.ts",
+    "specs/admin/claims/completion-T036.json"
+  ],
+  "files_modified": [
+    "api/src/auth/supertokens.ts",
+    "api/src/db/queries/index.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

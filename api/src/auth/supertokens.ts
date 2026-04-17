@@ -7,6 +7,7 @@ import type { TypeInput } from "supertokens-node/types";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { eq } from "drizzle-orm";
 import { customer } from "../db/schema/customer.js";
+import { linkGuestOrdersByEmail } from "../db/queries/order.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -76,6 +77,30 @@ export function initSuperTokens(config: SuperTokensConfig): void {
     }),
     EmailVerification.init({
       mode: "REQUIRED",
+      override: {
+        apis: (originalImplementation) => ({
+          ...originalImplementation,
+          verifyEmailPOST: async (input) => {
+            if (!originalImplementation.verifyEmailPOST) {
+              throw new Error("verifyEmailPOST not available");
+            }
+
+            const response = await originalImplementation.verifyEmailPOST(input);
+
+            if (response.status === "OK" && config.db) {
+              const email = response.user.email;
+              // Look up the customer by auth_subject to get their ID
+              const userId = response.user.recipeUserId.getAsString();
+              const cust = await getCustomerByAuthSubject(config.db, userId);
+              if (cust) {
+                await linkGuestOrdersByEmail(config.db, email, cust.id);
+              }
+            }
+
+            return response;
+          },
+        }),
+      },
     }),
     ThirdParty.init({
       signInAndUpFeature: {

@@ -59,3 +59,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Fastify's `onResponse` hook fires after the response is sent — use it for audit logging so it doesn't block the response. Route handlers set `request.auditContext` with action details; the hook persists them.
 - The `admin_audit_log` table and Drizzle schema were already created in the core migration (002-core-entities.xml) — no additional migration was needed
 - Audit log IP address extraction: use `x-forwarded-for` header first (for reverse proxy setups), fall back to `request.ip` for direct connections
+
+## T036 — Implement guest order → account linking
+- SuperTokens `EmailVerification.init()` supports `override.apis.verifyEmailPOST` — use this to hook into the email verification flow and trigger guest order linking (the override only fires on HTTP API calls, not on `verifyEmailUsingToken` called directly)
+- To test email verification overrides in integration tests, create the verification token via `EmailVerification.createEmailVerificationToken()` then POST it to `/auth/user/email/verify` (the HTTP endpoint) — calling `verifyEmailUsingToken()` directly bypasses the API override
