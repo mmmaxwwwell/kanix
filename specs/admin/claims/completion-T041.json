@@ -1,0 +1,24 @@
+{
+  "task_id": "T041",
+  "status": "complete",
+  "summary": "Implemented inventory reservation system with reserve/consume/release operations using SELECT ... FOR UPDATE for concurrency, status machine (pending→active→consumed/released/expired), inventory_movement ledger entries, and integration tests covering all flows including TTL expiry and concurrent reservation contention",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/reservation.ts",
+    "api/src/admin-reservation.integration.test.ts",
+    "specs/admin/claims/completion-T041.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/index.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

@@ -144,7 +144,7 @@
 - [x] T040 Implement inventory balance + adjustment API (admin) [FR-032, FR-033, FR-037, FR-038]
   Done when: GET /admin/inventory/balances with filters; POST /admin/inventory/adjustments with adjustment_type (restock/shrinkage/damage), quantity_delta, reason, notes; adjustment atomically updates on_hand and available; audit log entry created with actor; low-stock detection: when available < safety_stock, flag variant; inventory_movement ledger entry created for every adjustment; integration tests: restock +100 → verify balance; shrinkage -5 → verify; CHECK constraint prevents negative available
 
-- [ ] T041 Implement inventory reservation system [FR-034, FR-035, FR-036]
+- [x] T041 Implement inventory reservation system [FR-034, FR-035, FR-036]
   Done when: `inventoryService.reserve(variantId, locationId, quantity, ttl)` atomically increments reserved and decrements available using `SELECT ... FOR UPDATE`; `inventoryService.consume(reservationId)` decrements on_hand and reserved; `inventoryService.release(reservationId)` decrements reserved and increments available; reservation status machine: pending→active→consumed/released/expired; inventory_movement created for each operation; integration tests: reserve → consume; reserve → release; reserve → expire (TTL); concurrent reserve for last unit (one succeeds, one fails with ERR_INVENTORY_INSUFFICIENT)
 
 - [ ] T042 Implement reservation cleanup cron [FR-034]

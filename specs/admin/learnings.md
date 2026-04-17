@@ -51,3 +51,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `inventoryBalance` has a UNIQUE(variant_id, location_id) constraint — use `onConflictDoNothing()` for upsert, then fetch existing row if insert returns nothing (same pattern as T039 for product-class membership)
 - PostgreSQL CHECK constraint `ck_inventory_balance_available CHECK (available >= 0)` enforces non-negative inventory — catch error code `23514` with constraint name containing `ck_inventory_balance` to return a clean `ERR_INVENTORY_INSUFFICIENT` response
 - Use `sql` template for atomic column updates (`on_hand + delta`, `available + delta`) rather than reading, computing, and writing — avoids race conditions and lets the DB enforce constraints in a single statement
+
+## T041 — Implement inventory reservation system
+- Use raw `tx.execute(sql\`SELECT ... FOR UPDATE\`)` for row-level locking in Drizzle — the ORM's query builder doesn't support `FOR UPDATE` natively, but raw SQL in a transaction works correctly for pessimistic concurrency control
+- When `consume()` and `release()` read from raw SQL results, column names come back as snake_case (`variant_id`, `location_id`) not camelCase — cast them accordingly when accessing fields from `tx.execute()` results
+- The reservation goes directly to `active` status on creation (skipping `pending`) because the balance lock + available check + balance update all happen atomically in the same transaction — no separate "confirm" step is needed

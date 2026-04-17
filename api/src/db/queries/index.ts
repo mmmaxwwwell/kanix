@@ -68,3 +68,18 @@ export type {
   CreateAdjustmentInput,
   AdjustmentResult,
 } from "./inventory.js";
+export {
+  reserveInventory,
+  consumeReservation,
+  releaseReservation,
+  releaseExpiredReservations,
+  findReservationById,
+  isValidReservationTransition,
+} from "./reservation.js";
+export type {
+  InventoryReservation,
+  ReserveInput,
+  ReserveResult,
+  ConsumeResult,
+  ReleaseResult,
+} from "./reservation.js";

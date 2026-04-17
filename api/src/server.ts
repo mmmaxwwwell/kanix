@@ -60,6 +60,12 @@ import {
   removeProductFromClass,
 } from "./db/queries/product-class.js";
 import { findInventoryBalances, createInventoryAdjustment } from "./db/queries/inventory.js";
+import {
+  reserveInventory,
+  consumeReservation,
+  releaseReservation,
+  findReservationById,
+} from "./db/queries/reservation.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -546,6 +552,197 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           }
           throw err;
         }
+      },
+    );
+
+    // -----------------------------------------------------------------------
+    // Inventory Reservations
+    // -----------------------------------------------------------------------
+
+    // Reserve inventory
+    app.post(
+      "/api/admin/inventory/reservations",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.INVENTORY_ADJUST)],
+      },
+      async (request, reply) => {
+        const body = request.body as {
+          variant_id: string;
+          location_id: string;
+          quantity: number;
+          ttl_ms: number;
+          reservation_reason?: string;
+          order_id?: string;
+          cart_id?: string;
+        };
+
+        if (!body.variant_id || !body.location_id || body.quantity == null || body.ttl_ms == null) {
+          return reply.status(400).send({
+            error: "ERR_VALIDATION",
+            message: "Missing required fields: variant_id, location_id, quantity, ttl_ms",
+          });
+        }
+
+        if (!Number.isInteger(body.quantity) || body.quantity < 1) {
+          return reply.status(400).send({
+            error: "ERR_VALIDATION",
+            message: "quantity must be a positive integer",
+          });
+        }
+
+        if (!Number.isInteger(body.ttl_ms) || body.ttl_ms < 1) {
+          return reply.status(400).send({
+            error: "ERR_VALIDATION",
+            message: "ttl_ms must be a positive integer",
+          });
+        }
+
+        try {
+          const result = await reserveInventory(database.db, {
+            variantId: body.variant_id,
+            locationId: body.location_id,
+            quantity: body.quantity,
+            ttlMs: body.ttl_ms,
+            reservationReason: body.reservation_reason,
+            orderId: body.order_id,
+            cartId: body.cart_id,
+          });
+
+          request.auditContext = {
+            action: "CREATE",
+            entityType: "inventory_reservation",
+            entityId: result.reservation.id,
+            afterJson: {
+              variantId: body.variant_id,
+              locationId: body.location_id,
+              quantity: body.quantity,
+              ttlMs: body.ttl_ms,
+            },
+          };
+
+          return reply.status(201).send({
+            reservation: result.reservation,
+            movement: result.movement,
+          });
+        } catch (err: unknown) {
+          const appErr = err as { code?: string };
+          if (appErr.code === "ERR_INVENTORY_INSUFFICIENT") {
+            return reply.status(422).send({
+              error: "ERR_INVENTORY_INSUFFICIENT",
+              message: "Insufficient inventory to reserve",
+            });
+          }
+          if (appErr.code === "ERR_INVENTORY_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_INVENTORY_NOT_FOUND",
+              message: "No inventory balance found for variant/location",
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // Consume reservation
+    app.post(
+      "/api/admin/inventory/reservations/:id/consume",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.INVENTORY_ADJUST)],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+
+        try {
+          const result = await consumeReservation(database.db, id);
+
+          request.auditContext = {
+            action: "UPDATE",
+            entityType: "inventory_reservation",
+            entityId: id,
+            afterJson: { status: "consumed" },
+          };
+
+          return reply.status(200).send({
+            reservation: result.reservation,
+            movement: result.movement,
+          });
+        } catch (err: unknown) {
+          const appErr = err as { code?: string };
+          if (appErr.code === "ERR_RESERVATION_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_RESERVATION_NOT_FOUND",
+              message: "Reservation not found",
+            });
+          }
+          if (appErr.code === "ERR_INVALID_STATUS_TRANSITION") {
+            return reply.status(422).send({
+              error: "ERR_INVALID_STATUS_TRANSITION",
+              message: (err as Error).message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // Release reservation
+    app.post(
+      "/api/admin/inventory/reservations/:id/release",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.INVENTORY_ADJUST)],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+
+        try {
+          const result = await releaseReservation(database.db, id);
+
+          request.auditContext = {
+            action: "UPDATE",
+            entityType: "inventory_reservation",
+            entityId: id,
+            afterJson: { status: "released" },
+          };
+
+          return reply.status(200).send({
+            reservation: result.reservation,
+            movement: result.movement,
+          });
+        } catch (err: unknown) {
+          const appErr = err as { code?: string };
+          if (appErr.code === "ERR_RESERVATION_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_RESERVATION_NOT_FOUND",
+              message: "Reservation not found",
+            });
+          }
+          if (appErr.code === "ERR_INVALID_STATUS_TRANSITION") {
+            return reply.status(422).send({
+              error: "ERR_INVALID_STATUS_TRANSITION",
+              message: (err as Error).message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // Get reservation by ID
+    app.get(
+      "/api/admin/inventory/reservations/:id",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.INVENTORY_READ)],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const reservation = await findReservationById(database.db, id);
+        if (!reservation) {
+          return reply.status(404).send({
+            error: "ERR_RESERVATION_NOT_FOUND",
+            message: "Reservation not found",
+          });
+        }
+        return { reservation };
       },
     );
 
