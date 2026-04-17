@@ -45,7 +45,7 @@
 - [x] T011 Implement Vitest custom reporter for structured test output [FR-100]
   Done when: Vitest outputs JSON results to `test-logs/test-results.json`; reporter includes test name, status, duration, error message for failures; aggregatable by CI summary script
 
-- [ ] T012 Implement api/src/config.ts — single config module [FR-112, FR-113, FR-114]
+- [x] T012 Implement api/src/config.ts — single config module [FR-112, FR-113, FR-114]
   Done when: config loads from defaults → .env file → env vars; fail-fast validation on startup logs every missing/invalid key and exits non-zero; secrets (DATABASE_URL, STRIPE_SECRET_KEY, etc.) only from env vars; sensitive values never appear in logs ("present"/"missing" only); STRIPE_TAX_ENABLED flag controls tax adapter selection; unit tests cover: valid config, missing required, invalid type, sensitive redaction
 
 - [ ] T013 Implement api/src/errors.ts — typed error hierarchy [FR-105]

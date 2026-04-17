@@ -43,3 +43,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T011 — Vitest custom reporter
 - Vitest custom reporters can be specified as file paths in `vitest.config.ts` `reporters` array — use `["default", "./src/test-reporter.ts"]` to keep console output AND produce JSON
 - The `Reporter` interface's `onFinished(files?)` receives the complete test tree — traverse `file.tasks` recursively to collect suite/test results (suites have nested `tasks`, tests have `result`)
+
+## T012 — Config module
+- ESLint `@typescript-eslint/no-non-null-assertion` rule is enabled — use `?? ""` fallback instead of `!` assertions even when validation guarantees presence
+- Node 22 has `process.loadEnvFile()` but it modifies `process.env` directly — for layered precedence (defaults → .env → env vars) implement a custom parser

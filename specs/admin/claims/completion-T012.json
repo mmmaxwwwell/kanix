@@ -1,0 +1,15 @@
+{
+  "task_id": "T012",
+  "status": "complete",
+  "summary": "Implemented api/src/config.ts with three-layer precedence (defaults → .env → env vars), fail-fast validation, secret-only-from-env enforcement, sensitive value redaction, and 20 unit tests covering valid config, missing required, invalid type, and sensitive redaction",
+  "commands_run": [
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0}
+  ],
+  "files_created": ["api/src/config.ts", "api/src/config.test.ts", "specs/admin/claims/completion-T012.json"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
