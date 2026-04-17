@@ -4,26 +4,6 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 
 ---
 
-## T072 — Implement WebSocket server with auth
-- `@fastify/websocket` v11 handler signature is `(socket: WebSocket, request: FastifyRequest)` — no `SocketStream` wrapper; `WebSocket` type comes from `ws` package (needs `@types/ws` as devDependency)
-- `Session.getSessionWithoutRequestResponse(token)` validates an access token without HTTP request/reply — useful for WebSocket upgrade auth where there's no standard Fastify request lifecycle
-- `ws` must be added as a direct dependency (not just transitive via `@fastify/websocket`) for test files that import it as a WebSocket client — pnpm strict hoisting prevents resolving transitive deps
-
-## T073 — Implement server-side message buffering
-- A global buffer (array of all published messages with timestamps) is simpler and more correct than per-subject buffers — on replay, filter by the reconnecting client's channels and `sequenceId > lastSequenceId`
-- The `lastSequenceId` query parameter on the `/ws` endpoint enables reconnect replay — parsed after auth/welcome so the welcome message always arrives first, then replayed messages follow
-- `setInterval(...).unref()` prevents the cleanup timer from keeping the Node process alive during tests or graceful shutdown
-
-## T074 — Implement pub/sub for domain events
-- `wsManager` and `domainEvents` are declared after route definitions in `createServer()` but captured by route closures — JavaScript closures reference bindings not values, so the variables are available when handlers execute (after server.listen())
-- Customer event routing requires publishing to both `entity:entityId` (for admin wildcard) and `customer:customerId` (for customer channel) — the `DomainEventPublisher` wraps this dual-publish pattern
-- For ticket events, `findTicketById` is called after the mutation to get the `customerId` for customer routing — this is an extra DB query but tickets already have the customerId FK on the support_ticket table
-
-## T075 — Implement notification service + email stub
-- The `admin_setting` table's generic key-value pattern could store per-admin prefs, but a dedicated `admin_alert_preference` table with FK to `admin_user` + unique constraint is cleaner for per-admin config with a known schema
-- `NotificationDispatchService` is created after `wsManager` (which requires async `registerWebSocket`) since the in-app adapter depends on it — same closure pattern as `domainEvents`
-- `getAllAdminAlertTargets` uses LEFT JOIN from `admin_user` to `admin_alert_preference` so admins without a preference row default to `"both"` — no seeding needed for existing admins
-
 ## T076 — Initialize Flutter admin app with Riverpod + Dio + GoRouter
 - Nixpkgs Flutter ships `flutter_tester` without execute permission — the `flake.nix` shellHook creates a patched symlink farm at `.flutter-patched/` and sets `FLUTTER_ROOT`; CI/headless agents must replicate this or `flutter test` fails with a permissions error
 - SuperTokens admin auth uses cookie-based sessions; for Flutter web Dio handles cookies automatically, for non-web platforms extract `st-access-token` from signin response headers and send as `Authorization: Bearer` header via an interceptor
@@ -56,3 +36,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T082 — Implement admin settings + contributor management screens
 - `DefaultTabController` with `TabBar` + `TabBarView` works well for settings screens with multiple sections — wrap in `Column` with `Expanded` around `TabBarView` to avoid unbounded height
 - When replacing a placeholder screen (e.g. `CustomersScreen` → `ContributorsScreen`), update all three: the router import/route, the `AppShell` navigation label, and the `_routes` list for index mapping
+
+## T083 — Initialize Flutter customer app with Riverpod + Dio + GoRouter
+- Customer auth flow adds signup + email verification on top of admin's login-only flow — GoRouter redirect must handle three states (unauthenticated, pendingVerification, authenticated) and route to `/login`, `/verify-email`, or `/catalog` accordingly
+- Customer app uses `NavigationBar` (bottom nav, mobile-first) instead of admin's `NavigationRail` — map non-tab routes (e.g. `/product`, `/checkout`, `/support`) to their parent tab index in `_selectedIndex` for correct highlight
+- `AsyncNotifier` subclass overrides work well for test mocking: `authStateProvider.overrideWith(() => _MockAuthNotifier())` where the mock only overrides `build()` to return a fixed `AuthState`

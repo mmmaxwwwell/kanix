@@ -1,0 +1,39 @@
+{
+  "task_id": "T083",
+  "status": "complete",
+  "summary": "Initialized Flutter customer app with Riverpod + Dio + GoRouter, auth flow (signup/email verification/login), GitHub OAuth link in account, and all required routes",
+  "commands_run": [
+    {"command": "flutter pub get", "exit_code": 0},
+    {"command": "flutter analyze", "exit_code": 0},
+    {"command": "FLUTTER_ROOT=.flutter-patched flutter test", "exit_code": 0}
+  ],
+  "files_created": [
+    "customer/lib/config/api_client.dart",
+    "customer/lib/config/router.dart",
+    "customer/lib/providers/auth_provider.dart",
+    "customer/lib/screens/login_screen.dart",
+    "customer/lib/screens/signup_screen.dart",
+    "customer/lib/screens/email_verification_screen.dart",
+    "customer/lib/screens/catalog_screen.dart",
+    "customer/lib/screens/product_detail_screen.dart",
+    "customer/lib/screens/cart_screen.dart",
+    "customer/lib/screens/checkout_screen.dart",
+    "customer/lib/screens/orders_screen.dart",
+    "customer/lib/screens/support_screen.dart",
+    "customer/lib/screens/warranty_screen.dart",
+    "customer/lib/screens/account_screen.dart",
+    "customer/lib/screens/contributor_dashboard_screen.dart",
+    "customer/lib/widgets/app_shell.dart",
+    "specs/admin/claims/completion-T083.json"
+  ],
+  "files_modified": [
+    "customer/lib/main.dart",
+    "customer/pubspec.yaml",
+    "customer/pubspec.lock",
+    "customer/test/widget_test.dart",
+    "specs/admin/learnings.md",
+    "specs/admin/tasks.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

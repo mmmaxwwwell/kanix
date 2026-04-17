@@ -354,7 +354,7 @@
 
 ## Phase 12: Flutter Customer App Shell [Customer requirements]
 
-- [ ] T083 Initialize Flutter customer app with Riverpod + Dio + GoRouter [P]
+- [x] T083 Initialize Flutter customer app with Riverpod + Dio + GoRouter [P]
   Done when: `flutter run` launches customer app; GoRouter configured with routes (catalog, product detail, cart, checkout, orders, support, warranty, account, contributor dashboard); auth flow: signup → email verification → login; GitHub OAuth link in account settings; Dio configured with auth interceptor
 
 - [ ] T084 Implement catalog + product detail screens
