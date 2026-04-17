@@ -67,3 +67,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Fastify hooks execute in registration order — register CORS/rate-limit hooks before route handlers so they can short-circuit with 403/429 before the handler runs
 - In-memory rate limiting with `Map<string, {count, resetTime}>` is sufficient for single-instance; use `setInterval` with `.unref()` for cleanup to avoid keeping the process alive
 - Security headers must use `onSend` hook (not `onRequest`) to ensure they appear on ALL responses including error responses
+
+## T018 — JSON schema validation plugin
+- Fastify 5 accepts `ajv: { customOptions: { removeAdditional: true } }` in the constructor to strip extra fields — no need for a separate Ajv instance or `setValidatorCompiler`
+- Validation errors on `FastifyError` have a `.validation` array with Ajv error objects; for "required" errors, `instancePath` is the parent and `params.missingProperty` contains the missing field name

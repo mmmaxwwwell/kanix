@@ -63,7 +63,7 @@
 - [x] T017 Implement security middleware: CORS, rate limiting, security headers [FR-108, FR-109, FR-110]
   Done when: CORS rejects requests from non-allowed origins (returns 403, not wildcard); rate limiter returns 429 with Retry-After header and X-RateLimit-Limit/Remaining/Reset headers; security headers present on every response: Strict-Transport-Security, Content-Security-Policy, X-Content-Type-Options=nosniff, X-Frame-Options=DENY, Referrer-Policy=strict-origin-when-cross-origin; integration tests verify each header and rate limit behavior
 
-- [ ] T018 Implement JSON schema validation plugin [FR-107]
+- [x] T018 Implement JSON schema validation plugin [FR-107]
   Done when: Fastify JSON schema validation rejects invalid request bodies with 400 status; response includes `{error: "validation_failed", details: [{field, message}]}`; extra fields are stripped; integration test covers: missing required field, wrong type, extra fields
 
 - [ ] T019 Implement global error handler [FR-105]

@@ -3,6 +3,7 @@ import type { Config } from "./config.js";
 import { createLogger, generateCorrelationId, withCorrelationId } from "./logger.js";
 import { registerSecurityMiddleware, clearRateLimiterState } from "./security.js";
 import { createShutdownManager, isShuttingDown, type ShutdownManager } from "./shutdown.js";
+import { ajvOptions, registerValidation } from "./validation.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -67,6 +68,7 @@ export function createServer(options: CreateServerOptions): ServerInstance {
 
   const app = Fastify({
     logger: false, // We manage our own Pino logger
+    ajv: ajvOptions,
   });
 
   // -------------------------------------------------------------------------
@@ -74,6 +76,12 @@ export function createServer(options: CreateServerOptions): ServerInstance {
   // -------------------------------------------------------------------------
 
   const { rateLimiter } = registerSecurityMiddleware(app, config);
+
+  // -------------------------------------------------------------------------
+  // JSON schema validation error handler
+  // -------------------------------------------------------------------------
+
+  registerValidation(app);
 
   // -------------------------------------------------------------------------
   // Correlation ID hook — attach to every request
