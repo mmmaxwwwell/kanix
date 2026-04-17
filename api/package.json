@@ -28,6 +28,7 @@
     "vitest": "^3.0.0"
   },
   "dependencies": {
+    "fastify": "^5.8.5",
     "pino": "^10.3.1"
   }
 }

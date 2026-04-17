@@ -1,0 +1,16 @@
+{
+  "task_id": "T016",
+  "status": "complete",
+  "summary": "Implemented Fastify server skeleton with /health and /ready endpoints, correlation ID hook, shutdown integration, and integration tests",
+  "commands_run": [
+    {"command": "pnpm add fastify", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm format", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": ["api/src/server.ts", "api/src/server.test.ts", "specs/admin/claims/completion-T016.json"],
+  "files_modified": ["api/package.json", "api/pnpm-lock.yaml", "api/src/index.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

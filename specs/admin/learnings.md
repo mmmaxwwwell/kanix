@@ -58,3 +58,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T015 — Graceful shutdown
 - Module-level `shutdownInitiated` flag works for `/ready` endpoint integration but makes test isolation tricky — the flag persists across tests in the same Vitest run. Future: consider resetting via an exported `_resetForTesting()` if tests need to check `isShuttingDown() === false`
 - Use `EventEmitter` as a fake `NodeJS.Process` for testing signal handlers — cast via `as unknown as NodeJS.Process` since only `.on()` and `.emit()` are needed
+
+## T016 — Fastify server skeleton
+- `createServer` registers shutdown signal handlers on `processRef` — in tests, MUST pass a fake `EventEmitter` process to avoid Vitest catching `process.exit(0)` calls as unhandled rejections during teardown
+- Fastify `app.inject()` is the right way to test endpoints without opening a real port — use `PORT: 0` in test config and `app.ready()` instead of `start()`

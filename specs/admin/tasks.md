@@ -57,7 +57,7 @@
 - [x] T015 Implement api/src/shutdown.ts — graceful shutdown [FR-106]
   Done when: SIGTERM/SIGINT handlers registered; shutdown sequence: log "Shutdown initiated" → stop accepting connections → mark /ready as 503 → drain in-flight → close WebSocket → close DB pool → close externals → flush logs → exit 0; 30s timeout with force exit 1; shutdown hook registry (reverse order); unit test verifies sequence logging
 
-- [ ] T016 Implement Fastify server skeleton with health endpoints [FR-103]
+- [x] T016 Implement Fastify server skeleton with health endpoints [FR-103]
   Done when: Fastify server boots on configured PORT; `GET /health` returns 200 with `{status, uptime, version, ready, dependencies}`; `GET /ready` returns 503 during startup (no DB), 200 when ready; JSON response matches spec format; integration test verifies both endpoints
 
 - [ ] T017 Implement security middleware: CORS, rate limiting, security headers [FR-108, FR-109, FR-110]
