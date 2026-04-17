@@ -41,3 +41,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Customer auth flow adds signup + email verification on top of admin's login-only flow — GoRouter redirect must handle three states (unauthenticated, pendingVerification, authenticated) and route to `/login`, `/verify-email`, or `/catalog` accordingly
 - Customer app uses `NavigationBar` (bottom nav, mobile-first) instead of admin's `NavigationRail` — map non-tab routes (e.g. `/product`, `/checkout`, `/support`) to their parent tab index in `_selectedIndex` for correct highlight
 - `AsyncNotifier` subclass overrides work well for test mocking: `authStateProvider.overrideWith(() => _MockAuthNotifier())` where the mock only overrides `build()` to return a fixed `AuthState`
+
+## T084 — Implement catalog + product detail screens
+- `FutureProvider.autoDispose` loading-state tests must avoid `Future.delayed` (leaves pending timers) — use a `Completer` that you complete at the end of the test instead
+- Customer app product model differs from admin's: customer variants extract `material` from `optionValues` JSON and add `quantityOnHand`/`status` for availability checks; keep models separate between admin and customer apps
+- `MaterialWarrantyInfo.forMaterial()` centralizes per-material warranty text (TPU heat deformation exclusion, TPC heat resistance rating) — keeps warranty display consistent across product detail and future warranty claim screens

@@ -1,0 +1,23 @@
+{
+  "task_id": "T084",
+  "status": "complete",
+  "summary": "Implemented catalog screen with product grid (images, pricing, availability badges) and product detail screen with material variant selector (TPU/PA11/TPC), material-specific warranty info, and add-to-cart button; 13 widget tests all passing",
+  "commands_run": [
+    {"command": "flutter pub get", "exit_code": 0},
+    {"command": "flutter analyze", "exit_code": 0},
+    {"command": "FLUTTER_ROOT=.flutter-patched flutter test", "exit_code": 0}
+  ],
+  "files_created": [
+    "customer/lib/models/product.dart",
+    "customer/lib/providers/catalog_provider.dart",
+    "customer/test/catalog_test.dart"
+  ],
+  "files_modified": [
+    "customer/lib/screens/catalog_screen.dart",
+    "customer/lib/screens/product_detail_screen.dart",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

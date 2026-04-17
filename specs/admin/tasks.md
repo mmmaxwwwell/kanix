@@ -357,7 +357,7 @@
 - [x] T083 Initialize Flutter customer app with Riverpod + Dio + GoRouter [P]
   Done when: `flutter run` launches customer app; GoRouter configured with routes (catalog, product detail, cart, checkout, orders, support, warranty, account, contributor dashboard); auth flow: signup → email verification → login; GitHub OAuth link in account settings; Dio configured with auth interceptor
 
-- [ ] T084 Implement catalog + product detail screens
+- [x] T084 Implement catalog + product detail screens
   Done when: product grid/list with images, pricing, availability; product detail with material variant selector (TPU/PA11/TPC); material-specific warranty info displayed; add to cart button; widget tests
 
 - [ ] T085 Implement kit builder screen
