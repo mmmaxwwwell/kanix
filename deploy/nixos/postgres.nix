@@ -102,12 +102,12 @@ in
         User = "postgres";
         Group = "postgres";
         ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p ${cfg.backupDir}";
-        ExecStart = toString [
-          "${config.services.postgresql.package}/bin/pg_dump"
-          "--format=custom"
-          "--file=${cfg.backupDir}/kanix-$(date +%Y%m%d-%H%M%S).dump"
-          "kanix"
-        ];
+        ExecStart = pkgs.writeShellScript "kanix-pg-backup" ''
+          ${config.services.postgresql.package}/bin/pg_dump \
+            --format=custom \
+            --file=${cfg.backupDir}/kanix-$(date +%Y%m%d-%H%M%S).dump \
+            kanix
+        '';
       };
     };
 
