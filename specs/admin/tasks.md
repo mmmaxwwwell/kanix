@@ -208,7 +208,7 @@
 - [x] T054e Implement duplicate email verification conflict detection [FR-E017]
   Done when: if a second account attempts to verify an email that is already verified by another account, verification is rejected with ERR_EMAIL_ALREADY_CLAIMED; admin alert created; integration test: account A verifies email → account B attempts to verify same email → rejected
 
-- [ ] T055 Critical path checkpoint (Phase 6) [Critical Path]
+- [x] T055 Critical path checkpoint (Phase 6) [Critical Path]
   Done when: integration test exercises full checkout: seed products → create cart → add items → checkout → Stripe payment succeeds (test mode) → order confirmed → inventory consumed → snapshots stored → policy acknowledged
 
 ---

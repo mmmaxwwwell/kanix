@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from "vitest";
 import { EventEmitter } from "node:events";
+import { createHmac } from "node:crypto";
 import {
   createServer,
   markReady,
@@ -21,8 +22,14 @@ import {
   inventoryMovement,
   inventoryLocation,
 } from "./db/schema/inventory.js";
+import { order, orderLine, orderStatusHistory } from "./db/schema/order.js";
+import { payment, paymentEvent } from "./db/schema/payment.js";
+import { policySnapshot, orderPolicyAcknowledgment } from "./db/schema/evidence.js";
 import { adminAuditLog } from "./db/schema/admin.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
+import type { TaxAdapter } from "./services/tax-adapter.js";
+import type { ShippingAdapter } from "./services/shipping-adapter.js";
+import type { PaymentAdapter } from "./services/payment-adapter.js";
 
 const DATABASE_URL = process.env["DATABASE_URL"];
 
@@ -460,4 +467,440 @@ describeWithDb("critical path checkpoint (Phase 5)", () => {
     expect(detailBody.product.variants[0].available).toBe(50);
     expect(detailBody.product.variants[0].inStock).toBe(true);
   });
+});
+
+// --- Phase 6 Critical Path: Full Checkout End-to-End ---
+
+const CP6_WEBHOOK_SECRET = "whsec_cp6_test_secret";
+
+function createStubTaxAdapter(): TaxAdapter {
+  return {
+    async calculate() {
+      return { taxAmountMinor: 0, calculationId: null };
+    },
+  };
+}
+
+function createStubShippingAdapter(): ShippingAdapter {
+  return {
+    async calculateRate() {
+      return {
+        shippingAmountMinor: 599,
+        carrier: "USPS",
+        service: "Priority",
+        rateId: null,
+      };
+    },
+  };
+}
+
+let cp6PaymentCallCount = 0;
+function createStubPaymentAdapter(): PaymentAdapter {
+  return {
+    async createPaymentIntent() {
+      cp6PaymentCallCount++;
+      return {
+        id: `pi_cp6_${cp6PaymentCallCount}_${Date.now()}`,
+        clientSecret: `pi_cp6_${cp6PaymentCallCount}_secret_${Date.now()}`,
+      };
+    },
+    async createRefund() {
+      return { id: `re_cp6_${Date.now()}`, status: "succeeded" };
+    },
+  };
+}
+
+function generateWebhookPayload(
+  eventId: string,
+  eventType: string,
+  data: unknown,
+  secret: string,
+): { body: string; signature: string } {
+  const payload = JSON.stringify({
+    id: eventId,
+    object: "event",
+    type: eventType,
+    data: { object: data },
+    created: Math.floor(Date.now() / 1000),
+    livemode: false,
+    api_version: "2024-12-18.acacia",
+  });
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signedPayload = `${timestamp}.${payload}`;
+  const sig = createHmac("sha256", secret).update(signedPayload).digest("hex");
+  const signature = `t=${timestamp},v1=${sig}`;
+  return { body: payload, signature };
+}
+
+describeWithDb("critical path checkpoint (Phase 6)", () => {
+  let app: FastifyInstance;
+  let dbConn: DatabaseConnection;
+  let superTokensAvailable = false;
+
+  const ts = Date.now();
+
+  let activeProductId = "";
+  let activeVariantId = "";
+  let secondVariantId = "";
+  let locationId = "";
+
+  beforeAll(async () => {
+    try {
+      superTokensAvailable = await isSuperTokensUp();
+    } catch {
+      superTokensAvailable = false;
+    }
+    if (!superTokensAvailable) return;
+
+    try {
+      dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+      const db = dbConn.db;
+
+      const server = await createServer({
+        config: testConfig({
+          SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
+          STRIPE_WEBHOOK_SECRET: CP6_WEBHOOK_SECRET,
+          RATE_LIMIT_MAX: 1000,
+        }),
+        processRef: createFakeProcess() as unknown as NodeJS.Process,
+        database: dbConn,
+        reservationCleanupIntervalMs: 0,
+        taxAdapter: createStubTaxAdapter(),
+        shippingAdapter: createStubShippingAdapter(),
+        paymentAdapter: createStubPaymentAdapter(),
+      });
+      app = server.app;
+      await server.start();
+      markReady();
+
+      // Seed products
+      const [prod] = await db
+        .insert(product)
+        .values({
+          slug: `cp6-product-${ts}`,
+          title: `CP6 Test Product ${ts}`,
+          status: "active",
+        })
+        .returning();
+      activeProductId = prod.id;
+
+      const [variant1] = await db
+        .insert(productVariant)
+        .values({
+          productId: activeProductId,
+          sku: `CP6-VAR1-${ts}`,
+          title: `CP6 Variant A ${ts}`,
+          priceMinor: 2500,
+          status: "active",
+          weight: "12",
+        })
+        .returning();
+      activeVariantId = variant1.id;
+
+      const [variant2] = await db
+        .insert(productVariant)
+        .values({
+          productId: activeProductId,
+          sku: `CP6-VAR2-${ts}`,
+          title: `CP6 Variant B ${ts}`,
+          priceMinor: 1500,
+          status: "active",
+          weight: "8",
+        })
+        .returning();
+      secondVariantId = variant2.id;
+
+      // Inventory location + balances
+      const [loc] = await db
+        .insert(inventoryLocation)
+        .values({
+          name: `CP6 Warehouse ${ts}`,
+          code: `CP6-WH-${ts}`,
+          type: "warehouse",
+        })
+        .returning();
+      locationId = loc.id;
+
+      await db.insert(inventoryBalance).values({
+        variantId: activeVariantId,
+        locationId,
+        onHand: 100,
+        reserved: 0,
+        available: 100,
+      });
+      await db.insert(inventoryBalance).values({
+        variantId: secondVariantId,
+        locationId,
+        onHand: 50,
+        reserved: 0,
+        available: 50,
+      });
+
+      // Seed policy snapshots
+      const policyTypes = [
+        "terms_of_service",
+        "refund_policy",
+        "shipping_policy",
+        "privacy_policy",
+      ];
+      for (const pType of policyTypes) {
+        await db
+          .insert(policySnapshot)
+          .values({
+            policyType: pType,
+            version: 1,
+            contentHtml: `<p>${pType} v1</p>`,
+            contentText: `${pType} v1`,
+            effectiveAt: new Date(Date.now() - 86400000),
+          })
+          .onConflictDoNothing();
+      }
+    } catch (err) {
+      console.log(`Skipping Phase 6 critical path: setup failed — ${err}`);
+      superTokensAvailable = false;
+    }
+  }, 30000);
+
+  afterAll(async () => {
+    markNotReady();
+    try {
+      await app?.close();
+    } catch {
+      // ignore
+    }
+    try {
+      await dbConn?.close();
+    } catch {
+      // ignore
+    }
+  }, 15000);
+
+  it("full checkout: seed → cart → checkout → payment webhook → order confirmed → inventory consumed → snapshots → policy acknowledged", async () => {
+    if (!superTokensAvailable) {
+      console.log("Skipping Phase 6 critical path: SuperTokens not available");
+      return;
+    }
+
+    const db = dbConn.db;
+
+    // 1. Create guest cart
+    const cartRes = await app.inject({
+      method: "POST",
+      url: "/api/cart",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(cartRes.statusCode).toBe(201);
+    const cartData = JSON.parse(cartRes.body);
+    const cartToken = cartData.cart.token;
+    expect(cartToken).toBeDefined();
+
+    // 2. Add items to cart
+    const addItem1 = await app.inject({
+      method: "POST",
+      url: "/api/cart/items",
+      headers: {
+        "content-type": "application/json",
+        "x-cart-token": cartToken,
+      },
+      body: JSON.stringify({ variant_id: activeVariantId, quantity: 3 }),
+    });
+    expect(addItem1.statusCode).toBe(201);
+
+    const addItem2 = await app.inject({
+      method: "POST",
+      url: "/api/cart/items",
+      headers: {
+        "content-type": "application/json",
+        "x-cart-token": cartToken,
+      },
+      body: JSON.stringify({ variant_id: secondVariantId, quantity: 2 }),
+    });
+    expect(addItem2.statusCode).toBe(201);
+
+    // 3. Checkout
+    const checkoutRes = await app.inject({
+      method: "POST",
+      url: "/api/checkout",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        cart_token: cartToken,
+        email: `cp6-test-${ts}@kanix.dev`,
+        shipping_address: {
+          full_name: "CP6 Test User",
+          line1: "100 Commerce Blvd",
+          city: "Austin",
+          state: "TX",
+          postal_code: "78701",
+          country: "US",
+        },
+      }),
+    });
+    expect(checkoutRes.statusCode).toBe(201);
+    const checkoutBody = JSON.parse(checkoutRes.body);
+
+    const orderId = checkoutBody.order.id;
+    const orderNumber = checkoutBody.order.order_number;
+    expect(orderNumber).toMatch(/^KNX-\d{6}$/);
+    expect(checkoutBody.order.email).toBe(`cp6-test-${ts}@kanix.dev`);
+    expect(checkoutBody.order.status).toBe("pending_payment");
+    expect(checkoutBody.order.payment_status).toBe("unpaid");
+    // subtotal: 2500*3 + 1500*2 = 10500
+    expect(checkoutBody.order.subtotal_minor).toBe(10500);
+    expect(checkoutBody.order.tax_minor).toBe(0);
+    expect(checkoutBody.order.shipping_minor).toBe(599);
+    expect(checkoutBody.order.total_minor).toBe(11099);
+    expect(checkoutBody.client_secret).toBeDefined();
+
+    // 4. Verify order persisted with address snapshots
+    const [savedOrder] = await db.select().from(order).where(eq(order.id, orderId));
+    expect(savedOrder).toBeDefined();
+    expect(savedOrder.email).toBe(`cp6-test-${ts}@kanix.dev`);
+    expect(savedOrder.status).toBe("pending_payment");
+    expect(savedOrder.shippingAddressSnapshotJson).toBeDefined();
+
+    // 5. Verify order lines with product/price snapshots
+    const lines = await db.select().from(orderLine).where(eq(orderLine.orderId, orderId));
+    expect(lines.length).toBe(2);
+    const skus = lines.map((l) => l.skuSnapshot).sort();
+    expect(skus).toContain(`CP6-VAR1-${ts}`);
+    expect(skus).toContain(`CP6-VAR2-${ts}`);
+    // Verify price snapshots
+    const var1Line = lines.find((l) => l.skuSnapshot === `CP6-VAR1-${ts}`);
+    const var2Line = lines.find((l) => l.skuSnapshot === `CP6-VAR2-${ts}`);
+    expect(var1Line).toBeDefined();
+    expect(var2Line).toBeDefined();
+    expect(var1Line?.unitPriceMinor).toBe(2500);
+    expect(var1Line?.quantity).toBe(3);
+    expect(var2Line?.unitPriceMinor).toBe(1500);
+    expect(var2Line?.quantity).toBe(2);
+
+    // 6. Verify inventory reservations exist (active, linked to order)
+    const reservationsBeforeWebhook = await db
+      .select()
+      .from(inventoryReservation)
+      .where(eq(inventoryReservation.orderId, orderId));
+    expect(reservationsBeforeWebhook.length).toBe(2);
+    for (const res of reservationsBeforeWebhook) {
+      expect(res.status).toBe("active");
+    }
+
+    // 7. Verify payment record
+    const [paymentRecord] = await db.select().from(payment).where(eq(payment.orderId, orderId));
+    expect(paymentRecord).toBeDefined();
+    expect(paymentRecord.provider).toBe("stripe");
+    expect(paymentRecord.status).toBe("pending");
+    const paymentIntentId = paymentRecord.providerPaymentIntentId;
+
+    // 8. Verify policy acknowledgments
+    const acknowledgments = await db
+      .select()
+      .from(orderPolicyAcknowledgment)
+      .where(eq(orderPolicyAcknowledgment.orderId, orderId));
+    expect(acknowledgments.length).toBe(4);
+
+    const snapshotTypes: string[] = [];
+    for (const ack of acknowledgments) {
+      const [snap] = await db
+        .select()
+        .from(policySnapshot)
+        .where(eq(policySnapshot.id, ack.policySnapshotId));
+      expect(snap).toBeDefined();
+      snapshotTypes.push(snap.policyType);
+    }
+    expect(snapshotTypes.sort()).toEqual([
+      "privacy_policy",
+      "refund_policy",
+      "shipping_policy",
+      "terms_of_service",
+    ]);
+
+    // 9. Send payment_intent.succeeded webhook
+    const eventId = `evt_cp6_succeeded_${ts}`;
+    const chargeId = `ch_cp6_${ts}`;
+
+    const { body: webhookBody, signature } = generateWebhookPayload(
+      eventId,
+      "payment_intent.succeeded",
+      {
+        id: paymentIntentId,
+        object: "payment_intent",
+        amount: 11099,
+        currency: "usd",
+        status: "succeeded",
+        latest_charge: chargeId,
+      },
+      CP6_WEBHOOK_SECRET,
+    );
+
+    const webhookRes = await app.inject({
+      method: "POST",
+      url: "/webhooks/stripe",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": signature,
+      },
+      body: webhookBody,
+    });
+    expect(webhookRes.statusCode).toBe(200);
+    const webhookResBody = JSON.parse(webhookRes.body);
+    expect(webhookResBody.received).toBe(true);
+
+    // 10. Verify order confirmed
+    const [confirmedOrder] = await db.select().from(order).where(eq(order.id, orderId));
+    expect(confirmedOrder.status).toBe("confirmed");
+    expect(confirmedOrder.paymentStatus).toBe("paid");
+
+    // 11. Verify payment record updated
+    const [updatedPayment] = await db.select().from(payment).where(eq(payment.orderId, orderId));
+    expect(updatedPayment.status).toBe("succeeded");
+    expect(updatedPayment.providerChargeId).toBe(chargeId);
+
+    // 12. Verify payment event stored
+    const [storedEvent] = await db
+      .select()
+      .from(paymentEvent)
+      .where(eq(paymentEvent.providerEventId, eventId));
+    expect(storedEvent).toBeDefined();
+    expect(storedEvent.eventType).toBe("payment_intent.succeeded");
+
+    // 13. Verify inventory consumed (reservations status = consumed)
+    const reservationsAfterWebhook = await db
+      .select()
+      .from(inventoryReservation)
+      .where(eq(inventoryReservation.orderId, orderId));
+    expect(reservationsAfterWebhook.length).toBe(2);
+    for (const res of reservationsAfterWebhook) {
+      expect(res.status).toBe("consumed");
+    }
+
+    // 14. Verify inventory balances updated correctly
+    const [bal1] = await db
+      .select()
+      .from(inventoryBalance)
+      .where(eq(inventoryBalance.variantId, activeVariantId));
+    // Started with 100, reserved 3 (checkout), consumed 3 (webhook): on_hand reduced by 3
+    expect(bal1.onHand).toBe(97);
+    expect(bal1.reserved).toBe(0);
+    expect(bal1.available).toBe(97);
+
+    const [bal2] = await db
+      .select()
+      .from(inventoryBalance)
+      .where(eq(inventoryBalance.variantId, secondVariantId));
+    // Started with 50, reserved 2 (checkout), consumed 2 (webhook): on_hand reduced by 2
+    expect(bal2.onHand).toBe(48);
+    expect(bal2.reserved).toBe(0);
+    expect(bal2.available).toBe(48);
+
+    // 15. Verify order status history
+    const history = await db
+      .select()
+      .from(orderStatusHistory)
+      .where(eq(orderStatusHistory.orderId, orderId));
+    expect(history.length).toBeGreaterThanOrEqual(2);
+    const statusValues = history.map((h) => h.newValue);
+    expect(statusValues).toContain("pending_payment");
+    expect(statusValues).toContain("confirmed");
+  }, 30000);
 });

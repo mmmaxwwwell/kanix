@@ -117,3 +117,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - SuperTokens' `verifyEmailPOST` override runs after the email is verified, so duplicate detection must call `EmailVerification.unverifyEmail()` to roll back if a conflict is found — the check-then-reject pattern requires a compensating action
 - The `AdminAlertService` must be passed through `SuperTokensConfig` since `initSuperTokens` is a singleton — it captures `config` in the closure, so the service from the first `createServer` call is the one used for all verification attempts
 - For integration tests, seeding a customer record directly in the DB (with a fake `authSubject`) simulates an existing account owning the email — SuperTokens prevents duplicate email signups, so you can't create two real accounts with the same email via email/password
+
+## T055 — Critical path checkpoint (Phase 6)
+- The Phase 6 critical path test appends to `critical-path.integration.test.ts` alongside Phase 3 and Phase 5 checkpoints — reuse the same `describeWithDb`, `isSuperTokensUp`, `signUpUser`, and `signInAndGetHeaders` helpers already in the file
+- Webhook signature generation requires a known secret matching the server config's `STRIPE_WEBHOOK_SECRET` — use a dedicated constant (e.g. `CP6_WEBHOOK_SECRET`) and pass it through `testConfig` override + `generateWebhookPayload`
+- After `consumeReservation`, inventory balance `on_hand` decreases by the consumed quantity (not just `reserved`→0 and `available` restored) — verify `on_hand = initial - consumed`, `reserved = 0`, `available = on_hand`
