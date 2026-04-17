@@ -10,14 +10,19 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix",
+    "lint": "eslint src/ && prettier --check src/",
+    "lint:fix": "eslint src/ --fix && prettier --write src/",
+    "format": "prettier --write src/",
     "typecheck": "tsc --noEmit",
     "migrate": "liquibase update",
     "migrate:rollback": "liquibase rollback-count 1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "@eslint/js": "^9.0.0",
+    "typescript-eslint": "^8.0.0",
+    "prettier": "^3.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"

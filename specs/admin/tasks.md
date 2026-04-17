@@ -39,7 +39,7 @@
 
 ## Phase 2: Test Infrastructure + Foundational Backend [FR-100, FR-103, FR-104, FR-105, FR-106, FR-107, FR-108, FR-109, FR-110, FR-111, FR-112, FR-113, FR-114]
 
-- [ ] T010 Initialize api/ with pnpm, TypeScript strict, Vitest, ESLint + Prettier [FR-100]
+- [x] T010 Initialize api/ with pnpm, TypeScript strict, Vitest, ESLint + Prettier [FR-100]
   Done when: `pnpm install --ignore-scripts` succeeds; `pnpm typecheck` passes; `pnpm lint` passes; `pnpm test` runs Vitest (no tests yet); `pnpm build` produces dist/
 
 - [ ] T011 Implement Vitest custom reporter for structured test output [FR-100]
