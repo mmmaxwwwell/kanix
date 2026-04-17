@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_stripe/flutter_stripe.dart' show CardField;
 import 'package:go_router/go_router.dart';
 
 import '../models/cart.dart';
 import '../providers/cart_provider.dart';
+import '../providers/stripe_provider.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key});
@@ -17,6 +19,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   ShippingRate? _selectedRate;
   bool _showNewAddressForm = false;
   bool _isProcessing = false;
+  bool _isCardComplete = false;
 
   // New address form
   final _formKey = GlobalKey<FormState>();
@@ -148,7 +151,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               const Divider(height: 24),
             ],
 
-            // Payment section
+            // Payment section (Stripe SDK)
             if (_selectedAddress != null && _selectedRate != null) ...[
               Text('Payment',
                   style: theme.textTheme.titleMedium
@@ -157,16 +160,29 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.credit_card,
-                          color: theme.colorScheme.primary),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text('Stripe Secure Payment'),
+                      Row(
+                        children: [
+                          Icon(Icons.credit_card,
+                              color: theme.colorScheme.primary),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text('Stripe Secure Payment'),
+                          ),
+                          Icon(Icons.lock,
+                              size: 16, color: theme.colorScheme.outline),
+                        ],
                       ),
-                      Icon(Icons.lock,
-                          size: 16, color: theme.colorScheme.outline),
+                      const SizedBox(height: 12),
+                      CardField(
+                        onCardChanged: (card) {
+                          setState(() {
+                            _isCardComplete = card?.complete ?? false;
+                          });
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -190,6 +206,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 onPressed:
                     _selectedAddress != null &&
                             _selectedRate != null &&
+                            _isCardComplete &&
                             !_isProcessing
                         ? _placeOrder
                         : null,
@@ -212,11 +229,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   Future<void> _placeOrder() async {
     setState(() => _isProcessing = true);
     try {
+      final paymentMethodId = await createCardPaymentMethod();
       final confirmation =
           await ref.read(checkoutProvider.notifier).placeOrder(
                 address: _selectedAddress!,
                 shippingRateId: _selectedRate!.id,
-                paymentMethodId: 'pm_stripe_placeholder',
+                paymentMethodId: paymentMethodId,
               );
       if (mounted) {
         context.go('/checkout/confirmation', extra: confirmation);

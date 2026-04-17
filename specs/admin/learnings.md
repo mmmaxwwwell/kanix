@@ -56,6 +56,9 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Flutter 3.41+ deprecates `RadioListTile.groupValue`/`onChanged` — use `RadioGroup<T>(groupValue:, onChanged:, child:)` as an ancestor widget wrapping a `Column` of `RadioListTile` children (parameter is `groupValue`, not `value`)
 - `CartNotifier` works well as a `Notifier<List<CartItem>>` (not Async) since cart state is local — keeps tests simple with `ProviderContainer` and no need to mock Dio; the API calls happen only at checkout time via a separate `AsyncNotifier`
 - When testing cart screen with items added programmatically via `ProviderScope.containerOf`, call `addItem` after `pumpWidget` + `pumpAndSettle` to ensure the container is accessible from the widget tree
+- `flutter_stripe` exports `Address` and `Card` types that conflict with Flutter's `Card` widget and the app's own `Address` model — use `show CardField` on the import to avoid ambiguous_import errors
+- `Stripe.publishableKey` must be set before any Stripe widget renders — initialize in `main.dart` via `String.fromEnvironment('STRIPE_PUBLISHABLE_KEY')` and optionally fetch from API at runtime via a `FutureProvider`
+- Stripe `CardField` widget is a platform view; it won't render in `flutter test` but won't crash either as long as the widget isn't mounted — existing tests that don't navigate to the payment section work fine without mocking Stripe
 
 ## T087 — Implement order history + tracking screens
 - Customer app needs its own `WebSocketNotifier` + `webSocketProvider` (mirroring admin's) since customer and admin are separate packages — can't import admin providers

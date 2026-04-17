@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 
 import 'config/router.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  Stripe.publishableKey = const String.fromEnvironment(
+    'STRIPE_PUBLISHABLE_KEY',
+    defaultValue: '',
+  );
   runApp(const ProviderScope(child: KanixCustomerApp()));
 }
 
