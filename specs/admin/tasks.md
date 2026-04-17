@@ -252,7 +252,7 @@
 - [x] T061a Implement duplicate ticket detection [FR-E028]
   Done when: when a customer creates a ticket for an order that already has an open/waiting ticket from the same customer within 24 hours, the new ticket is created but flagged with `potential_duplicate=true` and linked to the existing ticket; admin sees flag in ticket queue; admin can merge or dismiss; integration test: create ticket for order → create second ticket for same order within 24h → second ticket flagged; tickets >24h apart → no flag
 
-- [ ] T062 Implement ticket attachments [FR-053]
+- [x] T062 Implement ticket attachments [FR-053]
   Done when: POST /support/tickets/:id/attachments accepts JPEG/PNG/PDF up to 10MB, max 5 per message; stored via storage adapter (local filesystem dev, S3 prod); file access controlled: only ticket customer + admins; integration tests: upload valid file → accessible; upload invalid type → rejected; unauthorized access → 403
 
 - [ ] T063 Implement warranty claim flow [FR-055]

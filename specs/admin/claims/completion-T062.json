@@ -1,0 +1,23 @@
+{
+  "task_id": "T062",
+  "status": "complete",
+  "summary": "Implemented ticket attachments with storage adapter, attachment queries (CRUD with validation), admin+customer routes for upload/list/download, and integration tests covering valid uploads, invalid types, size limits, and max-per-message enforcement",
+  "commands_run": [
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/services/storage-adapter.ts",
+    "api/src/ticket-attachment.integration.test.ts",
+    "specs/admin/claims/completion-T062.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/support-ticket.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

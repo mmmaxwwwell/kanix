@@ -1,8 +1,9 @@
-import { eq, and, desc, gte, inArray } from "drizzle-orm";
+import { eq, and, desc, gte, inArray, isNull } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import {
   supportTicket,
   supportTicketMessage,
+  supportTicketAttachment,
   supportTicketStatusHistory,
 } from "../schema/support.js";
 
@@ -519,4 +520,159 @@ export async function mergeTicket(
 
     return updated;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Attachments
+// ---------------------------------------------------------------------------
+
+export const ALLOWED_ATTACHMENT_TYPES = ["image/jpeg", "image/png", "application/pdf"] as const;
+export const MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+export const MAX_ATTACHMENTS_PER_MESSAGE = 5;
+
+export interface AttachmentRecord {
+  id: string;
+  ticketId: string;
+  messageId: string | null;
+  storageKey: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: Date;
+}
+
+const attachmentColumns = {
+  id: supportTicketAttachment.id,
+  ticketId: supportTicketAttachment.ticketId,
+  messageId: supportTicketAttachment.messageId,
+  storageKey: supportTicketAttachment.storageKey,
+  fileName: supportTicketAttachment.fileName,
+  contentType: supportTicketAttachment.contentType,
+  sizeBytes: supportTicketAttachment.sizeBytes,
+  createdAt: supportTicketAttachment.createdAt,
+};
+
+export interface CreateAttachmentInput {
+  ticketId: string;
+  messageId?: string;
+  storageKey: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+}
+
+export async function createTicketAttachment(
+  db: PostgresJsDatabase,
+  input: CreateAttachmentInput,
+): Promise<AttachmentRecord> {
+  // Verify ticket exists
+  const [ticket] = await db
+    .select({ id: supportTicket.id })
+    .from(supportTicket)
+    .where(eq(supportTicket.id, input.ticketId));
+
+  if (!ticket) {
+    throw {
+      code: "ERR_TICKET_NOT_FOUND",
+      message: `Support ticket ${input.ticketId} not found`,
+    };
+  }
+
+  // Validate content type
+  if (!(ALLOWED_ATTACHMENT_TYPES as readonly string[]).includes(input.contentType)) {
+    throw {
+      code: "ERR_INVALID_CONTENT_TYPE",
+      message: `Invalid content type: ${input.contentType}. Allowed: ${ALLOWED_ATTACHMENT_TYPES.join(", ")}`,
+    };
+  }
+
+  // Validate size
+  if (input.sizeBytes > MAX_ATTACHMENT_SIZE_BYTES) {
+    throw {
+      code: "ERR_FILE_TOO_LARGE",
+      message: `File size ${input.sizeBytes} exceeds maximum of ${MAX_ATTACHMENT_SIZE_BYTES} bytes`,
+    };
+  }
+
+  // Check max attachments per message (if messageId provided)
+  if (input.messageId) {
+    const existingCount = await db
+      .select({ id: supportTicketAttachment.id })
+      .from(supportTicketAttachment)
+      .where(eq(supportTicketAttachment.messageId, input.messageId));
+
+    if (existingCount.length >= MAX_ATTACHMENTS_PER_MESSAGE) {
+      throw {
+        code: "ERR_TOO_MANY_ATTACHMENTS",
+        message: `Maximum of ${MAX_ATTACHMENTS_PER_MESSAGE} attachments per message exceeded`,
+      };
+    }
+  }
+
+  // Check max attachments per ticket (when no messageId, it's attached to ticket directly)
+  if (!input.messageId) {
+    const existingCount = await db
+      .select({ id: supportTicketAttachment.id })
+      .from(supportTicketAttachment)
+      .where(
+        and(
+          eq(supportTicketAttachment.ticketId, input.ticketId),
+          isNull(supportTicketAttachment.messageId),
+        ),
+      );
+
+    if (existingCount.length >= MAX_ATTACHMENTS_PER_MESSAGE) {
+      throw {
+        code: "ERR_TOO_MANY_ATTACHMENTS",
+        message: `Maximum of ${MAX_ATTACHMENTS_PER_MESSAGE} attachments per ticket exceeded`,
+      };
+    }
+  }
+
+  const [row] = await db
+    .insert(supportTicketAttachment)
+    .values({
+      ticketId: input.ticketId,
+      messageId: input.messageId ?? null,
+      storageKey: input.storageKey,
+      fileName: input.fileName,
+      contentType: input.contentType,
+      sizeBytes: input.sizeBytes,
+    })
+    .returning(attachmentColumns);
+
+  return row;
+}
+
+export async function findAttachmentById(
+  db: PostgresJsDatabase,
+  id: string,
+): Promise<AttachmentRecord | null> {
+  const [row] = await db
+    .select(attachmentColumns)
+    .from(supportTicketAttachment)
+    .where(eq(supportTicketAttachment.id, id));
+  return row ?? null;
+}
+
+export async function listAttachmentsByTicketId(
+  db: PostgresJsDatabase,
+  ticketId: string,
+): Promise<AttachmentRecord[]> {
+  return db
+    .select(attachmentColumns)
+    .from(supportTicketAttachment)
+    .where(eq(supportTicketAttachment.ticketId, ticketId))
+    .orderBy(supportTicketAttachment.createdAt);
+}
+
+export async function deleteTicketAttachment(
+  db: PostgresJsDatabase,
+  id: string,
+): Promise<AttachmentRecord | null> {
+  const [row] = await db
+    .delete(supportTicketAttachment)
+    .where(eq(supportTicketAttachment.id, id))
+    .returning(attachmentColumns);
+  return row ?? null;
 }

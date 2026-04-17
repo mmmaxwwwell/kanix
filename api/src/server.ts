@@ -170,9 +170,16 @@ import {
   findTicketStatusHistory,
   dismissDuplicate,
   mergeTicket,
+  createTicketAttachment,
+  findAttachmentById,
+  listAttachmentsByTicketId,
+  ALLOWED_ATTACHMENT_TYPES,
+  MAX_ATTACHMENT_SIZE_BYTES,
 } from "./db/queries/support-ticket.js";
+import { createStorageAdapter, type StorageAdapter } from "./services/storage-adapter.js";
 import Stripe from "stripe";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -215,6 +222,8 @@ export interface CreateServerOptions {
   adminAlertService?: AdminAlertService;
   /** Override the notification service (useful for testing). */
   notificationService?: NotificationService;
+  /** Override the storage adapter (useful for testing). */
+  storageAdapter?: StorageAdapter;
 }
 
 export interface ServerInstance {
@@ -226,6 +235,7 @@ export interface ServerInstance {
   shippingAdapter: ShippingAdapter;
   paymentAdapter: PaymentAdapter;
   notificationService: NotificationService;
+  storageAdapter: StorageAdapter;
   start(): Promise<string>;
 }
 
@@ -274,6 +284,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       stripeSecretKey: config.STRIPE_SECRET_KEY,
     });
   const notificationService = options.notificationService ?? createNotificationService();
+  const storageAdapter = options.storageAdapter ?? createStorageAdapter();
 
   const logger = createLogger({
     level: config.LOG_LEVEL,
@@ -2398,6 +2409,297 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           includeInternalNotes: false,
         });
         return { messages };
+      },
+    );
+
+    // -----------------------------------------------------------------------
+    // Ticket Attachments (T062)
+    // -----------------------------------------------------------------------
+
+    // POST /api/admin/support-tickets/:id/attachments — admin uploads attachment
+    app.post(
+      "/api/admin/support-tickets/:id/attachments",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SUPPORT_MANAGE)],
+        schema: {
+          body: {
+            type: "object",
+            required: ["fileName", "contentType", "data"],
+            properties: {
+              fileName: { type: "string", minLength: 1 },
+              contentType: { type: "string" },
+              data: { type: "string", description: "Base64-encoded file data" },
+              messageId: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as {
+          fileName: string;
+          contentType: string;
+          data: string;
+          messageId?: string;
+        };
+
+        if (!(ALLOWED_ATTACHMENT_TYPES as readonly string[]).includes(body.contentType)) {
+          return reply.status(400).send({
+            error: "ERR_INVALID_CONTENT_TYPE",
+            message: `Invalid content type: ${body.contentType}. Allowed: ${ALLOWED_ATTACHMENT_TYPES.join(", ")}`,
+          });
+        }
+
+        const fileBuffer = Buffer.from(body.data, "base64");
+        if (fileBuffer.length > MAX_ATTACHMENT_SIZE_BYTES) {
+          return reply.status(400).send({
+            error: "ERR_FILE_TOO_LARGE",
+            message: `File size exceeds maximum of ${MAX_ATTACHMENT_SIZE_BYTES} bytes`,
+          });
+        }
+
+        const storageKey = `tickets/${id}/${randomUUID()}/${body.fileName}`;
+        await storageAdapter.put(storageKey, fileBuffer, body.contentType);
+
+        try {
+          const attachment = await createTicketAttachment(database.db, {
+            ticketId: id,
+            messageId: body.messageId,
+            storageKey,
+            fileName: body.fileName,
+            contentType: body.contentType,
+            sizeBytes: fileBuffer.length,
+          });
+
+          request.auditContext = {
+            action: "attachment.upload",
+            entityType: "support_ticket_attachment",
+            entityId: attachment.id,
+          };
+
+          return reply.status(201).send({ attachment });
+        } catch (err: unknown) {
+          // Clean up stored file on DB failure
+          await storageAdapter.delete(storageKey);
+          const errObj = err as { code?: string; message?: string };
+          if (
+            errObj.code === "ERR_TICKET_NOT_FOUND" ||
+            errObj.code === "ERR_TOO_MANY_ATTACHMENTS" ||
+            errObj.code === "ERR_INVALID_CONTENT_TYPE"
+          ) {
+            const status = errObj.code === "ERR_TICKET_NOT_FOUND" ? 404 : 400;
+            return reply.status(status).send({ error: errObj.code, message: errObj.message });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // GET /api/admin/support-tickets/:id/attachments — list attachments
+    app.get(
+      "/api/admin/support-tickets/:id/attachments",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SUPPORT_READ)],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const ticket = await findTicketById(database.db, id);
+        if (!ticket) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_TICKET_NOT_FOUND", message: "Support ticket not found" });
+        }
+        const attachments = await listAttachmentsByTicketId(database.db, id);
+        return { attachments };
+      },
+    );
+
+    // GET /api/admin/support-tickets/:id/attachments/:attachmentId/download — download attachment
+    app.get(
+      "/api/admin/support-tickets/:id/attachments/:attachmentId/download",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SUPPORT_READ)],
+      },
+      async (request, reply) => {
+        const { id, attachmentId } = request.params as { id: string; attachmentId: string };
+        const attachment = await findAttachmentById(database.db, attachmentId);
+        if (!attachment || attachment.ticketId !== id) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_ATTACHMENT_NOT_FOUND", message: "Attachment not found" });
+        }
+
+        const file = await storageAdapter.get(attachment.storageKey);
+        if (!file) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_FILE_NOT_FOUND", message: "File not found in storage" });
+        }
+
+        return reply
+          .header("Content-Type", attachment.contentType)
+          .header("Content-Disposition", `attachment; filename="${attachment.fileName}"`)
+          .send(file.data);
+      },
+    );
+
+    // POST /api/support/tickets/:id/attachments — customer uploads attachment
+    app.post(
+      "/api/support/tickets/:id/attachments",
+      {
+        preHandler: [verifySession, requireVerifiedEmail],
+        schema: {
+          body: {
+            type: "object",
+            required: ["fileName", "contentType", "data"],
+            properties: {
+              fileName: { type: "string", minLength: 1 },
+              contentType: { type: "string" },
+              data: { type: "string", description: "Base64-encoded file data" },
+              messageId: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const session = (request as unknown as { session: { getUserId: () => string } }).session;
+        const authSubject = session.getUserId();
+        const customerRow = await getCustomerByAuthSubject(database.db, authSubject);
+        if (!customerRow) {
+          return reply
+            .status(401)
+            .send({ error: "ERR_NOT_CUSTOMER", message: "Customer not found" });
+        }
+
+        const { id } = request.params as { id: string };
+        const ticket = await findTicketById(database.db, id);
+        if (!ticket || ticket.customerId !== customerRow.id) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_TICKET_NOT_FOUND", message: "Support ticket not found" });
+        }
+
+        const body = request.body as {
+          fileName: string;
+          contentType: string;
+          data: string;
+          messageId?: string;
+        };
+
+        if (!(ALLOWED_ATTACHMENT_TYPES as readonly string[]).includes(body.contentType)) {
+          return reply.status(400).send({
+            error: "ERR_INVALID_CONTENT_TYPE",
+            message: `Invalid content type: ${body.contentType}. Allowed: ${ALLOWED_ATTACHMENT_TYPES.join(", ")}`,
+          });
+        }
+
+        const fileBuffer = Buffer.from(body.data, "base64");
+        if (fileBuffer.length > MAX_ATTACHMENT_SIZE_BYTES) {
+          return reply.status(400).send({
+            error: "ERR_FILE_TOO_LARGE",
+            message: `File size exceeds maximum of ${MAX_ATTACHMENT_SIZE_BYTES} bytes`,
+          });
+        }
+
+        const storageKey = `tickets/${id}/${randomUUID()}/${body.fileName}`;
+        await storageAdapter.put(storageKey, fileBuffer, body.contentType);
+
+        try {
+          const attachment = await createTicketAttachment(database.db, {
+            ticketId: id,
+            messageId: body.messageId,
+            storageKey,
+            fileName: body.fileName,
+            contentType: body.contentType,
+            sizeBytes: fileBuffer.length,
+          });
+
+          return reply.status(201).send({ attachment });
+        } catch (err: unknown) {
+          await storageAdapter.delete(storageKey);
+          const errObj = err as { code?: string; message?: string };
+          if (
+            errObj.code === "ERR_TICKET_NOT_FOUND" ||
+            errObj.code === "ERR_TOO_MANY_ATTACHMENTS" ||
+            errObj.code === "ERR_INVALID_CONTENT_TYPE"
+          ) {
+            const status = errObj.code === "ERR_TICKET_NOT_FOUND" ? 404 : 400;
+            return reply.status(status).send({ error: errObj.code, message: errObj.message });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // GET /api/support/tickets/:id/attachments — customer lists attachments
+    app.get(
+      "/api/support/tickets/:id/attachments",
+      {
+        preHandler: [verifySession, requireVerifiedEmail],
+      },
+      async (request, reply) => {
+        const session = (request as unknown as { session: { getUserId: () => string } }).session;
+        const authSubject = session.getUserId();
+        const customerRow = await getCustomerByAuthSubject(database.db, authSubject);
+        if (!customerRow) {
+          return reply
+            .status(401)
+            .send({ error: "ERR_NOT_CUSTOMER", message: "Customer not found" });
+        }
+
+        const { id } = request.params as { id: string };
+        const ticket = await findTicketById(database.db, id);
+        if (!ticket || ticket.customerId !== customerRow.id) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_TICKET_NOT_FOUND", message: "Support ticket not found" });
+        }
+
+        const attachments = await listAttachmentsByTicketId(database.db, id);
+        return { attachments };
+      },
+    );
+
+    // GET /api/support/tickets/:id/attachments/:attachmentId/download — customer downloads
+    app.get(
+      "/api/support/tickets/:id/attachments/:attachmentId/download",
+      {
+        preHandler: [verifySession, requireVerifiedEmail],
+      },
+      async (request, reply) => {
+        const session = (request as unknown as { session: { getUserId: () => string } }).session;
+        const authSubject = session.getUserId();
+        const customerRow = await getCustomerByAuthSubject(database.db, authSubject);
+        if (!customerRow) {
+          return reply.status(403).send({ error: "ERR_FORBIDDEN", message: "Not authorized" });
+        }
+
+        const { id, attachmentId } = request.params as { id: string; attachmentId: string };
+        const ticket = await findTicketById(database.db, id);
+        if (!ticket || ticket.customerId !== customerRow.id) {
+          return reply
+            .status(403)
+            .send({ error: "ERR_FORBIDDEN", message: "Not authorized to access this attachment" });
+        }
+
+        const attachment = await findAttachmentById(database.db, attachmentId);
+        if (!attachment || attachment.ticketId !== id) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_ATTACHMENT_NOT_FOUND", message: "Attachment not found" });
+        }
+
+        const file = await storageAdapter.get(attachment.storageKey);
+        if (!file) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_FILE_NOT_FOUND", message: "File not found in storage" });
+        }
+
+        return reply
+          .header("Content-Type", attachment.contentType)
+          .header("Content-Disposition", `attachment; filename="${attachment.fileName}"`)
+          .send(file.data);
       },
     );
 
@@ -5041,6 +5343,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     shippingAdapter,
     paymentAdapter,
     notificationService,
+    storageAdapter,
     start,
   };
 }

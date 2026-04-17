@@ -56,3 +56,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Self-referencing FKs (`linked_ticket_id`, `merged_into_ticket_id` → `support_ticket.id`) require clearing these columns before deleting tickets in test cleanup, otherwise FK violations occur
 - Duplicate detection is best done in the `createSupportTicket` query function itself (not in routes) so both customer and admin ticket creation paths benefit automatically
 - The `support_ticket_status_history.actor_admin_user_id` has a real FK constraint — test code using fake admin UUIDs (e.g., `00000000-...01`) will fail on insert; use `null` in tests without a real admin user
+
+## T062 — Implement ticket attachments
+- The `supportTicketAttachment` schema already existed in `support.ts` and DB migration in `002-core-entities.xml` — only query functions, routes, storage adapter, and tests needed to be created
+- No `@fastify/multipart` needed: base64-encoded JSON body approach avoids adding a dependency and simplifies integration testing (send base64 data via JSON POST rather than multipart form data)
+- Test cleanup for attachments must delete `supportTicketAttachment` rows BEFORE `supportTicketMessage` rows due to the FK from attachment.message_id → message.id
