@@ -218,7 +218,7 @@
 - [x] T056 Implement fulfillment task system [FR-039, FR-040, FR-041, FR-042, FR-042a]
   Done when: fulfillment_task auto-created when order.payment_status → paid; state machine: new→assigned→picking→picked→packing→packed→shipment_pending→done; blocked state for exceptions; assignment API with admin_user_id; validation: cannot start until payment_status=paid; next-day SLA: orders confirmed before configurable cutoff (default 2:00 PM local) get priority=`high` and flag `sla_at_risk` on dashboard; integration tests: payment succeeds → task created; walk task through full lifecycle; invalid transitions rejected; order before cutoff → high priority; order after cutoff → normal priority
 
-- [ ] T057 Implement EasyPost adapter [FR-043, FR-049] [produces: IC-006]
+- [x] T057 Implement EasyPost adapter [FR-043, FR-049] [produces: IC-006]
   Done when: `shippingAdapter.getRates(fromAddress, toAddress, packages)` returns carrier rates; `shippingAdapter.buyLabel(rateId)` purchases label and returns tracking number + label URL; `shippingAdapter.getTracking(trackerId)` returns tracking status; adapter interface allows provider swap via config; integration tests (EasyPost test mode): get rates → buy label → verify tracking number returned
 
 - [ ] T058 Implement shipment system [FR-044, FR-046, FR-047, FR-048]

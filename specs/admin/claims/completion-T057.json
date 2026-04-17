@@ -1,0 +1,29 @@
+{
+  "task_id": "T057",
+  "status": "complete",
+  "summary": "Implemented EasyPost shipping adapter with getRates, buyLabel, getTracking, and voidLabel methods; updated stub adapter and all test stubs; wrote integration tests covering full flow",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/shipping-adapter.integration.test.ts",
+    "specs/admin/claims/completion-T057.json"
+  ],
+  "files_modified": [
+    "api/src/services/shipping-adapter.ts",
+    "api/src/checkout.integration.test.ts",
+    "api/src/critical-path.integration.test.ts",
+    "api/src/order-cancel.integration.test.ts",
+    "api/src/policy-acknowledgment.integration.test.ts",
+    "api/src/refund.integration.test.ts",
+    "api/src/reservation-expiry-race.integration.test.ts",
+    "api/src/stripe-unreachable.integration.test.ts",
+    "api/src/webhook.integration.test.ts",
+    "specs/admin/learnings.md",
+    "specs/admin/tasks.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

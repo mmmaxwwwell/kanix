@@ -9,7 +9,7 @@ import { product, productVariant } from "./db/schema/catalog.js";
 import { inventoryBalance, inventoryLocation } from "./db/schema/inventory.js";
 import { policySnapshot, orderPolicyAcknowledgment } from "./db/schema/evidence.js";
 import type { TaxAdapter } from "./services/tax-adapter.js";
-import type { ShippingAdapter } from "./services/shipping-adapter.js";
+import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 import type { PaymentAdapter } from "./services/payment-adapter.js";
 
 const DATABASE_URL = process.env["DATABASE_URL"];
@@ -53,19 +53,6 @@ function createStubTaxAdapter(): TaxAdapter {
   return {
     async calculate() {
       return { taxAmountMinor: 0, calculationId: null };
-    },
-  };
-}
-
-function createStubShippingAdapter(): ShippingAdapter {
-  return {
-    async calculateRate() {
-      return {
-        shippingAmountMinor: 599,
-        carrier: "USPS",
-        service: "Priority",
-        rateId: null,
-      };
     },
   };
 }

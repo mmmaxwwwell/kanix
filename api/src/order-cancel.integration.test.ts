@@ -15,7 +15,7 @@ import { order } from "./db/schema/order.js";
 import { payment, refund } from "./db/schema/payment.js";
 import { adminUser, adminRole, adminUserRole } from "./db/schema/admin.js";
 import type { TaxAdapter } from "./services/tax-adapter.js";
-import type { ShippingAdapter } from "./services/shipping-adapter.js";
+import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 import type { PaymentAdapter } from "./services/payment-adapter.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
 import { createHmac } from "node:crypto";
@@ -62,19 +62,6 @@ function createStubTaxAdapter(): TaxAdapter {
   return {
     async calculate() {
       return { taxAmountMinor: 0, calculationId: null };
-    },
-  };
-}
-
-function createStubShippingAdapter(): ShippingAdapter {
-  return {
-    async calculateRate() {
-      return {
-        shippingAmountMinor: 599,
-        carrier: "USPS",
-        service: "Priority",
-        rateId: null,
-      };
     },
   };
 }

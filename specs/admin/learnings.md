@@ -83,3 +83,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The fulfillment_task Drizzle schema and DB migration already existed — only the query layer, state machine logic, admin routes, and integration tests needed to be created
 - The `blocked` state in the fulfillment task state machine can transition back to ANY active state (recovery) — model this in the transition map with `blocked: [...ACTIVE_STATES]`
 - Auto-creation of fulfillment tasks is wired into `handlePaymentSucceeded` in webhook.ts — wrap in try/catch so fulfillment task creation failures don't block payment confirmation
+
+## T057 — Implement EasyPost adapter
+- Extending `ShippingAdapter` interface with new methods requires updating all test file stubs — export `createStubShippingAdapter()` from the adapter module so tests can import it directly instead of defining local copies
+- EasyPost `Shipment.buy(shipmentId, rateId)` returns the purchased shipment with `tracking_code`, `postage_label.label_url`, and `tracker.id` — these are the three key fields needed for `BuyLabelResult`
+- Stub adapter params that are unused should omit parameter names entirely (matching the existing `calculateRate()` pattern) to avoid `@typescript-eslint/no-unused-vars` lint errors
