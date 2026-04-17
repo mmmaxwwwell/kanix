@@ -8,7 +8,7 @@
 
 ## Phase 1: Repo Restructure + Nix Flakes [FR-098, FR-099]
 
-- [ ] T001 Create root flake.nix composing all sub-flakes [FR-098]
+- [x] T001 Create root flake.nix composing all sub-flakes [FR-098]
   Done when: `nix flake check` passes; `nix develop` enters shell with nodejs_22, pnpm, flutter, opentofu, liquibase, postgresql, process-compose, openscad, trivy, semgrep, gitleaks; `.envrc` auto-activates via direnv
 
 - [ ] T002 Reorganize scad/ with its own flake.nix [FR-098]
