@@ -94,3 +94,12 @@ export {
   validateAddressFields,
 } from "./address.js";
 export type { NewCustomerAddress, CustomerAddress } from "./address.js";
+export {
+  createCart,
+  findCartByToken,
+  findActiveCartByCustomerId,
+  addCartItem,
+  removeCartItem,
+  getCartWithItems,
+} from "./cart.js";
+export type { Cart, CartLine, CartLineWithDetails, CartWithItems } from "./cart.js";

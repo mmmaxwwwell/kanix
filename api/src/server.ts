@@ -73,6 +73,14 @@ import {
   validateAddressFields,
 } from "./db/queries/address.js";
 import {
+  createCart,
+  findCartByToken,
+  findActiveCartByCustomerId,
+  addCartItem,
+  removeCartItem,
+  getCartWithItems,
+} from "./db/queries/cart.js";
+import {
   reserveInventory,
   consumeReservation,
   releaseReservation,
@@ -2093,6 +2101,146 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         });
       }
       return reply.status(200).send({ product: found });
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Cart API — guest carts via X-Cart-Token, authenticated via session
+  // -------------------------------------------------------------------------
+
+  if (database) {
+    const db = database.db;
+
+    // POST /api/cart — create a new guest cart (or return existing for authenticated user)
+    app.post("/api/cart", async (request, reply) => {
+      // Check if authenticated customer via session (optional)
+      let customerId: string | undefined;
+      const session = request.session;
+      if (session) {
+        try {
+          const authSubject = session.getUserId();
+          const customer = await getCustomerByAuthSubject(db, authSubject);
+          if (customer) {
+            customerId = customer.id;
+            // Return existing active cart if one exists
+            const existing = await findActiveCartByCustomerId(db, customerId);
+            if (existing) {
+              const cartWithItems = await getCartWithItems(db, existing.id);
+              return reply.status(200).send({ cart: cartWithItems });
+            }
+          }
+        } catch {
+          // Session invalid — create guest cart
+        }
+      }
+
+      const newCart = await createCart(db, customerId);
+      const cartWithItems = await getCartWithItems(db, newCart.id);
+      return reply.status(201).send({ cart: cartWithItems });
+    });
+
+    // Helper to resolve cart from X-Cart-Token header
+    async function resolveCart(request: {
+      headers: Record<string, string | string[] | undefined>;
+    }) {
+      const token = request.headers["x-cart-token"] as string | undefined;
+      if (!token) return undefined;
+      return findCartByToken(db, token);
+    }
+
+    // POST /api/cart/items — add item to cart
+    app.post("/api/cart/items", async (request, reply) => {
+      const cartRow = await resolveCart(request);
+      if (!cartRow) {
+        return reply.status(404).send({
+          error: "ERR_CART_NOT_FOUND",
+          message: "Cart not found. Create a cart first or provide a valid X-Cart-Token.",
+        });
+      }
+
+      const body = request.body as {
+        variant_id?: string;
+        quantity?: number;
+      };
+
+      if (!body.variant_id) {
+        return reply.status(400).send({
+          error: "ERR_VALIDATION",
+          message: "variant_id is required",
+        });
+      }
+
+      const quantity = body.quantity ?? 1;
+      if (quantity < 1) {
+        return reply.status(400).send({
+          error: "ERR_VALIDATION",
+          message: "quantity must be at least 1",
+        });
+      }
+
+      try {
+        const item = await addCartItem(db, cartRow.id, body.variant_id, quantity);
+        const cartWithItems = await getCartWithItems(db, cartRow.id);
+        return reply.status(201).send({ item, cart: cartWithItems });
+      } catch (err: unknown) {
+        const appErr = err as { code?: string; message?: string };
+        if (appErr.code === "ERR_VARIANT_NOT_FOUND") {
+          return reply.status(404).send({
+            error: "ERR_VARIANT_NOT_FOUND",
+            message: "Variant not found",
+          });
+        }
+        if (appErr.code === "ERR_VARIANT_NOT_AVAILABLE") {
+          return reply.status(400).send({
+            error: "ERR_VARIANT_NOT_AVAILABLE",
+            message: "Variant is not available for purchase",
+          });
+        }
+        if (appErr.code === "ERR_INVENTORY_INSUFFICIENT") {
+          return reply.status(400).send({
+            error: "ERR_INVENTORY_INSUFFICIENT",
+            message: appErr.message ?? "Insufficient inventory",
+          });
+        }
+        throw err;
+      }
+    });
+
+    // DELETE /api/cart/items/:id — remove item from cart
+    app.delete("/api/cart/items/:id", async (request, reply) => {
+      const cartRow = await resolveCart(request);
+      if (!cartRow) {
+        return reply.status(404).send({
+          error: "ERR_CART_NOT_FOUND",
+          message: "Cart not found",
+        });
+      }
+
+      const { id } = request.params as { id: string };
+      const removed = await removeCartItem(db, id, cartRow.id);
+      if (!removed) {
+        return reply.status(404).send({
+          error: "ERR_CART_ITEM_NOT_FOUND",
+          message: "Cart item not found",
+        });
+      }
+
+      const cartWithItems = await getCartWithItems(db, cartRow.id);
+      return reply.status(200).send({ cart: cartWithItems });
+    });
+
+    // GET /api/cart — get cart with current prices + availability
+    app.get("/api/cart", async (request, reply) => {
+      const cartRow = await resolveCart(request);
+      if (!cartRow) {
+        return reply.status(404).send({
+          error: "ERR_CART_NOT_FOUND",
+          message: "Cart not found. Provide a valid X-Cart-Token header.",
+        });
+      }
+
+      const cartWithItems = await getCartWithItems(db, cartRow.id);
+      return reply.status(200).send({ cart: cartWithItems });
     });
   }
 

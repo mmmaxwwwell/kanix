@@ -166,7 +166,7 @@
 
 ## Phase 6: Cart + Checkout + Payments [FR-007 through FR-018, FR-019 through FR-031, FR-117 through FR-120]
 
-- [ ] T046 Implement cart API [FR-012, FR-013, FR-014] [produces: IC-010]
+- [x] T046 Implement cart API [FR-012, FR-013, FR-014] [produces: IC-010]
   Done when: POST /api/cart (creates guest cart, returns `cart.token` UUID — distinct from `cart.id` PK for security); POST /api/cart/items (add variant, validate availability); DELETE /api/cart/items/:id; GET /api/cart (returns items with current prices + availability); guest carts looked up by `token` column via `X-Cart-Token` header; authenticated carts linked to customer_id; cart validates inventory on read (stale items flagged); integration tests: create guest cart → add items → verify totals; add out-of-stock item → rejected
 
 - [ ] T047 Implement kit composition system [FR-007, FR-008, FR-009, FR-010, FR-011]
