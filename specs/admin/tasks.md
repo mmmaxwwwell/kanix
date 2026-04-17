@@ -29,7 +29,7 @@
 - [x] T007 Create process-compose.yml for dev services [FR-099]
   Done when: `process-compose up` starts Postgres on port 5432 and SuperTokens on port 3567; `pg_isready` confirms Postgres is up; health check confirms SuperTokens is up
 
-- [ ] T008 Create .env.example with all environment variables [FR-112]
+- [x] T008 Create .env.example with all environment variables [FR-112]
   Done when: .env.example lists every config key from spec (DATABASE_URL, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_TAX_ENABLED, SUPERTOKENS_API_KEY, SUPERTOKENS_CONNECTION_URI, EASYPOST_API_KEY, GITHUB_OAUTH_CLIENT_ID, GITHUB_OAUTH_CLIENT_SECRET, LOG_LEVEL, PORT) with placeholder values and comments
 
 - [ ] T009 Update .gitignore for all new directories
