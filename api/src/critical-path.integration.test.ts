@@ -333,9 +333,7 @@ describeWithDb("critical path checkpoint (Phase 5)", () => {
         await dbConn.db.delete(inventoryLocation).where(eq(inventoryLocation.id, testLocationId));
         await dbConn.db.delete(productVariant).where(eq(productVariant.id, testVariantId));
         await dbConn.db.delete(product).where(eq(product.id, testProductId));
-        await dbConn.db
-          .delete(adminUserRole)
-          .where(eq(adminUserRole.adminUserId, testAdminUserId));
+        await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, testAdminUserId));
         await dbConn.db.delete(adminUser).where(eq(adminUser.id, testAdminUserId));
         await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));
         await dbConn.db
@@ -372,10 +370,11 @@ describeWithDb("critical path checkpoint (Phase 5)", () => {
     };
     const cp5Product = listBody.products.find((p) => p.slug === testSlug);
     expect(cp5Product).toBeDefined();
-    expect(cp5Product!.variants.length).toBe(1);
-    expect(cp5Product!.variants[0].priceMinor).toBe(2999);
-    expect(cp5Product!.variants[0].available).toBe(50);
-    expect(cp5Product!.variants[0].inStock).toBe(true);
+    if (!cp5Product) throw new Error("cp5Product not found");
+    expect(cp5Product.variants.length).toBe(1);
+    expect(cp5Product.variants[0].priceMinor).toBe(2999);
+    expect(cp5Product.variants[0].available).toBe(50);
+    expect(cp5Product.variants[0].inStock).toBe(true);
 
     // 2. Check inventory via admin API
     const balanceRes = await fetch(
