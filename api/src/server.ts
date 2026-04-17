@@ -103,6 +103,7 @@ import {
   type LowStockAlertService,
 } from "./services/low-stock-alert.js";
 import { createAdminAlertService, type AdminAlertService } from "./services/admin-alert.js";
+import { createNotificationService, type NotificationService } from "./services/notification.js";
 import { createTaxAdapter, type TaxAdapter } from "./services/tax-adapter.js";
 import { createShippingAdapter, type ShippingAdapter } from "./services/shipping-adapter.js";
 import { sql } from "drizzle-orm";
@@ -116,6 +117,7 @@ import {
 } from "./db/queries/order-state-machine.js";
 import type { OrderStatusType } from "./db/queries/order-state-machine.js";
 import { cancelOrder } from "./db/queries/order-cancel.js";
+import { resendOrderConfirmation } from "./db/queries/order-resend-confirmation.js";
 import {
   listFulfillmentTasks,
   findFulfillmentTaskById,
@@ -199,6 +201,8 @@ export interface CreateServerOptions {
   paymentAdapter?: PaymentAdapter;
   /** Override the admin alert service (useful for testing). */
   adminAlertService?: AdminAlertService;
+  /** Override the notification service (useful for testing). */
+  notificationService?: NotificationService;
 }
 
 export interface ServerInstance {
@@ -209,6 +213,7 @@ export interface ServerInstance {
   taxAdapter: TaxAdapter;
   shippingAdapter: ShippingAdapter;
   paymentAdapter: PaymentAdapter;
+  notificationService: NotificationService;
   start(): Promise<string>;
 }
 
@@ -256,6 +261,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     createPaymentAdapter({
       stripeSecretKey: config.STRIPE_SECRET_KEY,
     });
+  const notificationService = options.notificationService ?? createNotificationService();
 
   const logger = createLogger({
     level: config.LOG_LEVEL,
@@ -1144,6 +1150,45 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           if (error.code === "ERR_INVALID_TRANSITION") {
             return reply.status(400).send({
               error: "ERR_INVALID_TRANSITION",
+              message: error.message,
+            });
+          }
+          throw err;
+        }
+      },
+    );
+
+    // Resend order confirmation email
+    app.post(
+      "/api/admin/orders/:id/resend-confirmation",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.ORDERS_MANAGE)],
+      },
+      async (request, reply) => {
+        const { id: orderId } = request.params as { id: string };
+
+        try {
+          const result = await resendOrderConfirmation(database.db, orderId, notificationService);
+
+          request.auditContext = {
+            action: "order.resend_confirmation",
+            entityType: "order",
+            entityId: orderId,
+            afterJson: { email: result.email },
+          };
+
+          return result;
+        } catch (err: unknown) {
+          const error = err as { code?: string; message?: string };
+          if (error.code === "ERR_ORDER_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_ORDER_NOT_FOUND",
+              message: error.message,
+            });
+          }
+          if (error.code === "ERR_RATE_LIMIT_EXCEEDED") {
+            return reply.status(429).send({
+              error: "ERR_RATE_LIMIT_EXCEEDED",
               message: error.message,
             });
           }
@@ -4391,6 +4436,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     taxAdapter,
     shippingAdapter,
     paymentAdapter,
+    notificationService,
     start,
   };
 }

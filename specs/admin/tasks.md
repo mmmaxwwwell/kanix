@@ -236,7 +236,7 @@
 - [x] T059c Implement shipment mark-shipped API [P]
   Done when: POST /admin/shipments/:id/mark-shipped transitions shipment.status → `shipped`; records shipped_at timestamp; only valid from `ready` status; integration test: ready shipment → mark-shipped → status=shipped + shipped_at set
 
-- [ ] T059d Implement order resend-confirmation API [P]
+- [x] T059d Implement order resend-confirmation API [P]
   Done when: POST /admin/orders/:id/resend-confirmation queues order confirmation notification (via notification service / email stub); rate-limited to prevent spam (max 1 per 5 minutes per order); integration test: resend → email logged to stub; rapid resend → rate limited
 
 - [ ] T060 Implement fulfillment → shipping status propagation [FR-039, FR-044]

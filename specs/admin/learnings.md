@@ -111,3 +111,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 
 ## T059c — Implement shipment mark-shipped API
 - The `transitionShipmentStatus` already sets `shippedAt` on transition to "shipped" — for a dedicated mark-shipped endpoint, a standalone `markShipmentShipped` function with explicit `ready`-only validation is cleaner than reusing the generic transition and gives better error messages
+
+## T059d — Implement order resend-confirmation API
+- Per-resource rate limiting (max 1 per 5 minutes per order) is best done with an in-memory Map keyed by orderId — simpler than database tracking and sufficient since the rate limit is non-critical (prevents spam, not a security boundary)
+- The `NotificationService` follows the same DI pattern as `AdminAlertService` — in-memory queue with `getSent()` for test assertions, injectable via `CreateServerOptions`
+- Resend-confirmation uses `ORDERS_MANAGE` capability (not a new capability) since it's an order management action, consistent with the transition endpoint

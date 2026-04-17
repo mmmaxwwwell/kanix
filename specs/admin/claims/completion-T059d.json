@@ -1,0 +1,22 @@
+{
+  "task_id": "T059d",
+  "status": "complete",
+  "summary": "Implemented POST /admin/orders/:id/resend-confirmation with NotificationService DI pattern and in-memory per-order rate limiting (max 1 per 5 minutes)",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test -- --run resend-confirmation", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/services/notification.ts",
+    "api/src/db/queries/order-resend-confirmation.ts",
+    "api/src/resend-confirmation.integration.test.ts"
+  ],
+  "files_modified": [
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
