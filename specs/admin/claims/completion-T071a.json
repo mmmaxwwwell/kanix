@@ -1,0 +1,22 @@
+{
+  "task_id": "T071a",
+  "status": "complete",
+  "summary": "Implemented admin dashboard summary and alerts API with GET /admin/dashboard/summary (ordersAwaitingFulfillment, openSupportTickets, lowStockVariants, openDisputes, shipmentsWithExceptions) and GET /admin/dashboard/alerts (expiring reservations, disputes nearing due_by, overdue disputes) plus integration tests",
+  "commands_run": [
+    {"command": "pnpm typecheck", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/dashboard.ts",
+    "api/src/admin-dashboard.integration.test.ts",
+    "specs/admin/claims/completion-T071a.json"
+  ],
+  "files_modified": [
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

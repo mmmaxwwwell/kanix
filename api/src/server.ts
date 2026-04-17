@@ -215,6 +215,7 @@ import {
   type TaxDocumentType,
   MILESTONE_TYPES,
 } from "./db/queries/contributor.js";
+import { getDashboardSummary, getDashboardAlerts } from "./db/queries/dashboard.js";
 import Stripe from "stripe";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { randomUUID } from "node:crypto";
@@ -6491,6 +6492,39 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           }
           throw err;
         }
+      },
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Admin dashboard routes [FR-081]
+  // -------------------------------------------------------------------------
+
+  if (database) {
+    const db = database.db;
+    const requireAdmin = createRequireAdmin(db);
+
+    // GET /api/admin/dashboard/summary
+    app.get(
+      "/api/admin/dashboard/summary",
+      {
+        preHandler: [verifySession, requireAdmin],
+      },
+      async () => {
+        const summary = await getDashboardSummary(db);
+        return summary;
+      },
+    );
+
+    // GET /api/admin/dashboard/alerts
+    app.get(
+      "/api/admin/dashboard/alerts",
+      {
+        preHandler: [verifySession, requireAdmin],
+      },
+      async () => {
+        const alerts = await getDashboardAlerts(db);
+        return { alerts };
       },
     );
   }

@@ -304,7 +304,7 @@
 
 ## Phase 10: Notifications + Real-Time [FR-081 through FR-087]
 
-- [ ] T071a Implement admin dashboard summary API
+- [x] T071a Implement admin dashboard summary API
   Done when: GET /admin/dashboard/summary returns `{ordersAwaitingFulfillment, openSupportTickets, lowStockVariants, openDisputes, shipmentsWithExceptions}`; counts computed from current DB state; GET /admin/dashboard/alerts returns actionable alerts (expiring reservations, disputes nearing due_by, cert expiry warnings); integration tests: seed data with known counts → verify summary matches
 
 - [ ] T071b Implement admin customer detail APIs
