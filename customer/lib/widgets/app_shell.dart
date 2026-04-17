@@ -57,6 +57,7 @@ class AppShell extends ConsumerWidget {
     }
     // Map other routes to their parent nav item
     if (location.startsWith('/product')) return 0;
+    if (location.startsWith('/kit-builder')) return 0;
     if (location.startsWith('/checkout')) return 1;
     if (location.startsWith('/support') || location.startsWith('/warranty')) {
       return 2;

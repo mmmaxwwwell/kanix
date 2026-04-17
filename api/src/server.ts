@@ -90,6 +90,7 @@ import {
   findKitClassRequirements,
   addKitToCart,
   flagCartsForKitRevalidation,
+  findActiveKitsWithDetails,
 } from "./db/queries/kit.js";
 import {
   reserveInventory,
@@ -5042,6 +5043,12 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     app.get("/api/products", async (_request, reply) => {
       const products = await findActiveProductsWithDetails(database.db);
       return reply.status(200).send({ products });
+    });
+
+    // GET /api/kits — list active kits with requirements and products per class
+    app.get("/api/kits", async (_request, reply) => {
+      const kits = await findActiveKitsWithDetails(database.db);
+      return reply.status(200).send({ kits });
     });
 
     // GET /api/products/:slug — product detail by slug

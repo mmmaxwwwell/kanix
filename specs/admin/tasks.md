@@ -360,7 +360,7 @@
 - [x] T084 Implement catalog + product detail screens
   Done when: product grid/list with images, pricing, availability; product detail with material variant selector (TPU/PA11/TPC); material-specific warranty info displayed; add to cart button; widget tests
 
-- [ ] T085 Implement kit builder screen
+- [x] T085 Implement kit builder screen
   Done when: kit selection UI: shows class requirements (e.g., "Pick 2 Plates"), available products per class, in-stock indicator; validates all classes satisfied; shows kit price + savings vs individual; add kit to cart; widget tests
 
 - [ ] T086 Implement cart + checkout screens

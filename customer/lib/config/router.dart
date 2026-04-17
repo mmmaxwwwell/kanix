@@ -8,6 +8,8 @@ import '../screens/signup_screen.dart';
 import '../screens/email_verification_screen.dart';
 import '../screens/catalog_screen.dart';
 import '../screens/product_detail_screen.dart';
+import '../screens/kit_builder_screen.dart'
+    show KitBuilderScreen, KitBuilderDetailScreen;
 import '../screens/cart_screen.dart';
 import '../screens/checkout_screen.dart';
 import '../screens/orders_screen.dart'
@@ -76,6 +78,18 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => ProductDetailScreen(
               productId: state.pathParameters['id']!,
             ),
+          ),
+          GoRoute(
+            path: '/kit-builder',
+            builder: (context, state) => const KitBuilderScreen(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (context, state) => KitBuilderDetailScreen(
+                  kitId: state.pathParameters['id']!,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: '/cart',

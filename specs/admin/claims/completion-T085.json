@@ -1,0 +1,27 @@
+{
+  "task_id": "T085",
+  "status": "complete",
+  "summary": "Implemented kit builder screen with class requirements UI, variant selection, savings display, add-to-cart, and widget tests; added public GET /api/kits endpoint",
+  "commands_run": [
+    {"command": "flutter pub get", "exit_code": 0},
+    {"command": "FLUTTER_ROOT=.flutter-patched flutter test", "exit_code": 0},
+    {"command": "npx tsc --noEmit", "exit_code": 0},
+    {"command": "flutter analyze", "exit_code": 0}
+  ],
+  "files_created": [
+    "customer/lib/models/kit.dart",
+    "customer/lib/providers/kit_provider.dart",
+    "customer/lib/screens/kit_builder_screen.dart",
+    "customer/test/kit_builder_test.dart"
+  ],
+  "files_modified": [
+    "api/src/db/queries/kit.ts",
+    "api/src/server.ts",
+    "customer/lib/config/router.dart",
+    "customer/lib/widgets/app_shell.dart",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

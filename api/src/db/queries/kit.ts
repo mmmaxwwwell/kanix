@@ -4,10 +4,11 @@ import {
   kitDefinition,
   kitClassRequirement,
   productClassMembership,
+  productClass,
 } from "../schema/product-class.js";
 import { cartLine, cartKitSelection } from "../schema/cart.js";
 import { cart } from "../schema/cart.js";
-import { productVariant } from "../schema/catalog.js";
+import { product, productVariant, productMedia } from "../schema/catalog.js";
 import { inventoryBalance } from "../schema/inventory.js";
 
 // ---------------------------------------------------------------------------
@@ -538,4 +539,154 @@ export async function getCurrentKitPriceForCartLine(
     kitDefinitionId: kit.id,
     currentPriceMinor: kit.priceMinor,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Public Kit Catalog — returns active kits with requirements and products
+// ---------------------------------------------------------------------------
+
+export interface CatalogKitProduct {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string | null;
+  imageUrl: string | null;
+  variants: Array<{
+    id: string;
+    title: string;
+    material: string;
+    priceCents: number;
+    inStock: boolean;
+    quantityOnHand: number;
+  }>;
+}
+
+export interface CatalogKitRequirement {
+  productClassId: string;
+  productClassName: string;
+  quantity: number;
+  products: CatalogKitProduct[];
+}
+
+export interface CatalogKit {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  priceMinor: number;
+  currency: string;
+  requirements: CatalogKitRequirement[];
+}
+
+export async function findActiveKitsWithDetails(
+  db: PostgresJsDatabase,
+): Promise<CatalogKit[]> {
+  // 1. Fetch active kit definitions
+  const kits = await db
+    .select()
+    .from(kitDefinition)
+    .where(eq(kitDefinition.status, "active"));
+
+  if (kits.length === 0) return [];
+
+  // 2. For each kit, fetch requirements with class info and products
+  const results = await Promise.all(
+    kits.map(async (kit) => {
+      const reqs = await db
+        .select()
+        .from(kitClassRequirement)
+        .where(eq(kitClassRequirement.kitDefinitionId, kit.id));
+
+      const requirements: CatalogKitRequirement[] = await Promise.all(
+        reqs.map(async (req) => {
+          // Get class info
+          const [cls] = await db
+            .select()
+            .from(productClass)
+            .where(eq(productClass.id, req.productClassId));
+
+          // Get products in this class
+          const memberships = await db
+            .select()
+            .from(productClassMembership)
+            .where(eq(productClassMembership.productClassId, req.productClassId));
+
+          const products: CatalogKitProduct[] = [];
+          for (const mem of memberships) {
+            const [prod] = await db
+              .select()
+              .from(product)
+              .where(and(eq(product.id, mem.productId), eq(product.status, "active")));
+            if (!prod) continue;
+
+            // Get active variants with inventory
+            const variants = await db
+              .select()
+              .from(productVariant)
+              .where(
+                and(
+                  eq(productVariant.productId, prod.id),
+                  eq(productVariant.status, "active"),
+                ),
+              );
+
+            const variantResults = await Promise.all(
+              variants.map(async (v) => {
+                const balances = await db
+                  .select()
+                  .from(inventoryBalance)
+                  .where(eq(inventoryBalance.variantId, v.id));
+                const totalAvailable = balances.reduce((sum, b) => sum + b.available, 0);
+                const optionValues = (v.optionValuesJson as Record<string, string>) ?? {};
+                return {
+                  id: v.id,
+                  title: v.title,
+                  material: optionValues.material ?? "Unknown",
+                  priceCents: v.priceMinor,
+                  inStock: totalAvailable > 0,
+                  quantityOnHand: totalAvailable,
+                };
+              }),
+            );
+
+            // Get primary image
+            const media = await db
+              .select()
+              .from(productMedia)
+              .where(eq(productMedia.productId, prod.id))
+              .orderBy(productMedia.sortOrder)
+              .limit(1);
+
+            products.push({
+              id: prod.id,
+              slug: prod.slug,
+              title: prod.title,
+              subtitle: prod.subtitle,
+              imageUrl: media.length > 0 ? media[0].url : null,
+              variants: variantResults,
+            });
+          }
+
+          return {
+            productClassId: req.productClassId,
+            productClassName: cls?.name ?? "Unknown",
+            quantity: req.quantity,
+            products,
+          };
+        }),
+      );
+
+      return {
+        id: kit.id,
+        slug: kit.slug,
+        title: kit.title,
+        description: kit.description,
+        priceMinor: kit.priceMinor,
+        currency: kit.currency,
+        requirements,
+      } satisfies CatalogKit;
+    }),
+  );
+
+  return results;
 }

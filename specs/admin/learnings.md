@@ -46,3 +46,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `FutureProvider.autoDispose` loading-state tests must avoid `Future.delayed` (leaves pending timers) — use a `Completer` that you complete at the end of the test instead
 - Customer app product model differs from admin's: customer variants extract `material` from `optionValues` JSON and add `quantityOnHand`/`status` for availability checks; keep models separate between admin and customer apps
 - `MaterialWarrantyInfo.forMaterial()` centralizes per-material warranty text (TPU heat deformation exclusion, TPC heat resistance rating) — keeps warranty display consistent across product detail and future warranty claim screens
+
+## T085 — Implement kit builder screen
+- Kit `individualTotalMinor` savings calculation must pick the N cheapest variants across ALL products in each class, not per-product — sort all variant prices from all products in the class together before picking the cheapest N
+- The public API needed a new `GET /api/kits` endpoint since admin kit endpoints require auth — added `findActiveKitsWithDetails` query that joins kit_definition → kit_class_requirement → product_class → product_class_membership → product → variants + inventory
+- When testing kit builder with `ChoiceChip` variant selectors, out-of-stock indicators are per-product (`isAvailable`) not per-variant — a product with mixed stock shows "In Stock" while individual chip `onSelected` is null for OOS variants
