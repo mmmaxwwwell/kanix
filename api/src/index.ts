@@ -4,7 +4,7 @@ import { createServer, markReady } from "./server.js";
 
 const config = loadConfig();
 const database = createDatabaseConnection(config.DATABASE_URL);
-const { start } = createServer({ config, database });
+const { start } = await createServer({ config, database });
 
 await start();
 

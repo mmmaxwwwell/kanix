@@ -61,7 +61,7 @@ describe("server", () => {
 
   async function startServer(configOverrides: Partial<Config> = {}, database?: DatabaseConnection) {
     const config = testConfig(configOverrides);
-    const { app, shutdownManager } = createServer({
+    const { app, shutdownManager } = await createServer({
       config,
       processRef: createFakeProcess(),
       database,
@@ -174,7 +174,7 @@ describe("server", () => {
   describe("server boot", () => {
     it("boots on configured PORT", async () => {
       const config = testConfig();
-      const server = createServer({ config, processRef: createFakeProcess() });
+      const server = await createServer({ config, processRef: createFakeProcess() });
       const address = await server.start();
       cleanup = async () => {
         await server.app.close();

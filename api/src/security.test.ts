@@ -41,7 +41,7 @@ describe("security middleware", () => {
 
   async function startServer(configOverrides: Partial<Config> = {}) {
     const config = testConfig(configOverrides);
-    const { app } = createServer({
+    const { app } = await createServer({
       config,
       processRef: createFakeProcess(),
     });

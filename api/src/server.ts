@@ -7,6 +7,13 @@ import { registerErrorHandler } from "./error-handler.js";
 import { registerSecurityMiddleware, clearRateLimiterState } from "./security.js";
 import { createShutdownManager, isShuttingDown, type ShutdownManager } from "./shutdown.js";
 import { ajvOptions } from "./validation.js";
+import {
+  initSuperTokens,
+  registerAuthMiddleware,
+  verifySession,
+  requireVerifiedEmail,
+  getCustomerByAuthSubject,
+} from "./auth/index.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -65,7 +72,7 @@ export function isReady(): boolean {
 
 const APP_VERSION = "0.1.0";
 
-export function createServer(options: CreateServerOptions): ServerInstance {
+export async function createServer(options: CreateServerOptions): Promise<ServerInstance> {
   const { config, processRef = process, database } = options;
 
   const logger = createLogger({
@@ -77,6 +84,21 @@ export function createServer(options: CreateServerOptions): ServerInstance {
     logger: false, // We manage our own Pino logger
     ajv: ajvOptions,
   });
+
+  // -------------------------------------------------------------------------
+  // SuperTokens initialization + auth middleware
+  // -------------------------------------------------------------------------
+
+  initSuperTokens({
+    connectionUri: config.SUPERTOKENS_CONNECTION_URI,
+    apiKey: config.SUPERTOKENS_API_KEY,
+    appName: "Kanix",
+    apiDomain: `http://localhost:${config.PORT}`,
+    websiteDomain: config.CORS_ALLOWED_ORIGINS[0] ?? "http://localhost:3000",
+    db: database?.db,
+  });
+
+  await registerAuthMiddleware(app);
 
   // -------------------------------------------------------------------------
   // Security middleware — CORS, rate limiting, security headers
@@ -136,6 +158,42 @@ export function createServer(options: CreateServerOptions): ServerInstance {
     const response: ReadyResponse = { status: "ready" };
     return reply.status(200).send(response);
   });
+
+  // -------------------------------------------------------------------------
+  // Protected customer endpoint — requires verified email
+  // -------------------------------------------------------------------------
+
+  app.get(
+    "/api/customer/me",
+    { preHandler: [verifySession, requireVerifiedEmail] },
+    async (request, reply) => {
+      const session = request.session;
+      if (!session) {
+        return reply.status(401).send({
+          error: "ERR_AUTHENTICATION_FAILED",
+          message: "Authentication required",
+        });
+      }
+      const userId = session.getUserId();
+
+      if (!database) {
+        return reply.status(503).send({
+          error: "ERR_SERVICE_UNAVAILABLE",
+          message: "Database not available",
+        });
+      }
+
+      const cust = await getCustomerByAuthSubject(database.db, userId);
+      if (!cust) {
+        return reply.status(404).send({
+          error: "ERR_NOT_FOUND",
+          message: "Customer record not found",
+        });
+      }
+
+      return { customer: cust };
+    },
+  );
 
   // -------------------------------------------------------------------------
   // Shutdown manager

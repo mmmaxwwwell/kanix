@@ -64,7 +64,7 @@ describeWithDb("critical path checkpoint (Phase 3)", () => {
     // 1. Create database connection and server
     dbConn = createDatabaseConnection(DATABASE_URL ?? "");
     const fakeProcess = createFakeProcess();
-    const server = createServer({
+    const server = await createServer({
       config: testConfig(),
       processRef: fakeProcess as unknown as NodeJS.Process,
       database: dbConn,

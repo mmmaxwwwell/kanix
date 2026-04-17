@@ -39,3 +39,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - process-compose.yml already had SuperTokens configured from project setup (setup script + Java process + HTTP health check on `/hello`) — only `deploy/nixos/supertokens.nix` needed to be created
 - SuperTokens core is a Java app that reads `config.yaml` from its working directory — in NixOS, copy the generated config to `StateDirectory` and pass that path as the CLI argument to `io.supertokens.Main`
 - Use `DynamicUser = true` in the systemd service for SuperTokens — it doesn't need a persistent system user, just a writable state directory for config and logs
+
+## T032 — Implement customer auth: email/password + email verification
+- `supertokens-node` Fastify integration exports `plugin` (not `middleware`) from `supertokens-node/framework/fastify/index.js` — register it as a Fastify plugin, it handles `/auth/*` routes via a `preHandler` hook
+- `supertokens.init()` can only be called once per process — guard with an `initialized` flag to make it idempotent for tests that create multiple server instances
+- `createServer` must be `async` after adding SuperTokens middleware registration — all existing tests calling `createServer` need `await` added

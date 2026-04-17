@@ -54,7 +54,7 @@ describeWithDb("/ready endpoint with Postgres connectivity", () => {
   it("returns 200 when Postgres is connected", async () => {
     dbConn = createDatabaseConnection(DATABASE_URL ?? "");
     const fakeProcess = createFakeProcess();
-    const server = createServer({
+    const server = await createServer({
       config: testConfig(),
       processRef: fakeProcess as unknown as NodeJS.Process,
       database: dbConn,
@@ -77,7 +77,7 @@ describeWithDb("/ready endpoint with Postgres connectivity", () => {
     // Create a connection to a bogus URL that will fail connectivity checks
     dbConn = createDatabaseConnection("postgres://localhost:19999/nonexistent");
     const fakeProcess = createFakeProcess();
-    const server = createServer({
+    const server = await createServer({
       config: testConfig(),
       processRef: fakeProcess as unknown as NodeJS.Process,
       database: dbConn,

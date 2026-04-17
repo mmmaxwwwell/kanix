@@ -53,7 +53,7 @@ describe("JSON schema validation plugin", () => {
 
   async function startServer() {
     const config = testConfig();
-    const { app } = createServer({
+    const { app } = await createServer({
       config,
       processRef: createFakeProcess(),
     });

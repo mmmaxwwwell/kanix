@@ -43,7 +43,7 @@ describe("global error handler", () => {
 
   async function startServer() {
     const config = testConfig();
-    const { app } = createServer({
+    const { app } = await createServer({
       config,
       processRef: createFakeProcess(),
     });

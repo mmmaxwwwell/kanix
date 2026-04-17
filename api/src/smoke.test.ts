@@ -45,7 +45,7 @@ describe("smoke test: server boots and responds", () => {
   it("starts server, /health returns 200, /ready returns 503, SIGTERM shuts down cleanly", async () => {
     const fakeProcess = createFakeProcess();
     const config = testConfig();
-    const server = createServer({
+    const server = await createServer({
       config,
       processRef: fakeProcess as unknown as NodeJS.Process,
     });

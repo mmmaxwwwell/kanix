@@ -113,7 +113,7 @@
 - [x] T031 Configure SuperTokens in process-compose and deploy/nixos [FR-064]
   Done when: `process-compose up` starts SuperTokens core on port 3567; health check confirms SuperTokens is up; `deploy/nixos/supertokens.nix` configures SuperTokens core with Postgres backend
 
-- [ ] T032 Implement customer auth: email/password + email verification [FR-064, FR-065]
+- [x] T032 Implement customer auth: email/password + email verification [FR-064, FR-065]
   Done when: SuperTokens email/password recipe configured; signup creates customer record; email verification required (unverified users get 403 on protected endpoints); login returns session tokens; integration tests: signup → verify email → login → access protected endpoint; unverified user blocked
 
 - [ ] T033 Implement GitHub OAuth: link GitHub account [FR-068] [produces: IC-002]
