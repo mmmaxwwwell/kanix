@@ -39,3 +39,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T010 — api/ project initialization
 - Vitest v3 exits with code 1 when no test files are found — set `passWithNoTests: true` in vitest config to allow `pnpm test` to succeed with no tests yet
 - ESLint v9 flat config with `typescript-eslint` works out of the box — use `tseslint.config()` wrapper with `projectService: true` for type-aware linting
+
+## T011 — Vitest custom reporter
+- Vitest custom reporters can be specified as file paths in `vitest.config.ts` `reporters` array — use `["default", "./src/test-reporter.ts"]` to keep console output AND produce JSON
+- The `Reporter` interface's `onFinished(files?)` receives the complete test tree — traverse `file.tasks` recursively to collect suite/test results (suites have nested `tasks`, tests have `result`)

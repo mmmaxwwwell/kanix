@@ -6,5 +6,6 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.ts"],
     passWithNoTests: true,
+    reporters: ["default", "./src/test-reporter.ts"],
   },
 });

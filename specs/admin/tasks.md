@@ -42,7 +42,7 @@
 - [x] T010 Initialize api/ with pnpm, TypeScript strict, Vitest, ESLint + Prettier [FR-100]
   Done when: `pnpm install --ignore-scripts` succeeds; `pnpm typecheck` passes; `pnpm lint` passes; `pnpm test` runs Vitest (no tests yet); `pnpm build` produces dist/
 
-- [ ] T011 Implement Vitest custom reporter for structured test output [FR-100]
+- [x] T011 Implement Vitest custom reporter for structured test output [FR-100]
   Done when: Vitest outputs JSON results to `test-logs/test-results.json`; reporter includes test name, status, duration, error message for failures; aggregatable by CI summary script
 
 - [ ] T012 Implement api/src/config.ts — single config module [FR-112, FR-113, FR-114]
