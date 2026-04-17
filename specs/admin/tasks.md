@@ -272,7 +272,7 @@
 - [x] T066a Implement manual evidence attachment API
   Done when: POST /admin/disputes/:id/evidence allows admin to attach manual evidence (file upload or text); creates evidence_record with admin-specified type; file stored via storage adapter; integration test: upload manual evidence → record created; accessible via GET /admin/evidence/:id
 
-- [ ] T066b Implement evidence browsing API
+- [x] T066b Implement evidence browsing API
   Done when: GET /admin/evidence with filters (type, order_id, shipment_id, ticket_id, dispute_id); GET /admin/evidence/:id returns single record with download URL for file-based evidence; integration tests: filter by order → returns all evidence for that order; filter by type → returns matching records
 
 - [ ] T066c Implement fulfillment edge case handling [FR-E013, FR-E023, FR-E024]

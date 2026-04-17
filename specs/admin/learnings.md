@@ -86,3 +86,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Manual evidence reuses `createEvidenceRecord` directly — no new schema or migration needed; the `type` field accepts any admin-specified type (not constrained to EVIDENCE_TYPES) since manual evidence may have custom types
 - File upload follows the same base64 JSON body pattern as ticket attachments (T062) — storage key format: `evidence/{disputeId}/{uuid}/{fileName}`; cleanup on DB failure via storageAdapter.delete()
 - The `metadataJson` field stores `{ source: "manual", adminAttached: true }` to distinguish manual evidence from auto-collected evidence in queries and UI
+
+## T066b — Implement evidence browsing API
+- The `listEvidence` query uses Drizzle's `and()` with dynamic filter building — collect `SQL[]` conditions and apply them with `and(...conditions)` only when non-empty; when a single condition, pass it directly to avoid wrapping
+- GET /api/admin/evidence/:id already existed from T066a (including download endpoint) — T066b only needed the list endpoint with query param filters (type, order_id, shipment_id, ticket_id, dispute_id)
+- The `supportTicket` schema requires a `source` field (not `customerEmail`) — check actual schema columns before inserting test data

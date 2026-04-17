@@ -1,0 +1,22 @@
+{
+  "task_id": "T066b",
+  "status": "complete",
+  "summary": "Implemented evidence browsing API with GET /admin/evidence (filterable by type, order_id, shipment_id, ticket_id, dispute_id) and verified GET /admin/evidence/:id returns single record with download URL",
+  "commands_run": [
+    {"command": "npx tsc --noEmit", "exit_code": 0},
+    {"command": "pnpm test -- --run evidence-browsing", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/evidence-browsing.integration.test.ts",
+    "specs/admin/claims/completion-T066b.json"
+  ],
+  "files_modified": [
+    "api/src/db/queries/evidence.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

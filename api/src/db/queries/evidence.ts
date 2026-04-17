@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and, type SQL } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { evidenceRecord, evidenceBundle } from "../schema/evidence.js";
 import { dispute } from "../schema/payment.js";
@@ -119,6 +119,49 @@ export async function findEvidenceByShipmentId(
     .select(evidenceColumns)
     .from(evidenceRecord)
     .where(eq(evidenceRecord.shipmentId, shipmentId));
+}
+
+// ---------------------------------------------------------------------------
+// List evidence records with optional filters
+// ---------------------------------------------------------------------------
+
+export interface ListEvidenceFilters {
+  type?: string;
+  orderId?: string;
+  shipmentId?: string;
+  supportTicketId?: string;
+  disputeId?: string;
+}
+
+export async function listEvidence(
+  db: PostgresJsDatabase,
+  filters: ListEvidenceFilters,
+): Promise<EvidenceRecordRow[]> {
+  const conditions: SQL[] = [];
+
+  if (filters.type) {
+    conditions.push(eq(evidenceRecord.type, filters.type));
+  }
+  if (filters.orderId) {
+    conditions.push(eq(evidenceRecord.orderId, filters.orderId));
+  }
+  if (filters.shipmentId) {
+    conditions.push(eq(evidenceRecord.shipmentId, filters.shipmentId));
+  }
+  if (filters.supportTicketId) {
+    conditions.push(eq(evidenceRecord.supportTicketId, filters.supportTicketId));
+  }
+  if (filters.disputeId) {
+    conditions.push(eq(evidenceRecord.disputeId, filters.disputeId));
+  }
+
+  const query = db.select(evidenceColumns).from(evidenceRecord);
+
+  if (conditions.length === 0) {
+    return query;
+  }
+
+  return query.where(conditions.length === 1 ? conditions[0] : and(...conditions));
 }
 
 // ---------------------------------------------------------------------------

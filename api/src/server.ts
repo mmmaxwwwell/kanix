@@ -186,6 +186,7 @@ import {
   findDisputeById,
   generateEvidenceBundle,
   createEvidenceRecord,
+  listEvidence,
 } from "./db/queries/evidence.js";
 import Stripe from "stripe";
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -2972,6 +2973,33 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           }
           throw err;
         }
+      },
+    );
+
+    // GET /api/admin/evidence — list evidence records with optional filters
+    app.get(
+      "/api/admin/evidence",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.DISPUTES_READ)],
+      },
+      async (request) => {
+        const query = request.query as {
+          type?: string;
+          order_id?: string;
+          shipment_id?: string;
+          ticket_id?: string;
+          dispute_id?: string;
+        };
+
+        const records = await listEvidence(database.db, {
+          type: query.type,
+          orderId: query.order_id,
+          shipmentId: query.shipment_id,
+          supportTicketId: query.ticket_id,
+          disputeId: query.dispute_id,
+        });
+
+        return { evidence: records, total: records.length };
       },
     );
 
