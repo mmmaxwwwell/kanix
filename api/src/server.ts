@@ -191,6 +191,13 @@ import {
   createEvidenceRecord,
   listEvidence,
 } from "./db/queries/evidence.js";
+import {
+  createContributor,
+  findContributorById,
+  listContributors,
+  linkContributorDesign,
+  listDesignsByContributor,
+} from "./db/queries/contributor.js";
 import Stripe from "stripe";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { randomUUID } from "node:crypto";
@@ -5877,6 +5884,168 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         return reply.status(200).send({ received: true });
       },
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // Admin contributor routes [FR-069, FR-070]
+  // -------------------------------------------------------------------------
+
+  if (database) {
+    const db = database.db;
+    const requireAdmin = createRequireAdmin(db);
+
+    // POST /api/admin/contributors — create contributor from CLA bot data
+    app.post(
+      "/api/admin/contributors",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.CONTRIBUTORS_MANAGE),
+        ],
+        schema: {
+          body: {
+            type: "object",
+            required: ["github_username", "github_user_id"],
+            properties: {
+              github_username: { type: "string" },
+              github_user_id: { type: "string" },
+              customer_id: { type: "string" },
+              cla_accepted_at: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request) => {
+        const body = request.body as {
+          github_username: string;
+          github_user_id: string;
+          customer_id?: string;
+          cla_accepted_at?: string;
+        };
+
+        const contrib = await createContributor(db, {
+          githubUsername: body.github_username,
+          githubUserId: body.github_user_id,
+          customerId: body.customer_id ?? null,
+          claAcceptedAt: body.cla_accepted_at ? new Date(body.cla_accepted_at) : null,
+        });
+
+        request.auditContext = {
+          action: "contributor.create",
+          entityType: "contributor",
+          entityId: contrib.id,
+          afterJson: { githubUsername: contrib.githubUsername, status: contrib.status },
+        };
+
+        return { contributor: contrib };
+      },
+    );
+
+    // GET /api/admin/contributors — list all contributors
+    app.get(
+      "/api/admin/contributors",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.CONTRIBUTORS_READ),
+        ],
+      },
+      async () => {
+        const contributors = await listContributors(db);
+        return { contributors };
+      },
+    );
+
+    // GET /api/admin/contributors/:id — get single contributor
+    app.get(
+      "/api/admin/contributors/:id",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.CONTRIBUTORS_READ),
+        ],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const contrib = await findContributorById(db, id);
+        if (!contrib) {
+          return reply.status(404).send({ error: "Contributor not found" });
+        }
+        return { contributor: contrib };
+      },
+    );
+
+    // POST /api/admin/contributors/:id/designs — link contributor to product
+    app.post(
+      "/api/admin/contributors/:id/designs",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.CONTRIBUTORS_MANAGE),
+        ],
+        schema: {
+          body: {
+            type: "object",
+            required: ["product_id"],
+            properties: {
+              product_id: { type: "string" },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { product_id: string };
+
+        // Verify contributor exists
+        const contrib = await findContributorById(db, id);
+        if (!contrib) {
+          return reply.status(404).send({ error: "Contributor not found" });
+        }
+
+        const design = await linkContributorDesign(db, {
+          contributorId: id,
+          productId: body.product_id,
+        });
+
+        request.auditContext = {
+          action: "contributor_design.create",
+          entityType: "contributor_design",
+          entityId: design.id,
+          afterJson: { contributorId: id, productId: body.product_id },
+        };
+
+        return { design };
+      },
+    );
+
+    // GET /api/admin/contributors/:id/designs — list designs for contributor
+    app.get(
+      "/api/admin/contributors/:id/designs",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.CONTRIBUTORS_READ),
+        ],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+
+        // Verify contributor exists
+        const contrib = await findContributorById(db, id);
+        if (!contrib) {
+          return reply.status(404).send({ error: "Contributor not found" });
+        }
+
+        const designs = await listDesignsByContributor(db, id);
+        return { designs };
+      },
+    );
   }
 
   // -------------------------------------------------------------------------

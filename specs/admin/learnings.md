@@ -4,49 +4,6 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 
 ---
 
-## T056 — Implement fulfillment task system
-- The fulfillment_task Drizzle schema and DB migration already existed — only the query layer, state machine logic, admin routes, and integration tests needed to be created
-- The `blocked` state in the fulfillment task state machine can transition back to ANY active state (recovery) — model this in the transition map with `blocked: [...ACTIVE_STATES]`
-- Auto-creation of fulfillment tasks is wired into `handlePaymentSucceeded` in webhook.ts — wrap in try/catch so fulfillment task creation failures don't block payment confirmation
-
-## T057 — Implement EasyPost adapter
-- Extending `ShippingAdapter` interface with new methods requires updating all test file stubs — export `createStubShippingAdapter()` from the adapter module so tests can import it directly instead of defining local copies
-- EasyPost `Shipment.buy(shipmentId, rateId)` returns the purchased shipment with `tracking_code`, `postage_label.label_url`, and `tracker.id` — these are the three key fields needed for `BuyLabelResult`
-- Stub adapter params that are unused should omit parameter names entirely (matching the existing `calculateRate()` pattern) to avoid `@typescript-eslint/no-unused-vars` lint errors
-
-## T058 — Implement shipment system
-- All shipment-related schema tables (shipment, shipment_package, shipment_line, shipment_event, shipping_label_purchase) were already defined in `fulfillment.ts` — only the query layer, state machine, routes, and tests needed to be created
-- The `buyShipmentLabel` function takes the `ShippingAdapter` as a parameter (DI pattern) — this allows tests to inject the stub adapter without external API calls, consistent with the pattern used for fulfillment tasks and payment
-- Shipment number generation uses `SHP-<orderNumber>-<timestamp_base36>` — sufficient for V1 since each order typically has one shipment, but could collide in high-concurrency scenarios (consider a sequence table later)
-
-## T059 — Implement tracking webhook handler
-- Adding a new required Config key (`EASYPOST_WEBHOOK_SECRET`) requires updating ALL test config objects across ~30 test files — use sed/batch replace to add the field consistently, but verify the easypost webhook test's config isn't duplicated
-- EasyPost webhook events are routed by `tracking_code` (→ `shipment.trackingNumber`) rather than a separate `trackerId` column — avoids schema migration since tracking number is already stored on shipment from label purchase
-- Shipment status doesn't have `out_for_delivery` but order `shipping_status` does — map EasyPost `out_for_delivery` to shipment `in_transit` while propagating the more granular `out_for_delivery` to the order level
-
-## T059a — Implement shipment void-label API
-- The `voidLabel` method and `voided` status transitions were already defined in the adapter interface and state machine from T057/T058 — only the query function, route, and tests needed to be created
-- Void only calls the adapter when a label was actually purchased (status `label_purchased` or `ready`) — for `draft`/`label_pending` it just transitions to `voided` without adapter interaction
-- The refund cost is calculated by summing all `shippingLabelPurchase` records for the shipment — supports future multi-label scenarios
-
-## T059b — Implement shipment refresh-tracking API
-- The `trackerId` needed for `adapter.getTracking()` is stored in `shippingLabelPurchase.rawPayloadJson` (the full `BuyLabelResult` object) — extract via `rawPayload.trackerId` rather than adding a new column
-- Use deterministic provider event IDs (`refresh-${occurredAt}-${status}`) for idempotency on refresh — this prevents duplicate events when refresh is called multiple times with the same tracking data
-- The refresh endpoint reuses `handleTrackingUpdate()` from the webhook handler to propagate status changes to both shipment and order — avoids duplicating the transition logic
-
-## T059c — Implement shipment mark-shipped API
-- The `transitionShipmentStatus` already sets `shippedAt` on transition to "shipped" — for a dedicated mark-shipped endpoint, a standalone `markShipmentShipped` function with explicit `ready`-only validation is cleaner than reusing the generic transition and gives better error messages
-
-## T059d — Implement order resend-confirmation API
-- Per-resource rate limiting (max 1 per 5 minutes per order) is best done with an in-memory Map keyed by orderId — simpler than database tracking and sufficient since the rate limit is non-critical (prevents spam, not a security boundary)
-- The `NotificationService` follows the same DI pattern as `AdminAlertService` — in-memory queue with `getSent()` for test assertions, injectable via `CreateServerOptions`
-- Resend-confirmation uses `ORDERS_MANAGE` capability (not a new capability) since it's an order management action, consistent with the transition endpoint
-
-## T060 — Implement fulfillment → shipping status propagation
-- The order `shipping_status` transition map needed `in_transit → delivered` added because the aggregate `propagateOrderDeliveredStatus` check skips `out_for_delivery` — not all carriers report this intermediate status, and multi-shipment orders may have mixed paths
-- The `handleTrackingUpdate` return type was extended with `orderCompleted: boolean` — this is backwards-compatible since existing code destructures only `shipmentTransitioned` and `orderTransitioned`
-- Propagation functions (`propagateOrderFulfillmentStatus`, `propagateOrderDeliveredStatus`, `tryAutoCompleteOrder`) use try/catch on `ERR_INVALID_TRANSITION` to be best-effort — if the fulfillment workflow hasn't reached a compatible state (e.g., still in `queued`), the propagation silently skips
-
 ## T061 — Implement support ticket system
 - The support_ticket Drizzle schema, DB migration, and CAPABILITIES (SUPPORT_READ, SUPPORT_MANAGE) all already existed — only the query layer, routes, and integration tests needed to be created
 - Customer-facing routes at `/api/support/tickets` use `verifySession + requireVerifiedEmail` (no admin middleware), while admin routes at `/api/admin/support-tickets` use `requireAdmin + requireCapability`
@@ -101,3 +58,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `buyShipmentLabel` transitions to `label_pending` before calling `adapter.buyLabel()` — wrapping the adapter call in try/catch with `ERR_LABEL_PURCHASE_FAILED` keeps shipment in `label_pending` on failure without needing rollback
 - `handleTrackingUpdate` accepts an optional `AdminAlertService` parameter — all callers (webhook handler, refreshShipmentTracking, transition route) must pass it through for delivery exception alerts to fire
 - The `exception → in_transit` recovery transition was already in the state machine from T058 — no schema or state machine changes needed, just test coverage
+
+## T067 — Implement contributor registry + design linking
+- The contributor Drizzle schema (7 tables), DB migration, and CAPABILITIES (CONTRIBUTORS_READ, CONTRIBUTORS_MANAGE) all already existed in contributor.ts, 002-core-entities.xml, and admin.ts — only the query layer, routes, and integration tests needed to be created
+- The `requireAdmin` middleware is scoped inside the main `if (database)` block starting at line ~892 — contributor routes added in a separate `if (database)` block must create their own `const requireAdmin = createRequireAdmin(db)` since it's not in scope
+- The `createContributor` function sets status to "active" if `claAcceptedAt` is provided, "pending" otherwise — this auto-activation matches the CLA bot workflow where acceptance implies activation

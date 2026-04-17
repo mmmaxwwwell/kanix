@@ -1,0 +1,23 @@
+{
+  "task_id": "T067",
+  "status": "complete",
+  "summary": "Implemented contributor registry query functions (create, find, list, link design, list designs) and admin API routes (POST/GET /api/admin/contributors, POST/GET /api/admin/contributors/:id/designs) with integration tests",
+  "commands_run": [
+    {"command": "npx tsc --noEmit", "exit_code": 0},
+    {"command": "pnpm build", "exit_code": 0},
+    {"command": "pnpm lint", "exit_code": 0},
+    {"command": "npx vitest run src/contributor.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/db/queries/contributor.ts",
+    "api/src/contributor.integration.test.ts",
+    "specs/admin/claims/completion-T067.json"
+  ],
+  "files_modified": [
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

@@ -285,7 +285,7 @@
 
 ## Phase 9: Contributor / Royalty System [FR-069 through FR-076]
 
-- [ ] T067 Implement contributor registry + design linking [FR-069, FR-070]
+- [x] T067 Implement contributor registry + design linking [FR-069, FR-070]
   Done when: contributor entity with github_username, github_user_id, customer_id (nullable), cla_accepted_at; contributor_design links contributor to product; POST /admin/contributors (create from CLA bot data); GET /admin/contributors/:id/designs; integration test: create contributor → link to product → verify association
 
 - [ ] T068 Implement per-design sales tracking [FR-070]
