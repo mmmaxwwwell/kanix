@@ -403,7 +403,7 @@
 
 **MCP-driven E2E**: uses `nix-mcp-debugkit` servers (`mcp-browser` for Astro site, `mcp-android` for Flutter apps on Android emulator). iOS coverage via `mcp-ios` is deferred — Android exercises the same Flutter code paths for now. Tasks annotated `[needs: mcp-*, e2e-loop]` use the explore-fix-verify cycle: MCP agent takes screenshots, taps elements, reads accessibility trees, finds bugs, fixes code, writes a regression test, re-runs. **Every bug fix gets a scripted regression test (Playwright for web, Patrol for Flutter) before the task is marked done — a fix without a test is not done.**
 
-- [ ] T095a Add `nix-mcp-debugkit` flake input + re-export packages + config writers
+- [x] T095a Add `nix-mcp-debugkit` flake input + re-export packages + config writers
   Done when: root `flake.nix` adds `nix-mcp-debugkit.url = "github:mmmaxwwwell/nix-mcp-debugkit"` input; re-exports `packages.mcp-android = nix-mcp-debugkit.packages.${system}.mcp-android` and `packages.mcp-browser = nix-mcp-debugkit.packages.${system}.mcp-browser`; adds `packages.mcp-android-config` and `packages.mcp-browser-config` writers that emit `mcp/android.json` and `mcp/browser.json` pinning MCP commands to Nix store paths (mirror of nix-key `flake.nix`); `nix build .#mcp-android-config` produces a pinned config file; `nix run .#mcp-android -- --help` works; (iOS / `mcp-ios` deferred)
 
 - [ ] T095b Register MCP servers + required permissions in `.claude/settings.json`

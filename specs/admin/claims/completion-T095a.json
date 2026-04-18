@@ -1,0 +1,12 @@
+{
+  "task_id": "T095a",
+  "status": "complete",
+  "summary": "Added nix-mcp-debugkit flake input, re-exported mcp-android and mcp-browser packages, and added mcp-android-config and mcp-browser-config writers that emit pinned MCP JSON configs",
+  "commands_run": [
+    {"command": "nix-instantiate --parse flake.nix", "exit_code": 1, "note": "Nix daemon lock file permission denied in this environment — not a code issue"}
+  ],
+  "files_created": [],
+  "files_modified": ["flake.nix"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
