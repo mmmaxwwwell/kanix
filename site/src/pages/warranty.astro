@@ -1,0 +1,131 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="Warranty - Kanix™"
+  description="Kanix™ warranty information including material-specific disclaimers for 3D-printed dog handler belt modules."
+>
+  <nav class="fixed top-0 w-full z-50 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href={import.meta.env.BASE_URL} class="text-xl font-extrabold tracking-tight hover:text-neutral-300 transition-colors">KANIX<sup class="text-[0.5em] align-super">™</sup></a>
+      <div class="hidden sm:flex items-center gap-6">
+        <a href={import.meta.env.BASE_URL} class="text-sm text-neutral-400 hover:text-white transition-colors">Home</a>
+        <a href={`${import.meta.env.BASE_URL}products/`} class="text-sm text-neutral-400 hover:text-white transition-colors">Shop</a>
+        <a href={`${import.meta.env.BASE_URL}kits/`} class="text-sm text-neutral-400 hover:text-white transition-colors">Kits</a>
+        <a href={`${import.meta.env.BASE_URL}checkout/`} class="text-sm text-neutral-400 hover:text-white transition-colors" id="cart-link">
+          Cart <span id="cart-count" class="hidden ml-1 px-1.5 py-0.5 bg-amber-500 text-neutral-950 text-xs font-bold rounded-full"></span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main" class="pt-20 pb-16 px-4 sm:px-6">
+    <div class="max-w-4xl mx-auto">
+      <a href={import.meta.env.BASE_URL} class="text-sm text-neutral-500 hover:text-white transition-colors mb-6 inline-block">
+        &larr; Back to home
+      </a>
+
+      <h1 class="text-3xl sm:text-5xl font-bold tracking-tight mb-8">Warranty</h1>
+
+      <div class="space-y-12">
+        <!-- Overview -->
+        <section>
+          <h2 class="text-xl font-semibold text-white mb-4">Limited Warranty</h2>
+          <div class="text-neutral-400 leading-relaxed space-y-4">
+            <p>
+              Kanix™ products purchased through our official store come with a <strong class="text-white">90-day limited warranty</strong> covering defects in manufacturing, including layer separation, structural cracking from normal use, and dimensional inaccuracies that prevent proper assembly.
+            </p>
+            <p>
+              This warranty does not cover damage from misuse, modification, exposure to conditions outside the material's rated specifications, or normal wear and tear. 3D-printed parts are consumable by nature and will wear over time with regular use.
+            </p>
+          </div>
+        </section>
+
+        <!-- Material-Specific Disclaimers -->
+        <section>
+          <h2 class="text-xl font-semibold text-white mb-4">Material-Specific Disclaimers</h2>
+          <p class="text-neutral-400 mb-6">
+            Each material has different properties and limitations. The warranty does not cover damage caused by exceeding these specifications.
+          </p>
+          <div class="space-y-4">
+            <div class="bg-amber-500/5 border border-amber-500/20 rounded-lg p-5">
+              <h3 class="text-sm font-semibold text-amber-500 mb-2">TPU (Thermoplastic Polyurethane)</h3>
+              <p class="text-sm text-neutral-400 leading-relaxed">
+                TPU is flexible and durable but <strong class="text-white">may deform under sustained heat above 60°C (140°F)</strong>. Do not leave TPU parts in direct sunlight inside a hot vehicle for extended periods. Deformation caused by heat exposure beyond this threshold is not covered under warranty.
+              </p>
+            </div>
+            <div class="bg-amber-500/5 border border-amber-500/20 rounded-lg p-5">
+              <h3 class="text-sm font-semibold text-amber-500 mb-2">TPC (Thermoplastic Copolyester)</h3>
+              <p class="text-sm text-neutral-400 leading-relaxed">
+                TPC offers excellent heat resistance with a <strong class="text-white">continuous service temperature rating up to 130°C (266°F)</strong> and superior chemical resistance. TPC is suitable for demanding environments but is not indestructible — extreme impact or sustained loads beyond design limits are not covered.
+              </p>
+            </div>
+            <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-5">
+              <h3 class="text-sm font-semibold text-neutral-300 mb-2">PLA (Polylactic Acid)</h3>
+              <p class="text-sm text-neutral-400 leading-relaxed">
+                PLA is rigid and easy to print but has <strong class="text-white">low heat resistance — may warp or deform above 50°C (122°F)</strong>. Not recommended for high-temperature environments or prolonged outdoor use in hot climates.
+              </p>
+            </div>
+            <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-5">
+              <h3 class="text-sm font-semibold text-neutral-300 mb-2">PETG (Polyethylene Terephthalate Glycol)</h3>
+              <p class="text-sm text-neutral-400 leading-relaxed">
+                PETG offers good strength and <strong class="text-white">moderate heat resistance up to 80°C (176°F)</strong>. A good balance of durability and printability for general-purpose use.
+              </p>
+            </div>
+            <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-5">
+              <h3 class="text-sm font-semibold text-neutral-300 mb-2">ABS (Acrylonitrile Butadiene Styrene)</h3>
+              <p class="text-sm text-neutral-400 leading-relaxed">
+                ABS is impact-resistant with <strong class="text-white">heat tolerance up to 100°C (212°F)</strong>. Good for parts that may experience occasional impacts or moderate heat.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- What Is Not Covered -->
+        <section>
+          <h2 class="text-xl font-semibold text-white mb-4">What Is Not Covered</h2>
+          <ul class="text-neutral-400 space-y-2 list-disc pl-5">
+            <li>Damage from drops, impacts, or forces beyond normal use</li>
+            <li>Heat damage from exposure beyond the material's rated temperature</li>
+            <li>Modifications, drilling, cutting, or chemical treatment of parts</li>
+            <li>Cosmetic wear including scratches, scuffs, and fading</li>
+            <li>Parts printed by the customer from downloaded files (self-printed parts are unwarranted)</li>
+            <li>Use with belts or hardware not compatible with Kanix™ specifications</li>
+          </ul>
+        </section>
+
+        <!-- How to File a Claim -->
+        <section>
+          <h2 class="text-xl font-semibold text-white mb-4">Filing a Warranty Claim</h2>
+          <div class="text-neutral-400 leading-relaxed space-y-4">
+            <p>
+              To file a warranty claim, contact us through the customer portal with your order number, a description of the defect, and photos showing the issue. We will review your claim and either replace the part or issue a refund at our discretion.
+            </p>
+          </div>
+        </section>
+
+        <!-- Safety Disclaimer -->
+        <section>
+          <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+            <h2 class="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-3">Safety Disclaimer</h2>
+            <p class="text-neutral-500 text-xs leading-relaxed">
+              3D-printed parts can vary in strength and durability depending on material, print settings, and environmental conditions. These products are designed as accessories for dog handling belts and are not safety-critical equipment. Inspect your modules regularly and replace any parts showing signs of wear, cracking, or deformation. Kanix™ is not responsible for injury, damage, or loss resulting from the use of these products. Always supervise dogs when using any handling equipment. Use at your own risk.
+            </p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="py-12 px-6 border-t border-neutral-800">
+    <div class="max-w-6xl mx-auto text-center text-sm text-neutral-500 space-y-2">
+      <div class="flex flex-wrap justify-center gap-4 mb-4">
+        <a href={`${import.meta.env.BASE_URL}warranty/`} class="hover:text-white transition-colors">Warranty</a>
+        <a href={`${import.meta.env.BASE_URL}returns/`} class="hover:text-white transition-colors">Returns</a>
+        <a href={`${import.meta.env.BASE_URL}care/`} class="hover:text-white transition-colors">Care Instructions</a>
+      </div>
+      <p>&copy; 2026 mmmaxwwwell. All rights reserved. Kanix™ designs are original works by mmmaxwwwell.</p>
+    </div>
+  </footer>
+</Base>

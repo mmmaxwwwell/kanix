@@ -391,7 +391,7 @@
 - [x] T093 Add contributions model page [FR-090] [P]
   Done when: Astro page describing contributor incentives: milestones table, royalty structure, CLA process, donation option; linked from README
 
-- [ ] T094 Add warranty, returns, and care instructions pages [FR-091, FR-092] [P]
+- [x] T094 Add warranty, returns, and care instructions pages [FR-091, FR-092] [P]
   Done when: warranty page with material-specific disclaimers (TPU heat >60°C, TPC 130°C rating); returns policy (30 days, conditions); safety disclaimer; care instructions per material tier; pages linked from footer and product detail pages
 
 - [ ] T095 Update README with contributions model

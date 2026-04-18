@@ -1,0 +1,27 @@
+{
+  "task_id": "T094",
+  "status": "complete",
+  "summary": "Added warranty, returns, and care instructions pages with material-specific disclaimers and linked from all page footers and product detail pages",
+  "commands_run": [
+    {"command": "cd site && npm run build", "exit_code": 0}
+  ],
+  "files_created": [
+    "site/src/pages/warranty.astro",
+    "site/src/pages/returns.astro",
+    "site/src/pages/care.astro",
+    "specs/admin/claims/completion-T094.json"
+  ],
+  "files_modified": [
+    "site/src/pages/index.astro",
+    "site/src/pages/products/[slug].astro",
+    "site/src/pages/products/index.astro",
+    "site/src/pages/kits.astro",
+    "site/src/pages/checkout.astro",
+    "site/src/pages/order-confirmation.astro",
+    "site/src/pages/contributions.astro",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

@@ -270,12 +270,22 @@ const ogImage = primaryImage?.url ?? undefined;
         <p class="text-neutral-500 text-xs leading-relaxed">
           3D-printed parts can vary in strength and durability depending on material, print settings, and environmental conditions. Inspect your modules regularly and replace any parts showing signs of wear or damage. Kanix™ is not responsible for injury, damage, or loss resulting from the use of these products.
         </p>
+        <div class="flex flex-wrap gap-4 mt-4">
+          <a href={`${import.meta.env.BASE_URL}warranty/`} class="text-xs text-amber-500 hover:text-amber-400 transition-colors font-medium">Warranty Policy &rarr;</a>
+          <a href={`${import.meta.env.BASE_URL}returns/`} class="text-xs text-amber-500 hover:text-amber-400 transition-colors font-medium">Returns Policy &rarr;</a>
+          <a href={`${import.meta.env.BASE_URL}care/`} class="text-xs text-amber-500 hover:text-amber-400 transition-colors font-medium">Care Instructions &rarr;</a>
+        </div>
       </div>
     </div>
   </main>
 
   <footer class="py-12 px-6 border-t border-neutral-800">
     <div class="max-w-6xl mx-auto text-center text-sm text-neutral-500 space-y-2">
+      <div class="flex flex-wrap justify-center gap-4 mb-4">
+        <a href={`${import.meta.env.BASE_URL}warranty/`} class="hover:text-white transition-colors">Warranty</a>
+        <a href={`${import.meta.env.BASE_URL}returns/`} class="hover:text-white transition-colors">Returns</a>
+        <a href={`${import.meta.env.BASE_URL}care/`} class="hover:text-white transition-colors">Care Instructions</a>
+      </div>
       <p>&copy; 2026 mmmaxwwwell. All rights reserved. Kanix™ designs are original works by mmmaxwwwell.</p>
     </div>
   </footer>

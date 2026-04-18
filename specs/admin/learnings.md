@@ -59,3 +59,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T093 — Add contributions model page
 - Astro content pages (contributions, warranty, etc.) are pure static pages — no API data fetching needed, just use the Base layout with matching nav/footer patterns from index.astro
 - Royalty spec details are spread across FR-069 through FR-076 — the key numbers are: 10% royalty at 25-unit threshold (retroactive), 20% for 501(c)(3) donation option, 50-unit starter kit milestone
+
+## T094 — Add warranty, returns, and care instructions pages
+- Material temperature thresholds already defined in `MATERIAL_WARNINGS` in `site/src/data/products.ts` — reuse these values (TPU 60°C, TPC 130°C, PLA 50°C, PETG 80°C, ABS 100°C) for consistency across warranty and care pages
+- Footer links must be added to every page individually since there's no shared footer component — 10 pages total needed updating (7 existing + 3 new)

@@ -1,0 +1,187 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="Care Instructions - Kanix™"
+  description="Care and maintenance instructions for Kanix™ 3D-printed dog handler belt modules, organized by material type."
+>
+  <nav class="fixed top-0 w-full z-50 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href={import.meta.env.BASE_URL} class="text-xl font-extrabold tracking-tight hover:text-neutral-300 transition-colors">KANIX<sup class="text-[0.5em] align-super">™</sup></a>
+      <div class="hidden sm:flex items-center gap-6">
+        <a href={import.meta.env.BASE_URL} class="text-sm text-neutral-400 hover:text-white transition-colors">Home</a>
+        <a href={`${import.meta.env.BASE_URL}products/`} class="text-sm text-neutral-400 hover:text-white transition-colors">Shop</a>
+        <a href={`${import.meta.env.BASE_URL}kits/`} class="text-sm text-neutral-400 hover:text-white transition-colors">Kits</a>
+        <a href={`${import.meta.env.BASE_URL}checkout/`} class="text-sm text-neutral-400 hover:text-white transition-colors" id="cart-link">
+          Cart <span id="cart-count" class="hidden ml-1 px-1.5 py-0.5 bg-amber-500 text-neutral-950 text-xs font-bold rounded-full"></span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main" class="pt-20 pb-16 px-4 sm:px-6">
+    <div class="max-w-4xl mx-auto">
+      <a href={import.meta.env.BASE_URL} class="text-sm text-neutral-500 hover:text-white transition-colors mb-6 inline-block">
+        &larr; Back to home
+      </a>
+
+      <h1 class="text-3xl sm:text-5xl font-bold tracking-tight mb-4">Care Instructions</h1>
+      <p class="text-neutral-400 mb-12 max-w-2xl">
+        Proper care extends the life of your Kanix™ modules. Follow the guidelines below for your specific material type.
+      </p>
+
+      <div class="space-y-12">
+        <!-- General Care -->
+        <section>
+          <h2 class="text-xl font-semibold text-white mb-4">General Care (All Materials)</h2>
+          <ul class="text-neutral-400 space-y-2 list-disc pl-5">
+            <li>Inspect modules regularly for cracks, warping, or layer separation</li>
+            <li>Replace any part showing signs of structural compromise</li>
+            <li>Clean with mild soap and lukewarm water — avoid harsh chemicals or solvents</li>
+            <li>Dry thoroughly before reattaching to belt hardware</li>
+            <li>Check bolt tightness periodically — vibration during use can loosen hardware</li>
+            <li>Store in a cool, dry place away from direct sunlight when not in use</li>
+          </ul>
+        </section>
+
+        <!-- Material-Specific Care -->
+        <section>
+          <h2 class="text-xl font-semibold text-white mb-6">Material-Specific Care</h2>
+          <div class="space-y-6">
+            <!-- TPU -->
+            <div class="bg-amber-500/5 border border-amber-500/20 rounded-xl p-6">
+              <div class="flex items-center gap-3 mb-3">
+                <span class="px-2.5 py-1 text-xs font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-500 rounded-full border border-amber-500/20">Flexible</span>
+                <h3 class="text-lg font-semibold text-white">TPU (Thermoplastic Polyurethane)</h3>
+              </div>
+              <p class="text-sm text-neutral-400 mb-1"><strong class="text-white">Max temperature:</strong> 60°C (140°F)</p>
+              <p class="text-sm text-neutral-400 leading-relaxed mb-4">
+                TPU is your most flexible and impact-resistant option. It absorbs shock well and resists cracking, making it ideal for modules that may experience drops or rough handling.
+              </p>
+              <h4 class="text-sm font-semibold text-neutral-300 mb-2">Care Tips</h4>
+              <ul class="text-sm text-neutral-400 space-y-1.5 list-disc pl-5">
+                <li><strong class="text-white">Never leave in a hot car</strong> — interior temperatures can exceed 60°C in summer, causing permanent deformation</li>
+                <li>TPU is resistant to many oils and greases, but avoid prolonged contact with acetone or strong solvents</li>
+                <li>Flexibility means TPU parts may stretch slightly over time under constant load — this is normal</li>
+                <li>Clean with warm water and mild soap; TPU handles moisture well</li>
+              </ul>
+            </div>
+
+            <!-- TPC -->
+            <div class="bg-amber-500/5 border border-amber-500/20 rounded-xl p-6">
+              <div class="flex items-center gap-3 mb-3">
+                <span class="px-2.5 py-1 text-xs font-semibold uppercase tracking-wider bg-green-500/10 text-green-500 rounded-full border border-green-500/20">Premium</span>
+                <h3 class="text-lg font-semibold text-white">TPC (Thermoplastic Copolyester)</h3>
+              </div>
+              <p class="text-sm text-neutral-400 mb-1"><strong class="text-white">Max temperature:</strong> 130°C (266°F)</p>
+              <p class="text-sm text-neutral-400 leading-relaxed mb-4">
+                TPC is the most durable and heat-resistant material in the Kanix™ lineup. It offers excellent chemical resistance and maintains its shape under demanding conditions.
+              </p>
+              <h4 class="text-sm font-semibold text-neutral-300 mb-2">Care Tips</h4>
+              <ul class="text-sm text-neutral-400 space-y-1.5 list-disc pl-5">
+                <li>Safe to leave in vehicles — TPC can withstand typical car interior temperatures</li>
+                <li>Resistant to most chemicals including oils, fuels, and cleaning agents</li>
+                <li>While highly durable, TPC can still crack under extreme point impacts — avoid dropping on hard surfaces from height</li>
+                <li>No special storage requirements beyond general care guidelines</li>
+              </ul>
+            </div>
+
+            <!-- PLA -->
+            <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+              <div class="flex items-center gap-3 mb-3">
+                <span class="px-2.5 py-1 text-xs font-semibold uppercase tracking-wider bg-neutral-800 text-neutral-400 rounded-full border border-neutral-700">Basic</span>
+                <h3 class="text-lg font-semibold text-white">PLA (Polylactic Acid)</h3>
+              </div>
+              <p class="text-sm text-neutral-400 mb-1"><strong class="text-white">Max temperature:</strong> 50°C (122°F)</p>
+              <p class="text-sm text-neutral-400 leading-relaxed mb-4">
+                PLA is rigid and produces excellent surface finish but has the lowest heat tolerance. Best suited for indoor use or moderate climates.
+              </p>
+              <h4 class="text-sm font-semibold text-neutral-300 mb-2">Care Tips</h4>
+              <ul class="text-sm text-neutral-400 space-y-1.5 list-disc pl-5">
+                <li><strong class="text-white">Never leave in a hot car or in direct sunlight</strong> — PLA can warp at temperatures as low as 50°C</li>
+                <li>PLA is more brittle than TPU or PETG — avoid impacts and sudden flexing</li>
+                <li>PLA is biodegradable and may degrade with prolonged moisture exposure — dry after cleaning</li>
+                <li>Not recommended for use in hot or humid climates without frequent inspection</li>
+              </ul>
+            </div>
+
+            <!-- PETG -->
+            <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+              <div class="flex items-center gap-3 mb-3">
+                <span class="px-2.5 py-1 text-xs font-semibold uppercase tracking-wider bg-neutral-800 text-neutral-400 rounded-full border border-neutral-700">Standard</span>
+                <h3 class="text-lg font-semibold text-white">PETG (Polyethylene Terephthalate Glycol)</h3>
+              </div>
+              <p class="text-sm text-neutral-400 mb-1"><strong class="text-white">Max temperature:</strong> 80°C (176°F)</p>
+              <p class="text-sm text-neutral-400 leading-relaxed mb-4">
+                PETG offers a strong balance of durability, heat resistance, and ease of printing. A versatile all-rounder suitable for most conditions.
+              </p>
+              <h4 class="text-sm font-semibold text-neutral-300 mb-2">Care Tips</h4>
+              <ul class="text-sm text-neutral-400 space-y-1.5 list-disc pl-5">
+                <li>Generally safe in vehicles during moderate temperatures, but avoid leaving on dashboards in peak summer</li>
+                <li>Good moisture resistance — no special drying requirements</li>
+                <li>More impact-resistant than PLA but less flexible than TPU</li>
+                <li>Avoid strong solvents like acetone, which can cloud or weaken PETG</li>
+              </ul>
+            </div>
+
+            <!-- ABS -->
+            <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+              <div class="flex items-center gap-3 mb-3">
+                <span class="px-2.5 py-1 text-xs font-semibold uppercase tracking-wider bg-neutral-800 text-neutral-400 rounded-full border border-neutral-700">Standard</span>
+                <h3 class="text-lg font-semibold text-white">ABS (Acrylonitrile Butadiene Styrene)</h3>
+              </div>
+              <p class="text-sm text-neutral-400 mb-1"><strong class="text-white">Max temperature:</strong> 100°C (212°F)</p>
+              <p class="text-sm text-neutral-400 leading-relaxed mb-4">
+                ABS is impact-resistant and heat-tolerant, making it suitable for parts that may experience rough handling or moderate heat exposure.
+              </p>
+              <h4 class="text-sm font-semibold text-neutral-300 mb-2">Care Tips</h4>
+              <ul class="text-sm text-neutral-400 space-y-1.5 list-disc pl-5">
+                <li>Good heat resistance — generally safe in vehicles</li>
+                <li><strong class="text-white">Avoid acetone</strong> — ABS dissolves in acetone (this property is used intentionally for smoothing, but accidental exposure weakens parts)</li>
+                <li>UV exposure can cause yellowing and brittleness over time — store out of direct sunlight</li>
+                <li>Good impact resistance but can crack along layer lines under sustained stress</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- When to Replace -->
+        <section>
+          <h2 class="text-xl font-semibold text-white mb-4">When to Replace</h2>
+          <div class="text-neutral-400 leading-relaxed space-y-4">
+            <p>Replace any Kanix™ module immediately if you notice:</p>
+            <ul class="space-y-2 list-disc pl-5">
+              <li>Visible cracks or fractures, especially around bolt holes or stress points</li>
+              <li>Warping or deformation that prevents proper seating on the belt</li>
+              <li>Layer separation (delamination) visible as white lines or peeling layers</li>
+              <li>Excessive wear that reduces grip, retention force, or structural integrity</li>
+              <li>Bolt holes that have become enlarged or stripped</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Safety Disclaimer -->
+        <section>
+          <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+            <h2 class="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-3">Safety Disclaimer</h2>
+            <p class="text-neutral-500 text-xs leading-relaxed">
+              3D-printed parts can vary in strength and durability depending on material, print settings, and environmental conditions. These products are designed as accessories for dog handling belts and are not safety-critical equipment. Inspect your modules regularly and replace any parts showing signs of wear, cracking, or deformation. Kanix™ is not responsible for injury, damage, or loss resulting from the use of these products. Always supervise dogs when using any handling equipment. Use at your own risk.
+            </p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="py-12 px-6 border-t border-neutral-800">
+    <div class="max-w-6xl mx-auto text-center text-sm text-neutral-500 space-y-2">
+      <div class="flex flex-wrap justify-center gap-4 mb-4">
+        <a href={`${import.meta.env.BASE_URL}warranty/`} class="hover:text-white transition-colors">Warranty</a>
+        <a href={`${import.meta.env.BASE_URL}returns/`} class="hover:text-white transition-colors">Returns</a>
+        <a href={`${import.meta.env.BASE_URL}care/`} class="hover:text-white transition-colors">Care Instructions</a>
+      </div>
+      <p>&copy; 2026 mmmaxwwwell. All rights reserved. Kanix™ designs are original works by mmmaxwwwell.</p>
+    </div>
+  </footer>
+</Base>
