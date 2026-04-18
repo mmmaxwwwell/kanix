@@ -47,3 +47,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Flutter app package IDs follow `com.kanix.kanix_admin` / `com.kanix.kanix_customer` pattern (not `com.kanix.admin`) — defined in `android/app/build.gradle.kts` as `applicationId`
 - Debug APK output path is `build/app/outputs/flutter-apk/app-debug.apk` relative to each Flutter project root
 - `adb shell am force-stop` before `am start` ensures a cold start; idempotent since force-stop on an uninstalled package is a no-op
+
+## T095e — Set up Playwright + Patrol regression harnesses
+- Playwright JSON reporter configured via `PW_JSON_OUTPUT` env var — defaults to `../test-logs/e2e/playwright-results.json` relative to site dir; Patrol uses `flutter test --machine` to emit JSON
+- Patrol Android setup requires both `MainActivityTest.java` with `@RunWith(PatrolJUnitRunner.class)` in `androidTest/` AND `testInstrumentationRunner` in `build.gradle.kts` `defaultConfig`
+- Site uses pnpm (not npm) for dependency management — `pnpm add -D @playwright/test` installs correctly; CI workflow uses `npm ci` since `package-lock.json` may be expected by the workflow

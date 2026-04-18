@@ -1,0 +1,94 @@
+name: E2E Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  playwright:
+    name: Playwright (Astro site)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./site
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Install OpenSCAD
+        run: sudo apt-get update && sudo apt-get install -y openscad xvfb
+
+      - name: Install BOSL2
+        run: |
+          mkdir -p ~/.local/share/OpenSCAD/libraries
+          git clone --depth 1 https://github.com/BelfrySCAD/BOSL2.git ~/.local/share/OpenSCAD/libraries/BOSL2
+
+      - name: Build site
+        run: xvfb-run npm run build
+
+      - name: Run Playwright E2E tests
+        run: npx playwright test
+        env:
+          ASTRO_URL: http://127.0.0.1:4321
+          PW_JSON_OUTPUT: ../test-logs/e2e/playwright-results.json
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: |
+            test-logs/e2e/playwright-results.json
+            site/test-results/
+
+  patrol:
+    name: Patrol (Flutter ${{ matrix.app }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [admin, customer]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.app }}
+        run: flutter pub get
+
+      - name: Start Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: |
+            cd ${{ matrix.app }}
+            mkdir -p ../test-logs/e2e
+            flutter test integration_test/smoke_test.dart --machine > ../test-logs/e2e/patrol-${{ matrix.app }}-results.json 2>&1 || true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: patrol-${{ matrix.app }}-results
+          path: test-logs/e2e/patrol-${{ matrix.app }}-results.json

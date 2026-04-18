@@ -10,6 +10,7 @@
     "dev": "astro dev",
     "build": "npm run render && astro build",
     "test": "bash scripts/check-links.sh && bash scripts/test-checkout.sh",
+    "test:e2e": "playwright test",
     "preview": "astro preview",
     "astro": "astro"
   },
@@ -18,5 +19,8 @@
     "astro": "^6.1.6",
     "tailwindcss": "^4.2.1",
     "three": "^0.172.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1"
   }
 }

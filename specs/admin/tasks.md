@@ -415,7 +415,7 @@
 - [x] T095d APK install + app launch scripts consumed by MCP runner
   Done when: `scripts/e2e-install-apks.sh` builds admin + customer Flutter debug APKs and installs both on the running emulator via `adb install -r`; `scripts/e2e-launch-admin.sh` and `scripts/e2e-launch-customer.sh` cold-start each app with `adb shell am start`; scripts idempotent; app package IDs documented (e.g., `com.kanix.admin`, `com.kanix.customer`)
 
-- [ ] T095e Set up Playwright + Patrol regression harnesses
+- [x] T095e Set up Playwright + Patrol regression harnesses
   Done when: `site/tests/e2e/` has Playwright config running against local Astro served by `test/e2e/setup.sh`; `admin/integration_test/` and `customer/integration_test/` have Patrol config wired to `flutter test integration_test/`; both emit structured JSON to `test-logs/e2e/` for agent + CI consumption; `.github/workflows/e2e.yml` runs Playwright headless + Patrol on Android CI emulator on push
 
 - [ ] T096 E2E: guest checkout on Astro [SC-001] [needs: mcp-browser, e2e-loop]

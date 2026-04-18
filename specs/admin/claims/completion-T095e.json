@@ -1,0 +1,30 @@
+{
+  "task_id": "T095e",
+  "status": "complete",
+  "summary": "Set up Playwright E2E harness for Astro site, Patrol integration test harness for admin/customer Flutter apps, structured JSON output to test-logs/e2e/, and GitHub Actions e2e.yml workflow",
+  "commands_run": [
+    {"command": "cd site && pnpm add -D @playwright/test", "exit_code": 0}
+  ],
+  "files_created": [
+    "site/playwright.config.ts",
+    "site/tests/e2e/smoke.spec.ts",
+    "admin/integration_test/smoke_test.dart",
+    "customer/integration_test/smoke_test.dart",
+    "admin/android/app/src/androidTest/java/com/kanix/kanix_admin/MainActivityTest.java",
+    "customer/android/app/src/androidTest/java/com/kanix/kanix_customer/MainActivityTest.java",
+    "scripts/e2e-run-patrol.sh",
+    ".github/workflows/e2e.yml",
+    "test-logs/e2e/.gitkeep"
+  ],
+  "files_modified": [
+    "site/package.json",
+    "admin/pubspec.yaml",
+    "customer/pubspec.yaml",
+    "admin/android/app/build.gradle.kts",
+    "customer/android/app/build.gradle.kts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
