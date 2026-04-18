@@ -388,7 +388,7 @@
 - [x] T092 Implement kit builder page [FR-007, FR-088]
   Done when: Astro page with client-side kit builder island; class requirements displayed; product selection per class; availability checking; price + savings display; add to cart integration
 
-- [ ] T093 Add contributions model page [FR-090] [P]
+- [x] T093 Add contributions model page [FR-090] [P]
   Done when: Astro page describing contributor incentives: milestones table, royalty structure, CLA process, donation option; linked from README
 
 - [ ] T094 Add warranty, returns, and care instructions pages [FR-091, FR-092] [P]

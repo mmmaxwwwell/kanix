@@ -1,0 +1,245 @@
+---
+import Base from "../layouts/Base.astro";
+
+const repoUrl = "https://github.com/mmmaxwwwell/kanix";
+---
+
+<Base
+  title="Contributions Model - Kanix™"
+  description="Learn how Kanix™ rewards open-source contributors with royalties, milestone rewards, and donation matching."
+>
+  <!-- Nav -->
+  <nav class="fixed top-0 w-full z-50 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href={import.meta.env.BASE_URL} class="text-xl font-extrabold tracking-tight">KANIX<sup class="text-[0.5em] align-super">&trade;</sup></a>
+      <div class="hidden sm:flex items-center gap-6">
+        <a href={`${import.meta.env.BASE_URL}products/`} class="text-sm text-neutral-400 hover:text-white transition-colors">Shop</a>
+        <a href={import.meta.env.BASE_URL} class="text-sm text-neutral-400 hover:text-white transition-colors">Home</a>
+        <a
+          href={repoUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-sm text-neutral-400 hover:text-white transition-colors"
+        >
+          GitHub
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main" class="pt-24 pb-16">
+    <!-- Hero -->
+    <section class="px-6 py-16">
+      <div class="max-w-4xl mx-auto text-center">
+        <h1 class="text-4xl sm:text-5xl font-bold tracking-tight mb-6">
+          Contributions Model
+        </h1>
+        <p class="text-neutral-400 text-lg max-w-2xl mx-auto leading-relaxed">
+          Kanix&trade; is open source and community-driven. We reward contributors who design
+          new modules with royalties, milestone rewards, and the option to donate to charity at
+          double the rate.
+        </p>
+      </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="px-6 py-16">
+      <div class="max-w-4xl mx-auto">
+        <h2 class="text-3xl font-bold tracking-tight mb-8 text-center">How It Works</h2>
+        <div class="grid sm:grid-cols-3 gap-8">
+          <div class="text-center">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 font-bold text-xl mb-4">1</div>
+            <h3 class="text-lg font-semibold mb-2 text-white">Design a Module</h3>
+            <p class="text-neutral-400 leading-relaxed">Create an OpenSCAD module for the Kanix&trade; system and submit a pull request on GitHub.</p>
+          </div>
+          <div class="text-center">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 font-bold text-xl mb-4">2</div>
+            <h3 class="text-lg font-semibold mb-2 text-white">Sign the CLA</h3>
+            <p class="text-neutral-400 leading-relaxed">Sign the Contributor License Agreement when you open your first PR. Our CLA bot handles this automatically.</p>
+          </div>
+          <div class="text-center">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 font-bold text-xl mb-4">3</div>
+            <h3 class="text-lg font-semibold mb-2 text-white">Earn Rewards</h3>
+            <p class="text-neutral-400 leading-relaxed">Once your design is accepted and listed for sale, you start earning milestone rewards and royalties.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Milestones Table -->
+    <section class="px-6 py-16 bg-neutral-900/50">
+      <div class="max-w-4xl mx-auto">
+        <h2 class="text-3xl font-bold tracking-tight mb-4 text-center">Milestones</h2>
+        <p class="text-neutral-400 text-center mb-8 max-w-2xl mx-auto">
+          Contributors unlock rewards as their designs reach sales milestones.
+        </p>
+        <div class="overflow-x-auto">
+          <table class="w-full border-collapse">
+            <thead>
+              <tr class="border-b border-neutral-700">
+                <th class="text-left py-4 px-6 text-sm font-semibold text-neutral-300 uppercase tracking-wider">Milestone</th>
+                <th class="text-left py-4 px-6 text-sm font-semibold text-neutral-300 uppercase tracking-wider">Threshold</th>
+                <th class="text-left py-4 px-6 text-sm font-semibold text-neutral-300 uppercase tracking-wider">Reward</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b border-neutral-800">
+                <td class="py-4 px-6 text-white font-medium">PR Accepted</td>
+                <td class="py-4 px-6 text-neutral-400">First design merged</td>
+                <td class="py-4 px-6 text-amber-500">2 Kanix&trade; plates + 2 modules of your choice</td>
+              </tr>
+              <tr class="border-b border-neutral-800">
+                <td class="py-4 px-6 text-white font-medium">Royalty Activation</td>
+                <td class="py-4 px-6 text-neutral-400">25 units sold</td>
+                <td class="py-4 px-6 text-amber-500">10% royalty activated, retroactive to unit 1</td>
+              </tr>
+              <tr>
+                <td class="py-4 px-6 text-white font-medium">Starter Kit</td>
+                <td class="py-4 px-6 text-neutral-400">50 units sold</td>
+                <td class="py-4 px-6 text-amber-500">Complete Kanix&trade; starter kit</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Royalty Structure -->
+    <section class="px-6 py-16">
+      <div class="max-w-4xl mx-auto">
+        <h2 class="text-3xl font-bold tracking-tight mb-4 text-center">Royalty Structure</h2>
+        <p class="text-neutral-400 text-center mb-8 max-w-2xl mx-auto">
+          Once your design crosses the 25-unit sales threshold, you earn a 10% royalty on every
+          sale &mdash; calculated retroactively from unit 1.
+        </p>
+        <div class="grid sm:grid-cols-2 gap-6">
+          <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-8">
+            <h3 class="text-lg font-semibold mb-3 text-white">How Royalties Work</h3>
+            <ul class="text-neutral-400 space-y-3 leading-relaxed">
+              <li><span class="text-amber-500 font-medium">10% royalty rate</span> on the sale price of each unit sold</li>
+              <li><span class="text-amber-500 font-medium">Retroactive</span> &mdash; when you hit 25 units, you receive a lump sum for units 1&ndash;25</li>
+              <li><span class="text-amber-500 font-medium">Per-design tracking</span> &mdash; each module you contribute is tracked independently</li>
+              <li><span class="text-amber-500 font-medium">All variants count</span> &mdash; sales of any material variant (TPU, PA11, TPC) count toward your total</li>
+            </ul>
+          </div>
+          <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-8">
+            <h3 class="text-lg font-semibold mb-3 text-white">Tax Requirements</h3>
+            <ul class="text-neutral-400 space-y-3 leading-relaxed">
+              <li>Before your first royalty payment, you must submit a <span class="text-white font-medium">W-9</span> (US) or <span class="text-white font-medium">W-8BEN</span> (international) tax form</li>
+              <li>You will be prompted to submit your tax form as you approach the 25-unit threshold</li>
+              <li>Royalty accrual is tracked even before tax forms are submitted &mdash; no earnings are lost</li>
+            </ul>
+          </div>
+        </div>
+        <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 mt-6">
+          <p class="text-neutral-500 text-sm leading-relaxed">
+            <span class="text-neutral-300 font-medium">Refund policy:</span> If a sale is later refunded,
+            the corresponding royalty is clawed back from your accrual. This ensures royalty calculations
+            always reflect actual revenue.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- CLA Process -->
+    <section class="px-6 py-16 bg-neutral-900/50">
+      <div class="max-w-4xl mx-auto">
+        <h2 class="text-3xl font-bold tracking-tight mb-4 text-center">Contributor License Agreement (CLA)</h2>
+        <p class="text-neutral-400 text-center mb-8 max-w-2xl mx-auto">
+          All contributors must sign a CLA before their first contribution can be merged.
+          This protects both you and the project.
+        </p>
+        <div class="max-w-2xl mx-auto">
+          <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-8">
+            <ol class="space-y-6">
+              <li class="flex gap-4">
+                <div class="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 font-bold text-sm">1</div>
+                <div>
+                  <h4 class="text-white font-semibold mb-1">Open a Pull Request</h4>
+                  <p class="text-neutral-400 leading-relaxed">Submit your module design as a pull request to the <a href={repoUrl} target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:text-amber-400 transition-colors">Kanix&trade; GitHub repository</a>.</p>
+                </div>
+              </li>
+              <li class="flex gap-4">
+                <div class="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 font-bold text-sm">2</div>
+                <div>
+                  <h4 class="text-white font-semibold mb-1">Sign the CLA</h4>
+                  <p class="text-neutral-400 leading-relaxed">Our CLA bot will automatically comment on your PR with instructions. Follow the link to review and sign the agreement electronically.</p>
+                </div>
+              </li>
+              <li class="flex gap-4">
+                <div class="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 font-bold text-sm">3</div>
+                <div>
+                  <h4 class="text-white font-semibold mb-1">Get Registered</h4>
+                  <p class="text-neutral-400 leading-relaxed">Once signed, the CLA bot creates your contributor record linked to your GitHub username. You only need to sign once &mdash; all future contributions are covered.</p>
+                </div>
+              </li>
+              <li class="flex gap-4">
+                <div class="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 font-bold text-sm">4</div>
+                <div>
+                  <h4 class="text-white font-semibold mb-1">Track Your Progress</h4>
+                  <p class="text-neutral-400 leading-relaxed">Link your GitHub account in the Kanix&trade; app to access your contributor dashboard with per-design sales, royalty accrual, and milestone progress.</p>
+                </div>
+              </li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Donation Option -->
+    <section class="px-6 py-16">
+      <div class="max-w-4xl mx-auto text-center">
+        <h2 class="text-3xl font-bold tracking-tight mb-4">Donation Option</h2>
+        <p class="text-neutral-400 mb-8 max-w-2xl mx-auto leading-relaxed">
+          Prefer to give back? Contributors can opt to donate their royalties to a
+          501(c)(3) charity of their choice at <span class="text-amber-500 font-semibold">double the royalty rate (20%)</span>.
+        </p>
+        <div class="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+          <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-8">
+            <p class="text-sm text-neutral-500 uppercase tracking-wider font-semibold mb-3">Standard Royalty</p>
+            <p class="text-4xl font-bold text-white mb-2">10%</p>
+            <p class="text-neutral-400 text-sm">Paid directly to you</p>
+          </div>
+          <div class="bg-neutral-900 border border-amber-500/30 rounded-xl p-8">
+            <p class="text-sm text-amber-500 uppercase tracking-wider font-semibold mb-3">Donation Option</p>
+            <p class="text-4xl font-bold text-amber-500 mb-2">20%</p>
+            <p class="text-neutral-400 text-sm">Donated to your chosen 501(c)(3) charity</p>
+          </div>
+        </div>
+        <p class="text-neutral-500 text-sm mt-6 max-w-xl mx-auto">
+          You can choose the donation option at any time from your contributor dashboard.
+          Kanix&trade; tracks the designated charity and generates appropriate records for tax purposes.
+        </p>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="px-6 py-16">
+      <div class="max-w-3xl mx-auto text-center">
+        <h2 class="text-3xl font-bold tracking-tight mb-6">Ready to Contribute?</h2>
+        <p class="text-neutral-400 mb-8 max-w-xl mx-auto leading-relaxed">
+          Check out the repository, design a module, and submit a pull request. Our community
+          and maintainers will help you through the process.
+        </p>
+        <a
+          href={repoUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-2 px-8 py-3 bg-white text-neutral-950 font-semibold rounded-lg hover:bg-neutral-200 transition-colors"
+        >
+          View on GitHub &rarr;
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="py-12 px-6 border-t border-neutral-800">
+    <div class="max-w-6xl mx-auto text-center text-sm text-neutral-500 space-y-2">
+      <p>
+        Licensed under <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener noreferrer" class="underline hover:text-white transition-colors">CC BY-NC 4.0</a>. Free for personal use. <a href={`${repoUrl}#commercial-licensing`} class="underline hover:text-white transition-colors">Commercial licensing available</a>.
+      </p>
+      <p>&copy; 2026 mmmaxwwwell. All rights reserved. Kanix&trade; designs are original works by mmmaxwwwell.</p>
+    </div>
+  </footer>
+</Base>

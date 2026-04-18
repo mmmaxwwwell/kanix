@@ -1,0 +1,12 @@
+{
+  "task_id": "T093",
+  "status": "complete",
+  "summary": "Added Astro contributions model page with milestones table, royalty structure, CLA process, and donation option; linked from README",
+  "commands_run": [
+    {"command": "cd site && npm run build", "exit_code": 0}
+  ],
+  "files_created": ["site/src/pages/contributions.astro"],
+  "files_modified": ["README.md", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

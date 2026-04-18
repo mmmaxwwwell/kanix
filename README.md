@@ -65,6 +65,18 @@ npm run dev
 
 The build pipeline automatically renders all `.scad` files to `.stl` using OpenSCAD, then builds the Astro site with interactive 3D model viewers.
 
+## Contributions Model
+
+Kanix™ rewards open-source contributors who design new modules. See the full details on the [Contributions Model](https://mmmaxwwwell.github.io/kanix/contributions/) page.
+
+| Milestone | Threshold | Reward |
+|-----------|-----------|--------|
+| **PR Accepted** | First design merged | 2 plates + 2 modules of your choice |
+| **Royalty Activation** | 25 units sold | 10% royalty, retroactive to unit 1 |
+| **Starter Kit** | 50 units sold | Complete Kanix™ starter kit |
+
+Contributors can also opt to donate royalties to a 501(c)(3) charity at double the rate (20%). All contributors must sign a [Contributor License Agreement (CLA)](https://mmmaxwwwell.github.io/kanix/contributions/#contributor-license-agreement-cla) when opening their first pull request.
+
 ## Disclaimer
 
 These designs are provided "as is" without warranty of any kind. The creator assumes no liability for injury, damage, or loss resulting from the use of these designs or any parts printed from them. You are solely responsible for ensuring that printed parts are suitable and safe for your intended use, including material selection, print quality, and structural integrity. 3D-printed parts can fail without warning, so inspect your gear regularly and replace any parts showing signs of wear or damage. Use at your own risk.
