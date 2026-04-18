@@ -1,0 +1,624 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="Checkout - Kanix™ Shop"
+  description="Complete your purchase from Kanix™"
+>
+  <nav class="fixed top-0 w-full z-50 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href={import.meta.env.BASE_URL} class="text-xl font-extrabold tracking-tight hover:text-neutral-300 transition-colors">KANIX<sup class="text-[0.5em] align-super">™</sup></a>
+      <div class="hidden sm:flex items-center gap-6">
+        <a href={import.meta.env.BASE_URL} class="text-sm text-neutral-400 hover:text-white transition-colors">Home</a>
+        <a href={`${import.meta.env.BASE_URL}products/`} class="text-sm text-neutral-400 hover:text-white transition-colors">Shop</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main" class="pt-20 pb-16 px-4 sm:px-6">
+    <div class="max-w-4xl mx-auto">
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight mb-8">Checkout</h1>
+
+      <!-- Loading State -->
+      <div id="checkout-loading" class="text-center py-16">
+        <p class="text-neutral-400">Loading your cart...</p>
+      </div>
+
+      <!-- Empty Cart -->
+      <div id="checkout-empty" class="hidden text-center py-16">
+        <p class="text-neutral-400 mb-4">Your cart is empty.</p>
+        <a
+          href={`${import.meta.env.BASE_URL}products/`}
+          class="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-neutral-950 font-semibold rounded-lg hover:bg-amber-400 transition-colors text-sm"
+        >
+          Browse Products
+        </a>
+      </div>
+
+      <!-- Checkout Form -->
+      <div id="checkout-form" class="hidden">
+        <div class="grid lg:grid-cols-5 gap-8">
+          <!-- Left: Form -->
+          <div class="lg:col-span-3 space-y-8">
+            <!-- Cart Summary Island -->
+            <section id="cart-summary-section">
+              <h2 class="text-lg font-semibold mb-4">Cart</h2>
+              <div id="cart-items" class="space-y-3"></div>
+            </section>
+
+            <!-- Contact & Address Form Island -->
+            <section id="address-section">
+              <h2 class="text-lg font-semibold mb-4">Shipping Information</h2>
+              <form id="shipping-form" class="space-y-4">
+                <div>
+                  <label for="email" class="block text-sm font-medium text-neutral-400 mb-1">Email</label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    required
+                    class="w-full px-4 py-2.5 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                    placeholder="you@example.com"
+                  />
+                  <p id="email-error" class="text-red-400 text-xs mt-1 hidden"></p>
+                </div>
+
+                <div>
+                  <label for="full_name" class="block text-sm font-medium text-neutral-400 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    id="full_name"
+                    name="full_name"
+                    required
+                    class="w-full px-4 py-2.5 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                    placeholder="Jane Doe"
+                  />
+                  <p id="full_name-error" class="text-red-400 text-xs mt-1 hidden"></p>
+                </div>
+
+                <div>
+                  <label for="line1" class="block text-sm font-medium text-neutral-400 mb-1">Address Line 1</label>
+                  <input
+                    type="text"
+                    id="line1"
+                    name="line1"
+                    required
+                    class="w-full px-4 py-2.5 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                    placeholder="123 Main St"
+                  />
+                  <p id="line1-error" class="text-red-400 text-xs mt-1 hidden"></p>
+                </div>
+
+                <div>
+                  <label for="line2" class="block text-sm font-medium text-neutral-400 mb-1">Address Line 2 <span class="text-neutral-600">(optional)</span></label>
+                  <input
+                    type="text"
+                    id="line2"
+                    name="line2"
+                    class="w-full px-4 py-2.5 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                    placeholder="Apt 4B"
+                  />
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label for="city" class="block text-sm font-medium text-neutral-400 mb-1">City</label>
+                    <input
+                      type="text"
+                      id="city"
+                      name="city"
+                      required
+                      class="w-full px-4 py-2.5 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                      placeholder="Austin"
+                    />
+                    <p id="city-error" class="text-red-400 text-xs mt-1 hidden"></p>
+                  </div>
+                  <div>
+                    <label for="state" class="block text-sm font-medium text-neutral-400 mb-1">State</label>
+                    <select
+                      id="state"
+                      name="state"
+                      required
+                      class="w-full px-4 py-2.5 bg-neutral-900 border border-neutral-700 rounded-lg text-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                    >
+                      <option value="">Select state</option>
+                    </select>
+                    <p id="state-error" class="text-red-400 text-xs mt-1 hidden"></p>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label for="postal_code" class="block text-sm font-medium text-neutral-400 mb-1">ZIP Code</label>
+                    <input
+                      type="text"
+                      id="postal_code"
+                      name="postal_code"
+                      required
+                      pattern="\d{5}(-\d{4})?"
+                      class="w-full px-4 py-2.5 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                      placeholder="78701"
+                    />
+                    <p id="postal_code-error" class="text-red-400 text-xs mt-1 hidden"></p>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-neutral-400 mb-1">Country</label>
+                    <input
+                      type="text"
+                      value="United States"
+                      disabled
+                      class="w-full px-4 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-500 cursor-not-allowed"
+                    />
+                    <p class="text-neutral-600 text-xs mt-1">US shipping only</p>
+                  </div>
+                </div>
+
+                <!-- Error display -->
+                <div id="checkout-error" class="hidden bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                  <p id="checkout-error-message" class="text-sm text-red-400"></p>
+                </div>
+
+                <button
+                  type="submit"
+                  id="submit-address-btn"
+                  class="w-full py-3 bg-amber-500 text-neutral-950 font-semibold rounded-lg hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Continue to Payment
+                </button>
+              </form>
+            </section>
+
+            <!-- Payment Section Island (hidden until address submitted) -->
+            <section id="payment-section" class="hidden">
+              <h2 class="text-lg font-semibold mb-4">Payment</h2>
+
+              <!-- Shipping Rate Display -->
+              <div id="shipping-rate-display" class="mb-4">
+                <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <p class="text-sm font-medium text-white" id="shipping-carrier"></p>
+                      <p class="text-xs text-neutral-500" id="shipping-service"></p>
+                    </div>
+                    <p class="text-sm font-semibold text-white" id="shipping-cost"></p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Stripe Elements Container -->
+              <div id="stripe-card-element" class="bg-neutral-900 border border-neutral-700 rounded-lg p-4 mb-4"></div>
+              <p id="stripe-card-error" class="text-red-400 text-xs mb-4 hidden"></p>
+
+              <button
+                type="button"
+                id="pay-btn"
+                class="w-full py-3 bg-amber-500 text-neutral-950 font-semibold rounded-lg hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled
+              >
+                Pay Now
+              </button>
+            </section>
+          </div>
+
+          <!-- Right: Order Summary Sidebar -->
+          <div class="lg:col-span-2">
+            <div class="sticky top-24 bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+              <h2 class="text-lg font-semibold mb-4">Order Summary</h2>
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                  <span class="text-neutral-400">Subtotal</span>
+                  <span id="summary-subtotal" class="text-white">$0.00</span>
+                </div>
+                <div id="summary-shipping-row" class="flex justify-between hidden">
+                  <span class="text-neutral-400">Shipping</span>
+                  <span id="summary-shipping" class="text-white">--</span>
+                </div>
+                <div id="summary-tax-row" class="flex justify-between hidden">
+                  <span class="text-neutral-400">Tax</span>
+                  <span id="summary-tax" class="text-white">--</span>
+                </div>
+                <div class="border-t border-neutral-800 pt-2 mt-2">
+                  <div class="flex justify-between font-semibold">
+                    <span class="text-neutral-200">Total</span>
+                    <span id="summary-total" class="text-white">$0.00</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Processing State -->
+      <div id="checkout-processing" class="hidden text-center py-16">
+        <div class="inline-block w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p class="text-neutral-400">Processing your payment...</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="py-12 px-6 border-t border-neutral-800">
+    <div class="max-w-6xl mx-auto text-center text-sm text-neutral-500 space-y-2">
+      <p>&copy; 2026 mmmaxwwwell. All rights reserved. Kanix™ designs are original works by mmmaxwwwell.</p>
+    </div>
+  </footer>
+</Base>
+
+<script>
+  import {
+    getCart,
+    getCartToken,
+    removeFromCart,
+    checkout,
+    formatPrice,
+    US_STATES,
+    isValidUSPostalCode,
+    emitCartUpdate,
+    clearCartToken,
+  } from "../lib/cart";
+  import type { Cart, CheckoutResponse } from "../lib/cart";
+
+  // -----------------------------------------------------------------------
+  // DOM refs
+  // -----------------------------------------------------------------------
+  const loadingEl = document.getElementById("checkout-loading")!;
+  const emptyEl = document.getElementById("checkout-empty")!;
+  const formEl = document.getElementById("checkout-form")!;
+  const processingEl = document.getElementById("checkout-processing")!;
+  const cartItemsEl = document.getElementById("cart-items")!;
+  const shippingForm = document.getElementById("shipping-form") as HTMLFormElement;
+  const submitBtn = document.getElementById("submit-address-btn") as HTMLButtonElement;
+  const paymentSection = document.getElementById("payment-section")!;
+  const payBtn = document.getElementById("pay-btn") as HTMLButtonElement;
+  const errorEl = document.getElementById("checkout-error")!;
+  const errorMessageEl = document.getElementById("checkout-error-message")!;
+
+  // Summary elements
+  const summarySubtotal = document.getElementById("summary-subtotal")!;
+  const summaryShippingRow = document.getElementById("summary-shipping-row")!;
+  const summaryShipping = document.getElementById("summary-shipping")!;
+  const summaryTaxRow = document.getElementById("summary-tax-row")!;
+  const summaryTax = document.getElementById("summary-tax")!;
+  const summaryTotal = document.getElementById("summary-total")!;
+
+  // Shipping display
+  const shippingCarrier = document.getElementById("shipping-carrier")!;
+  const shippingService = document.getElementById("shipping-service")!;
+  const shippingCost = document.getElementById("shipping-cost")!;
+
+  // State select
+  const stateSelect = document.getElementById("state") as HTMLSelectElement;
+
+  // -----------------------------------------------------------------------
+  // Populate US states
+  // -----------------------------------------------------------------------
+  for (const [code, name] of Object.entries(US_STATES)) {
+    const opt = document.createElement("option");
+    opt.value = code;
+    opt.textContent = name;
+    stateSelect.appendChild(opt);
+  }
+
+  // -----------------------------------------------------------------------
+  // State
+  // -----------------------------------------------------------------------
+  let currentCart: Cart | null = null;
+  let checkoutResult: CheckoutResponse | null = null;
+  let stripe: any = null;
+  let cardElement: any = null;
+
+  // -----------------------------------------------------------------------
+  // Initialize
+  // -----------------------------------------------------------------------
+  async function init() {
+    currentCart = await getCart();
+    if (!currentCart || currentCart.items.length === 0) {
+      loadingEl.classList.add("hidden");
+      emptyEl.classList.remove("hidden");
+      return;
+    }
+
+    renderCart(currentCart);
+    loadingEl.classList.add("hidden");
+    formEl.classList.remove("hidden");
+  }
+
+  // -----------------------------------------------------------------------
+  // Render cart items
+  // -----------------------------------------------------------------------
+  function renderCart(cart: Cart) {
+    cartItemsEl.innerHTML = "";
+    for (const item of cart.items) {
+      const div = document.createElement("div");
+      div.className = "bg-neutral-900 border border-neutral-800 rounded-lg p-4 flex items-center justify-between";
+      div.innerHTML = `
+        <div class="flex-1">
+          <p class="text-sm font-medium text-white">${escapeHtml(item.variantTitle)}</p>
+          <p class="text-xs text-neutral-500">SKU: ${escapeHtml(item.sku)} &middot; Qty: ${item.quantity}</p>
+          ${item.priceChanged ? '<p class="text-xs text-amber-500 mt-1">Price has changed</p>' : ""}
+          ${item.insufficientStock ? '<p class="text-xs text-red-400 mt-1">Insufficient stock</p>' : ""}
+        </div>
+        <div class="text-right ml-4">
+          <p class="text-sm font-semibold text-white">${formatPrice(item.lineTotalMinor)}</p>
+          <button data-remove-item="${item.id}" class="text-xs text-neutral-500 hover:text-red-400 transition-colors mt-1">Remove</button>
+        </div>
+      `;
+      cartItemsEl.appendChild(div);
+    }
+
+    // Attach remove handlers
+    cartItemsEl.querySelectorAll("[data-remove-item]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const itemId = (btn as HTMLElement).dataset.removeItem!;
+        try {
+          currentCart = await removeFromCart(itemId);
+          emitCartUpdate(currentCart);
+          if (currentCart.items.length === 0) {
+            formEl.classList.add("hidden");
+            emptyEl.classList.remove("hidden");
+          } else {
+            renderCart(currentCart);
+            updateSummary(currentCart);
+          }
+        } catch {
+          // ignore remove errors
+        }
+      });
+    });
+
+    updateSummary(cart);
+  }
+
+  function updateSummary(cart: Cart) {
+    summarySubtotal.textContent = formatPrice(cart.subtotalMinor);
+    summaryTotal.textContent = formatPrice(cart.subtotalMinor);
+  }
+
+  function escapeHtml(str: string): string {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // -----------------------------------------------------------------------
+  // Form validation
+  // -----------------------------------------------------------------------
+  function validateForm(): boolean {
+    let valid = true;
+
+    // Reset all errors
+    document.querySelectorAll("[id$='-error']").forEach((el) => {
+      el.classList.add("hidden");
+      el.textContent = "";
+    });
+
+    const email = (document.getElementById("email") as HTMLInputElement).value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showFieldError("email", "Please enter a valid email address");
+      valid = false;
+    }
+
+    const fullName = (document.getElementById("full_name") as HTMLInputElement).value.trim();
+    if (!fullName) {
+      showFieldError("full_name", "Full name is required");
+      valid = false;
+    }
+
+    const line1 = (document.getElementById("line1") as HTMLInputElement).value.trim();
+    if (!line1) {
+      showFieldError("line1", "Address is required");
+      valid = false;
+    }
+
+    const city = (document.getElementById("city") as HTMLInputElement).value.trim();
+    if (!city) {
+      showFieldError("city", "City is required");
+      valid = false;
+    }
+
+    const state = stateSelect.value;
+    if (!state) {
+      showFieldError("state", "State is required");
+      valid = false;
+    }
+
+    const postalCode = (document.getElementById("postal_code") as HTMLInputElement).value.trim();
+    if (!postalCode) {
+      showFieldError("postal_code", "ZIP code is required");
+      valid = false;
+    } else if (!isValidUSPostalCode(postalCode)) {
+      showFieldError("postal_code", "Enter a valid US ZIP code (e.g., 78701 or 78701-1234)");
+      valid = false;
+    }
+
+    return valid;
+  }
+
+  function showFieldError(fieldId: string, message: string) {
+    const errorEl = document.getElementById(`${fieldId}-error`);
+    if (errorEl) {
+      errorEl.textContent = message;
+      errorEl.classList.remove("hidden");
+    }
+  }
+
+  function showError(message: string) {
+    errorEl.classList.remove("hidden");
+    errorMessageEl.textContent = message;
+  }
+
+  function hideError() {
+    errorEl.classList.add("hidden");
+    errorMessageEl.textContent = "";
+  }
+
+  // -----------------------------------------------------------------------
+  // Submit address → initiate checkout
+  // -----------------------------------------------------------------------
+  shippingForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    hideError();
+
+    if (!validateForm()) return;
+    if (!currentCart) return;
+
+    const token = getCartToken();
+    if (!token) {
+      showError("Cart session expired. Please try again.");
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Calculating shipping & tax...";
+
+    try {
+      checkoutResult = await checkout({
+        cart_token: token,
+        email: (document.getElementById("email") as HTMLInputElement).value.trim(),
+        shipping_address: {
+          full_name: (document.getElementById("full_name") as HTMLInputElement).value.trim(),
+          line1: (document.getElementById("line1") as HTMLInputElement).value.trim(),
+          line2: (document.getElementById("line2") as HTMLInputElement).value.trim() || undefined,
+          city: (document.getElementById("city") as HTMLInputElement).value.trim(),
+          state: stateSelect.value,
+          postal_code: (document.getElementById("postal_code") as HTMLInputElement).value.trim(),
+          country: "US",
+        },
+      });
+
+      // Update summary with shipping & tax
+      const order = checkoutResult.order;
+      summarySubtotal.textContent = formatPrice(order.subtotal_minor);
+      summaryShippingRow.classList.remove("hidden");
+      summaryShipping.textContent = formatPrice(order.shipping_minor);
+      summaryTaxRow.classList.remove("hidden");
+      summaryTax.textContent = formatPrice(order.tax_minor);
+      summaryTotal.textContent = formatPrice(order.total_minor);
+
+      // Show shipping rate info
+      shippingCarrier.textContent = "Standard Shipping";
+      shippingService.textContent = "Estimated delivery: 5-7 business days";
+      shippingCost.textContent = formatPrice(order.shipping_minor);
+
+      // Disable form fields
+      shippingForm.querySelectorAll("input, select").forEach((el) => {
+        (el as HTMLInputElement | HTMLSelectElement).disabled = true;
+      });
+      submitBtn.classList.add("hidden");
+
+      // Show payment section and initialize Stripe
+      paymentSection.classList.remove("hidden");
+      await initStripe(checkoutResult.client_secret);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Checkout failed. Please try again.";
+      showError(message);
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Continue to Payment";
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // Stripe Elements
+  // -----------------------------------------------------------------------
+  async function initStripe(clientSecret: string) {
+    // Load Stripe.js from CDN if not already loaded
+    if (!(window as any).Stripe) {
+      await new Promise<void>((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://js.stripe.com/v3/";
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error("Failed to load Stripe.js"));
+        document.head.appendChild(script);
+      });
+    }
+
+    const publishableKey = (document.getElementById("stripe-card-element") as HTMLElement)?.dataset.stripeKey
+      || import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY
+      || "";
+
+    if (!publishableKey) {
+      showError("Payment is not configured. Please contact support.");
+      return;
+    }
+
+    stripe = (window as any).Stripe(publishableKey);
+    const elements = stripe.elements({
+      clientSecret,
+      appearance: {
+        theme: "night",
+        variables: {
+          colorPrimary: "#f59e0b",
+          colorBackground: "#171717",
+          colorText: "#ffffff",
+          colorDanger: "#ef4444",
+          fontFamily: "Inter, sans-serif",
+          borderRadius: "8px",
+        },
+      },
+    });
+
+    cardElement = elements.create("payment");
+    cardElement.mount("#stripe-card-element");
+
+    cardElement.on("change", (event: any) => {
+      const cardError = document.getElementById("stripe-card-error")!;
+      if (event.error) {
+        cardError.textContent = event.error.message;
+        cardError.classList.remove("hidden");
+        payBtn.disabled = true;
+      } else {
+        cardError.classList.add("hidden");
+        payBtn.disabled = !event.complete;
+      }
+    });
+
+    payBtn.disabled = false;
+  }
+
+  // -----------------------------------------------------------------------
+  // Pay button
+  // -----------------------------------------------------------------------
+  payBtn.addEventListener("click", async () => {
+    if (!stripe || !cardElement || !checkoutResult) return;
+
+    payBtn.disabled = true;
+    payBtn.textContent = "Processing...";
+    formEl.classList.add("hidden");
+    processingEl.classList.remove("hidden");
+
+    try {
+      const { error } = await stripe.confirmPayment({
+        elements: cardElement._elements || cardElement,
+        confirmParams: {
+          return_url: `${window.location.origin}${import.meta.env.BASE_URL}order-confirmation/?order_number=${encodeURIComponent(checkoutResult.order.order_number)}&email=${encodeURIComponent(checkoutResult.order.email)}`,
+        },
+        redirect: "if_required",
+      });
+
+      if (error) {
+        processingEl.classList.add("hidden");
+        formEl.classList.remove("hidden");
+        showError(error.message || "Payment failed. Please try again.");
+        payBtn.disabled = false;
+        payBtn.textContent = "Pay Now";
+        paymentSection.classList.remove("hidden");
+      } else {
+        // Payment succeeded without redirect
+        clearCartToken();
+        window.location.href = `${import.meta.env.BASE_URL}order-confirmation/?order_number=${encodeURIComponent(checkoutResult.order.order_number)}&email=${encodeURIComponent(checkoutResult.order.email)}&total=${checkoutResult.order.total_minor}`;
+      }
+    } catch (err: unknown) {
+      processingEl.classList.add("hidden");
+      formEl.classList.remove("hidden");
+      showError("Payment processing failed. Please try again.");
+      payBtn.disabled = false;
+      payBtn.textContent = "Pay Now";
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // Start
+  // -----------------------------------------------------------------------
+  init();
+</script>

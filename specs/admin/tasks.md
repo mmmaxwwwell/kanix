@@ -382,7 +382,7 @@
 - [x] T090 Implement SSG product catalog pages [FR-088] [P]
   Done when: Astro generates static product listing page from API data at build time; product detail pages with variants, pricing, media, material warnings; SEO metadata (title, description, OpenGraph); existing STL viewer preserved for 3D model products
 
-- [ ] T091 Implement guest checkout as Astro islands [FR-089, FR-012a] [consumes: IC-009, IC-010]
+- [x] T091 Implement guest checkout as Astro islands [FR-089, FR-012a] [consumes: IC-009, IC-010]
   Done when: checkout UI as client-side Astro islands; cart stored via cart_token in localStorage; email + address form; Stripe Elements for payment; shipping rate selection; tax display; order confirmation page; US-only address validation; integration test: full guest checkout flow
 
 - [ ] T092 Implement kit builder page [FR-007, FR-088]

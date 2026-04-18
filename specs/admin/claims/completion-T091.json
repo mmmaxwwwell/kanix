@@ -1,0 +1,23 @@
+{
+  "task_id": "T091",
+  "status": "complete",
+  "summary": "Implemented guest checkout as Astro islands with cart summary, email/address form (US-only), Stripe Elements payment, shipping rate display, tax display, order confirmation page, and integration test (36 assertions)",
+  "commands_run": [
+    {"command": "cd site && npx astro build", "exit_code": 0},
+    {"command": "cd site && npm test", "exit_code": 0}
+  ],
+  "files_created": [
+    "site/src/pages/checkout.astro",
+    "site/src/pages/order-confirmation.astro",
+    "site/scripts/test-checkout.sh"
+  ],
+  "files_modified": [
+    "site/src/pages/products/[slug].astro",
+    "site/src/pages/products/index.astro",
+    "site/package.json",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

@@ -9,7 +9,7 @@
     "render": "bash scripts/render-stl.sh",
     "dev": "astro dev",
     "build": "npm run render && astro build",
-    "test": "bash scripts/check-links.sh",
+    "test": "bash scripts/check-links.sh && bash scripts/test-checkout.sh",
     "preview": "astro preview",
     "astro": "astro"
   },
