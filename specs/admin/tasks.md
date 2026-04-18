@@ -385,7 +385,7 @@
 - [x] T091 Implement guest checkout as Astro islands [FR-089, FR-012a] [consumes: IC-009, IC-010]
   Done when: checkout UI as client-side Astro islands; cart stored via cart_token in localStorage; email + address form; Stripe Elements for payment; shipping rate selection; tax display; order confirmation page; US-only address validation; integration test: full guest checkout flow
 
-- [ ] T092 Implement kit builder page [FR-007, FR-088]
+- [x] T092 Implement kit builder page [FR-007, FR-088]
   Done when: Astro page with client-side kit builder island; class requirements displayed; product selection per class; availability checking; price + savings display; add to cart integration
 
 - [ ] T093 Add contributions model page [FR-090] [P]

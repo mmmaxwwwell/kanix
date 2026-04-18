@@ -1,0 +1,321 @@
+---
+import Base from "../layouts/Base.astro";
+import { fetchKits, formatPrice } from "../data/kits";
+import type { CatalogKit } from "../data/kits";
+
+const kits = await fetchKits();
+---
+
+<Base
+  title="Kit Builder - Kanix™ Shop"
+  description="Build your own Kanix™ kit. Choose components from each category, see your savings, and add the complete kit to your cart."
+>
+  <nav class="fixed top-0 w-full z-50 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href={import.meta.env.BASE_URL} class="text-xl font-extrabold tracking-tight hover:text-neutral-300 transition-colors">KANIX<sup class="text-[0.5em] align-super">™</sup></a>
+      <div class="hidden sm:flex items-center gap-6">
+        <a href={import.meta.env.BASE_URL} class="text-sm text-neutral-400 hover:text-white transition-colors">Home</a>
+        <a href={`${import.meta.env.BASE_URL}products/`} class="text-sm text-neutral-400 hover:text-white transition-colors">Shop</a>
+        <a href={`${import.meta.env.BASE_URL}checkout/`} class="text-sm text-neutral-400 hover:text-white transition-colors" id="cart-link">
+          Cart <span id="cart-count" class="hidden ml-1 px-1.5 py-0.5 bg-amber-500 text-neutral-950 text-xs font-bold rounded-full"></span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main" class="pt-20 pb-16 px-4 sm:px-6">
+    <div class="max-w-4xl mx-auto">
+      <a href={`${import.meta.env.BASE_URL}products/`} class="text-sm text-neutral-500 hover:text-white transition-colors mb-6 inline-block">
+        &larr; Back to shop
+      </a>
+
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight mb-2">Kit Builder</h1>
+      <p class="text-neutral-400 mb-8">Build a kit by choosing one product from each category. Save compared to buying items individually.</p>
+
+      {kits.length === 0 ? (
+        <div class="text-center py-16 bg-neutral-900 rounded-xl border border-neutral-800">
+          <svg class="w-12 h-12 text-neutral-700 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+          <p class="text-neutral-400 text-lg mb-2">Kits Coming Soon</p>
+          <p class="text-neutral-500 text-sm">We're putting together curated kits for you. Check back soon!</p>
+        </div>
+      ) : (
+        <div id="kits-container">
+          {kits.map((kit) => (
+            <div
+              class="kit-builder mb-12 bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden"
+              data-kit-id={kit.id}
+              data-kit-price={kit.priceMinor}
+              data-kit-currency={kit.currency}
+            >
+              <div class="p-6 border-b border-neutral-800">
+                <h2 class="text-xl font-bold mb-1">{kit.title}</h2>
+                {kit.description && (
+                  <p class="text-neutral-400 text-sm mb-3">{kit.description}</p>
+                )}
+                <div class="flex items-center gap-4">
+                  <span class="text-2xl font-bold text-amber-500">{formatPrice(kit.priceMinor, kit.currency)}</span>
+                  <span class="text-sm text-neutral-500">Kit price</span>
+                </div>
+              </div>
+
+              <div class="p-6 space-y-6">
+                {kit.requirements.map((req) => (
+                  <div class="kit-class-section" data-class-id={req.productClassId} data-class-quantity={req.quantity}>
+                    <div class="flex items-center justify-between mb-3">
+                      <h3 class="text-sm font-semibold text-neutral-300 uppercase tracking-wider">{req.productClassName}</h3>
+                      <span class="kit-class-status text-xs text-neutral-500">
+                        Select {req.quantity} {req.quantity === 1 ? "item" : "items"}
+                      </span>
+                    </div>
+
+                    <div class="grid gap-3">
+                      {req.products.map((prod) => (
+                        <div class="kit-product bg-neutral-950 border border-neutral-800 rounded-lg p-4" data-product-id={prod.id}>
+                          <div class="flex items-start gap-4">
+                            {prod.imageUrl ? (
+                              <img src={prod.imageUrl} alt={prod.title} class="w-16 h-16 rounded-lg object-cover flex-shrink-0" loading="lazy" />
+                            ) : (
+                              <div class="w-16 h-16 rounded-lg bg-neutral-800 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-6 h-6 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                              </div>
+                            )}
+                            <div class="flex-1 min-w-0">
+                              <p class="font-medium text-white">{prod.title}</p>
+                              {prod.subtitle && <p class="text-xs text-neutral-500 mt-0.5">{prod.subtitle}</p>}
+
+                              <div class="mt-2 flex flex-wrap gap-2">
+                                {prod.variants.map((variant) => {
+                                  const isAvailable = variant.inStock;
+                                  return (
+                                    <button
+                                      type="button"
+                                      class={`kit-variant-btn px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                                        isAvailable
+                                          ? "border-neutral-700 text-neutral-300 hover:border-amber-500 hover:text-amber-500"
+                                          : "border-neutral-800 text-neutral-600 cursor-not-allowed opacity-50"
+                                      }`}
+                                      data-variant-id={variant.id}
+                                      data-variant-price={variant.priceCents}
+                                      data-variant-title={variant.title}
+                                      data-class-id={req.productClassId}
+                                      data-in-stock={isAvailable ? "true" : "false"}
+                                      disabled={!isAvailable}
+                                    >
+                                      {variant.material} - {formatPrice(variant.priceCents, kit.currency)}
+                                      {!isAvailable && " (Out of stock)"}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div class="p-6 border-t border-neutral-800 bg-neutral-950/50">
+                <div class="kit-summary space-y-2 mb-4">
+                  <div class="flex justify-between text-sm">
+                    <span class="text-neutral-400">Individual total</span>
+                    <span class="kit-individual-total text-neutral-400">$0.00</span>
+                  </div>
+                  <div class="flex justify-between text-sm">
+                    <span class="text-neutral-400">Kit price</span>
+                    <span class="text-white font-medium">{formatPrice(kit.priceMinor, kit.currency)}</span>
+                  </div>
+                  <div class="flex justify-between text-sm font-semibold">
+                    <span class="text-green-500">You save</span>
+                    <span class="kit-savings text-green-500">$0.00</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  class="kit-add-to-cart-btn w-full py-3 bg-amber-500 text-neutral-950 font-semibold rounded-lg hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled
+                >
+                  Select all required items to add kit to cart
+                </button>
+                <p class="kit-message text-sm text-center mt-2 hidden"></p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </main>
+
+  <footer class="py-12 px-6 border-t border-neutral-800">
+    <div class="max-w-6xl mx-auto text-center text-sm text-neutral-500 space-y-2">
+      <p>&copy; 2026 mmmaxwwwell. All rights reserved. Kanix&trade; designs are original works by mmmaxwwwell.</p>
+    </div>
+  </footer>
+</Base>
+
+<script>
+  import { addKitToCart, getCart, formatPrice, emitCartUpdate } from "../lib/cart";
+  import type { KitSelection } from "../lib/cart";
+
+  // Update cart badge on load
+  const cartCountEl = document.getElementById("cart-count");
+  async function updateCartBadge() {
+    try {
+      const cart = await getCart();
+      if (cart && cart.itemCount > 0 && cartCountEl) {
+        cartCountEl.textContent = String(cart.itemCount);
+        cartCountEl.classList.remove("hidden");
+      }
+    } catch {
+      // ignore
+    }
+  }
+  updateCartBadge();
+
+  // Kit builder logic
+  document.querySelectorAll<HTMLElement>(".kit-builder").forEach((kitEl) => {
+    const kitId = kitEl.dataset.kitId!;
+    const kitPrice = parseInt(kitEl.dataset.kitPrice!, 10);
+    const kitCurrency = kitEl.dataset.kitCurrency || "USD";
+
+    // Track selections per class: classId -> { variantId, priceCents }
+    const selections = new Map<string, { variantId: string; priceCents: number }>();
+
+    // Gather required quantities per class
+    const classRequirements = new Map<string, number>();
+    kitEl.querySelectorAll<HTMLElement>(".kit-class-section").forEach((section) => {
+      const classId = section.dataset.classId!;
+      const qty = parseInt(section.dataset.classQuantity!, 10);
+      classRequirements.set(classId, qty);
+    });
+
+    const totalRequired = Array.from(classRequirements.values()).reduce((a, b) => a + b, 0);
+    const individualTotalEl = kitEl.querySelector(".kit-individual-total")!;
+    const savingsEl = kitEl.querySelector(".kit-savings")!;
+    const addBtn = kitEl.querySelector<HTMLButtonElement>(".kit-add-to-cart-btn")!;
+    const messageEl = kitEl.querySelector<HTMLElement>(".kit-message")!;
+
+    function updateSummary() {
+      let individualTotal = 0;
+      for (const sel of selections.values()) {
+        individualTotal += sel.priceCents;
+      }
+
+      individualTotalEl.textContent = formatPrice(individualTotal);
+      const savings = Math.max(0, individualTotal - kitPrice);
+      savingsEl.textContent = formatPrice(savings);
+
+      // Check if all requirements satisfied
+      let allSatisfied = true;
+      for (const [classId, qty] of classRequirements) {
+        if (qty !== 1) {
+          // For multi-select classes, we'd need array tracking.
+          // Current API uses 1 variant per class, so this is the common case.
+          if (!selections.has(classId)) {
+            allSatisfied = false;
+            break;
+          }
+        } else {
+          if (!selections.has(classId)) {
+            allSatisfied = false;
+            break;
+          }
+        }
+      }
+
+      if (allSatisfied) {
+        addBtn.disabled = false;
+        addBtn.textContent = "Add Kit to Cart";
+      } else {
+        addBtn.disabled = true;
+        const selected = selections.size;
+        const remaining = totalRequired - selected;
+        addBtn.textContent = `Select ${remaining} more ${remaining === 1 ? "item" : "items"} to complete kit`;
+      }
+    }
+
+    // Handle variant button clicks
+    kitEl.querySelectorAll<HTMLButtonElement>(".kit-variant-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (btn.dataset.inStock !== "true") return;
+
+        const variantId = btn.dataset.variantId!;
+        const priceCents = parseInt(btn.dataset.variantPrice!, 10);
+        const classId = btn.dataset.classId!;
+
+        // Deselect previous selection in same class
+        kitEl.querySelectorAll<HTMLButtonElement>(`.kit-variant-btn[data-class-id="${classId}"]`).forEach((other) => {
+          other.classList.remove("border-amber-500", "text-amber-500", "bg-amber-500/10");
+          if (other.dataset.inStock === "true") {
+            other.classList.add("border-neutral-700", "text-neutral-300");
+          }
+        });
+
+        // Select this variant
+        btn.classList.remove("border-neutral-700", "text-neutral-300");
+        btn.classList.add("border-amber-500", "text-amber-500", "bg-amber-500/10");
+        selections.set(classId, { variantId, priceCents });
+
+        // Update class status
+        const section = kitEl.querySelector<HTMLElement>(`.kit-class-section[data-class-id="${classId}"]`);
+        const statusEl = section?.querySelector<HTMLElement>(".kit-class-status");
+        if (statusEl) {
+          statusEl.textContent = "Selected";
+          statusEl.classList.remove("text-neutral-500");
+          statusEl.classList.add("text-green-500");
+        }
+
+        updateSummary();
+      });
+    });
+
+    // Handle add to cart
+    addBtn.addEventListener("click", async () => {
+      if (addBtn.disabled) return;
+
+      addBtn.disabled = true;
+      addBtn.textContent = "Adding to cart...";
+
+      const kitSelections: KitSelection[] = [];
+      for (const [classId, sel] of selections) {
+        kitSelections.push({
+          product_class_id: classId,
+          variant_id: sel.variantId,
+        });
+      }
+
+      try {
+        const result = await addKitToCart(kitId, kitSelections);
+        emitCartUpdate(result.cart);
+
+        if (cartCountEl) {
+          cartCountEl.textContent = String(result.cart.itemCount);
+          cartCountEl.classList.remove("hidden");
+        }
+
+        messageEl.textContent = "Kit added to cart!";
+        messageEl.className = "kit-message text-sm text-center mt-2 text-green-500";
+        addBtn.textContent = "Add Kit to Cart";
+        addBtn.disabled = false;
+
+        setTimeout(() => {
+          messageEl.classList.add("hidden");
+        }, 3000);
+      } catch (err: unknown) {
+        messageEl.textContent = err instanceof Error ? err.message : "Failed to add kit to cart";
+        messageEl.className = "kit-message text-sm text-center mt-2 text-red-400";
+        addBtn.textContent = "Add Kit to Cart";
+        addBtn.disabled = false;
+      }
+    });
+
+    // Initial state
+    updateSummary();
+  });
+</script>

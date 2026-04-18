@@ -1,0 +1,23 @@
+{
+  "task_id": "T092",
+  "status": "complete",
+  "summary": "Implemented kit builder Astro page with client-side island: fetches kits from API, displays class requirements with product/variant selection, availability checking, price + savings display, and add-to-cart integration via POST /api/cart/kits",
+  "commands_run": [
+    {"command": "cd site && npm run build", "exit_code": 0},
+    {"command": "cd site && npm test", "exit_code": 0}
+  ],
+  "files_created": [
+    "site/src/data/kits.ts",
+    "site/src/pages/kits.astro",
+    "specs/admin/claims/completion-T092.json"
+  ],
+  "files_modified": [
+    "site/src/lib/cart.ts",
+    "site/src/pages/products/index.astro",
+    "site/src/pages/products/[slug].astro",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
