@@ -226,11 +226,11 @@
         "nixpkgs": "nixpkgs_5"
       },
       "locked": {
-        "lastModified": 1775286028,
-        "narHash": "sha256-dPh1nx+cwXFTiqpZ2mOFLsGOsgLxdsbd/jo/eJQWNXg=",
+        "lastModified": 1776485901,
+        "narHash": "sha256-vvQY0dSvs4+W/V5UtejO2u+yeMnLHOKh0F6HG7Vxs5k=",
         "owner": "mmmaxwwwell",
         "repo": "nix-mcp-debugkit",
-        "rev": "ecf35c9b362d632b216cfe2f7efe226f5dec4a5e",
+        "rev": "2a765b6a78dbdb409f1514f4a3694818247f6c33",
         "type": "github"
       },
       "original": {
