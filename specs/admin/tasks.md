@@ -412,7 +412,7 @@
 - [x] T095c KVM + emulator prereq verification + backend setup/teardown scripts
   Done when: `scripts/e2e-check-prereqs.sh` verifies `kvm-ok` passes and `egrep -c '(vmx|svm)' /proc/cpuinfo` > 0 (fail fast with clear message otherwise); `test/e2e/setup.sh` starts backend services in idempotent order: postgres → supertokens → api → astro site; kills orphan processes on known ports (3000, 3567, 4321, 5432); cleans stale sockets; writes `$STATE_DIR/env` with service URLs, test admin credentials, Stripe test key presence flag; `test/e2e/teardown.sh` reverses cleanly; the Android emulator itself is managed by the spec-kit runner's PlatformManager (not this script); mirror of nix-key `test/e2e/setup.sh`
 
-- [ ] T095d APK install + app launch scripts consumed by MCP runner
+- [x] T095d APK install + app launch scripts consumed by MCP runner
   Done when: `scripts/e2e-install-apks.sh` builds admin + customer Flutter debug APKs and installs both on the running emulator via `adb install -r`; `scripts/e2e-launch-admin.sh` and `scripts/e2e-launch-customer.sh` cold-start each app with `adb shell am start`; scripts idempotent; app package IDs documented (e.g., `com.kanix.admin`, `com.kanix.customer`)
 
 - [ ] T095e Set up Playwright + Patrol regression harnesses

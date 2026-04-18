@@ -1,0 +1,21 @@
+{
+  "task_id": "T095d",
+  "status": "complete",
+  "summary": "Created e2e-install-apks.sh (builds + installs admin/customer debug APKs via adb), e2e-launch-admin.sh, and e2e-launch-customer.sh (cold-start each app via adb shell am start)",
+  "commands_run": [
+    {"command": "bash -n scripts/e2e-install-apks.sh", "exit_code": 0},
+    {"command": "bash -n scripts/e2e-launch-admin.sh", "exit_code": 0},
+    {"command": "bash -n scripts/e2e-launch-customer.sh", "exit_code": 0}
+  ],
+  "files_created": [
+    "scripts/e2e-install-apks.sh",
+    "scripts/e2e-launch-admin.sh",
+    "scripts/e2e-launch-customer.sh"
+  ],
+  "files_modified": [
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

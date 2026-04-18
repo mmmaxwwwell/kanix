@@ -42,3 +42,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `kvm-ok` is not always installed (not in the Nix devshell); the prereqs script falls back to checking `/dev/kvm` readability when `kvm-ok` is unavailable
 - Astro dev server default port is 4321 (not 3000) — setup.sh uses `--port 4321` explicitly to avoid conflicts with the API on port 3000
 - `pg_ctl start` is idempotent-safe (returns 0 even if already running) making the setup script re-runnable without killing existing services first
+
+## T095d — APK install + app launch scripts consumed by MCP runner
+- Flutter app package IDs follow `com.kanix.kanix_admin` / `com.kanix.kanix_customer` pattern (not `com.kanix.admin`) — defined in `android/app/build.gradle.kts` as `applicationId`
+- Debug APK output path is `build/app/outputs/flutter-apk/app-debug.apk` relative to each Flutter project root
+- `adb shell am force-stop` before `am start` ensures a cold start; idempotent since force-stop on an uninstalled package is a no-op
