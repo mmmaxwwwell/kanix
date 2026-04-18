@@ -312,6 +312,7 @@ import Base from "../layouts/Base.astro";
   let checkoutResult: CheckoutResponse | null = null;
   let stripe: any = null;
   let cardElement: any = null;
+  let stripeElements: any = null;
 
   // -----------------------------------------------------------------------
   // Initialize
@@ -548,7 +549,7 @@ import Base from "../layouts/Base.astro";
     }
 
     stripe = (window as any).Stripe(publishableKey);
-    const elements = stripe.elements({
+    stripeElements = stripe.elements({
       clientSecret,
       appearance: {
         theme: "night",
@@ -563,7 +564,7 @@ import Base from "../layouts/Base.astro";
       },
     });
 
-    cardElement = elements.create("payment");
+    cardElement = stripeElements.create("payment");
     cardElement.mount("#stripe-card-element");
 
     cardElement.on("change", (event: any) => {
@@ -594,7 +595,7 @@ import Base from "../layouts/Base.astro";
 
     try {
       const { error } = await stripe.confirmPayment({
-        elements: cardElement._elements || cardElement,
+        elements: stripeElements,
         confirmParams: {
           return_url: `${window.location.origin}${import.meta.env.BASE_URL}order-confirmation/?order_number=${encodeURIComponent(checkoutResult.order.order_number)}&email=${encodeURIComponent(checkoutResult.order.email)}`,
         },
