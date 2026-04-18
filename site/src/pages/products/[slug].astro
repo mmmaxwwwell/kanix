@@ -1,0 +1,249 @@
+---
+import Base from "../../layouts/Base.astro";
+import STLViewer from "../../components/STLViewer.astro";
+import {
+  fetchProducts,
+  formatPrice,
+  formatPriceRange,
+  getMaterialsFromVariants,
+  getMaterialWarning,
+} from "../../data/products";
+import type { CatalogProduct } from "../../data/products";
+import { modules } from "../../data/modules";
+
+export async function getStaticPaths() {
+  const products = await fetchProducts();
+  return products.map((product) => ({
+    params: { slug: product.slug },
+    props: { product },
+  }));
+}
+
+interface Props {
+  product: CatalogProduct;
+}
+
+const { product } = Astro.props;
+const { title, subtitle, description, brand, media, variants } = product;
+
+const sortedMedia = [...media].sort((a, b) => a.sortOrder - b.sortOrder);
+const primaryImage = sortedMedia[0];
+const materials = getMaterialsFromVariants(variants);
+const priceRange = formatPriceRange(variants);
+const hasStock = variants.some((v) => v.inStock);
+
+// Check if this product has a matching 3D module for the STL viewer
+const matchingModule = modules.find(
+  (mod) =>
+    product.slug.includes(mod.slug) ||
+    mod.slug.includes(product.slug) ||
+    mod.name.toLowerCase() === product.title.toLowerCase()
+);
+const stlPath = matchingModule
+  ? `${import.meta.env.BASE_URL}models/${matchingModule.stlFile}`
+  : null;
+
+// Build SEO description
+const seoDescription = [
+  description ?? `${title} by Kanix™`,
+  priceRange ? `Starting at ${priceRange}` : null,
+  materials.length > 0 ? `Available in ${materials.join(", ")}` : null,
+]
+  .filter(Boolean)
+  .join(". ");
+
+// OpenGraph image
+const ogImage = primaryImage?.url ?? undefined;
+---
+
+<Base
+  title={`${title} - Kanix™ Shop`}
+  description={seoDescription}
+  ogImage={ogImage}
+  ogType="product"
+>
+  <nav class="fixed top-0 w-full z-50 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href={import.meta.env.BASE_URL} class="text-xl font-extrabold tracking-tight hover:text-neutral-300 transition-colors">KANIX<sup class="text-[0.5em] align-super">™</sup></a>
+      <div class="hidden sm:flex items-center gap-6">
+        <a href={import.meta.env.BASE_URL} class="text-sm text-neutral-400 hover:text-white transition-colors">Home</a>
+        <a href={`${import.meta.env.BASE_URL}products/`} class="text-sm text-neutral-400 hover:text-white transition-colors">Shop</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main" class="pt-20 pb-16 px-4 sm:px-6">
+    <div class="max-w-6xl mx-auto">
+      <a href={`${import.meta.env.BASE_URL}products/`} class="text-sm text-neutral-500 hover:text-white transition-colors mb-6 inline-block">
+        &larr; Back to shop
+      </a>
+
+      <div class="grid lg:grid-cols-2 gap-8 lg:gap-12">
+        <!-- Media Section -->
+        <div>
+          {sortedMedia.length > 0 ? (
+            <div class="space-y-4">
+              <div class="aspect-square bg-neutral-900 rounded-xl border border-neutral-800 overflow-hidden">
+                <img
+                  src={primaryImage.url}
+                  alt={primaryImage.altText ?? title}
+                  class="w-full h-full object-cover"
+                />
+              </div>
+              {sortedMedia.length > 1 && (
+                <div class="grid grid-cols-4 gap-2">
+                  {sortedMedia.slice(1, 5).map((img) => (
+                    <div class="aspect-square bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden">
+                      <img
+                        src={img.url}
+                        alt={img.altText ?? title}
+                        class="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : stlPath ? (
+            <div>
+              <STLViewer stlPath={stlPath} name={title} />
+              <p class="text-neutral-600 text-xs sm:text-sm mt-2 text-center">
+                Drag to rotate. Scroll to zoom. Pinch on mobile.
+              </p>
+            </div>
+          ) : (
+            <div class="aspect-square bg-neutral-900 rounded-xl border border-neutral-800 flex items-center justify-center">
+              <svg class="w-16 h-16 text-neutral-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+            </div>
+          )}
+
+          {/* Show STL viewer below images if product has both images and a 3D model */}
+          {sortedMedia.length > 0 && stlPath && (
+            <div class="mt-6">
+              <h3 class="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-3">3D Model Preview</h3>
+              <STLViewer stlPath={stlPath} name={title} />
+              <p class="text-neutral-600 text-xs sm:text-sm mt-2 text-center">
+                Drag to rotate. Scroll to zoom. Pinch on mobile.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <!-- Product Details -->
+        <div>
+          {brand && (
+            <p class="text-sm text-amber-500 uppercase tracking-wider font-semibold mb-2">{brand}</p>
+          )}
+
+          <h1 class="text-2xl sm:text-4xl font-bold tracking-tight mb-2">{title}</h1>
+
+          {subtitle && (
+            <p class="text-lg text-neutral-400 mb-4">{subtitle}</p>
+          )}
+
+          {priceRange && (
+            <p class="text-2xl font-bold text-white mb-6">{priceRange}</p>
+          )}
+
+          <div class="mb-6">
+            <span class={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${hasStock ? "bg-green-500/10 text-green-500 border border-green-500/20" : "bg-neutral-800 text-neutral-500 border border-neutral-700"}`}>
+              <span class={`w-2 h-2 rounded-full ${hasStock ? "bg-green-500" : "bg-neutral-600"}`}></span>
+              {hasStock ? "In Stock" : "Out of Stock"}
+            </span>
+          </div>
+
+          {description && (
+            <div class="mb-8">
+              <p class="text-neutral-400 leading-relaxed">{description}</p>
+            </div>
+          )}
+
+          <!-- Variants -->
+          {variants.length > 0 && (
+            <div class="mb-8">
+              <h2 class="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-3">Available Options</h2>
+              <div class="space-y-3">
+                {variants.map((variant) => {
+                  const material = variant.optionValuesJson?.material;
+                  return (
+                    <div class={`bg-neutral-900 border rounded-lg p-4 ${variant.inStock ? "border-neutral-800" : "border-neutral-800/50 opacity-60"}`}>
+                      <div class="flex items-center justify-between">
+                        <div>
+                          <p class="text-white font-medium">{variant.title}</p>
+                          {material && (
+                            <p class="text-xs text-neutral-500 mt-0.5">Material: {material}</p>
+                          )}
+                          <p class="text-xs text-neutral-600 mt-0.5">SKU: {variant.sku}</p>
+                        </div>
+                        <div class="text-right">
+                          <p class="text-white font-semibold">{formatPrice(variant.priceMinor, variant.currency)}</p>
+                          <p class={`text-xs mt-0.5 ${variant.inStock ? "text-green-500" : "text-neutral-500"}`}>
+                            {variant.inStock ? `${variant.available} available` : "Out of stock"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <!-- Material Warnings -->
+          {materials.length > 0 && (
+            <div class="mb-8">
+              <h2 class="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-3">Material Information</h2>
+              <div class="space-y-3">
+                {materials.map((material) => {
+                  const warning = getMaterialWarning(material);
+                  return warning ? (
+                    <div class="bg-amber-500/5 border border-amber-500/20 rounded-lg p-4">
+                      <p class="text-sm font-semibold text-amber-500 mb-1">{material}</p>
+                      <p class="text-sm text-neutral-400 leading-relaxed">{warning}</p>
+                    </div>
+                  ) : (
+                    <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
+                      <p class="text-sm font-semibold text-neutral-300">{material}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <!-- 3D Model Link -->
+          {matchingModule && (
+            <div class="mb-8">
+              <a
+                href={`${import.meta.env.BASE_URL}modules/${matchingModule.slug}/`}
+                class="inline-flex items-center gap-2 px-5 py-2.5 border border-neutral-700 text-neutral-300 font-semibold rounded-lg hover:border-neutral-500 hover:text-white transition-colors text-sm"
+              >
+                View Free 3D Model &rarr;
+              </a>
+              <p class="text-xs text-neutral-600 mt-2">
+                Prefer to print your own? Download the free OpenSCAD source and STL files.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <!-- Disclaimer -->
+      <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 mt-12">
+        <h3 class="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-3">Disclaimer</h3>
+        <p class="text-neutral-500 text-xs leading-relaxed">
+          3D-printed parts can vary in strength and durability depending on material, print settings, and environmental conditions. Inspect your modules regularly and replace any parts showing signs of wear or damage. Kanix™ is not responsible for injury, damage, or loss resulting from the use of these products.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="py-12 px-6 border-t border-neutral-800">
+    <div class="max-w-6xl mx-auto text-center text-sm text-neutral-500 space-y-2">
+      <p>&copy; 2026 mmmaxwwwell. All rights reserved. Kanix™ designs are original works by mmmaxwwwell.</p>
+    </div>
+  </footer>
+</Base>

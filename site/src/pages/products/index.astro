@@ -1,0 +1,111 @@
+---
+import Base from "../../layouts/Base.astro";
+import { fetchProducts, formatPriceRange, getMaterialsFromVariants } from "../../data/products";
+
+const products = await fetchProducts();
+---
+
+<Base
+  title="Shop - Kanix™"
+  description="Browse pre-printed Kanix™ modules. Professional-grade 3D-printed belt modules for dog handlers, trainers, and walkers."
+>
+  <nav class="fixed top-0 w-full z-50 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href={import.meta.env.BASE_URL} class="text-xl font-extrabold tracking-tight hover:text-neutral-300 transition-colors">KANIX<sup class="text-[0.5em] align-super">™</sup></a>
+      <div class="hidden sm:flex items-center gap-6">
+        <a href={import.meta.env.BASE_URL} class="text-sm text-neutral-400 hover:text-white transition-colors">Home</a>
+        <a href={`${import.meta.env.BASE_URL}products/`} class="text-sm text-white font-medium">Shop</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main" class="pt-20 pb-16 px-4 sm:px-6">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-12 pt-8">
+        <h1 class="text-3xl sm:text-5xl font-bold tracking-tight mb-4">Shop Kanix™ Modules</h1>
+        <p class="text-neutral-400 text-lg max-w-2xl mx-auto">
+          Pre-printed, ready-to-mount belt modules. Each module is professionally 3D-printed and ships directly to you.
+        </p>
+      </div>
+
+      {products.length === 0 ? (
+        <div class="text-center py-16">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 mb-6">
+            <svg class="w-8 h-8 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          </div>
+          <h2 class="text-xl font-semibold text-neutral-300 mb-2">Coming Soon</h2>
+          <p class="text-neutral-500 max-w-md mx-auto">
+            Our product catalog is being prepared. In the meantime, you can download free 3D models from our <a href={import.meta.env.BASE_URL} class="text-amber-500 hover:text-amber-400 transition-colors">modules page</a> and print them yourself.
+          </p>
+        </div>
+      ) : (
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {products.map((product) => {
+            const priceRange = formatPriceRange(product.variants);
+            const materials = getMaterialsFromVariants(product.variants);
+            const primaryImage = product.media.sort((a, b) => a.sortOrder - b.sortOrder)[0];
+            const hasStock = product.variants.some((v) => v.inStock);
+
+            return (
+              <a
+                href={`${import.meta.env.BASE_URL}products/${product.slug}/`}
+                class="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden flex flex-col hover:border-neutral-600 transition-colors group"
+              >
+                {primaryImage ? (
+                  <div class="aspect-square bg-neutral-800 overflow-hidden">
+                    <img
+                      src={primaryImage.url}
+                      alt={primaryImage.altText ?? product.title}
+                      class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      loading="lazy"
+                    />
+                  </div>
+                ) : (
+                  <div class="aspect-square bg-neutral-800 flex items-center justify-center">
+                    <svg class="w-12 h-12 text-neutral-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                  </div>
+                )}
+                <div class="p-5 flex flex-col flex-1">
+                  {product.brand && (
+                    <p class="text-xs text-neutral-500 uppercase tracking-wider font-medium mb-1">{product.brand}</p>
+                  )}
+                  <h2 class="text-lg font-semibold text-white group-hover:text-amber-500 transition-colors mb-1">{product.title}</h2>
+                  {product.subtitle && (
+                    <p class="text-sm text-neutral-400 mb-2">{product.subtitle}</p>
+                  )}
+                  {materials.length > 0 && (
+                    <div class="flex flex-wrap gap-1.5 mb-3">
+                      {materials.map((mat) => (
+                        <span class="px-2 py-0.5 text-xs font-medium bg-neutral-800 text-neutral-400 rounded-full border border-neutral-700">
+                          {mat}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div class="mt-auto flex items-center justify-between">
+                    {priceRange && (
+                      <span class="text-white font-semibold">{priceRange}</span>
+                    )}
+                    <span class={`text-xs font-medium ${hasStock ? "text-green-500" : "text-neutral-500"}`}>
+                      {hasStock ? "In Stock" : "Out of Stock"}
+                    </span>
+                  </div>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  </main>
+
+  <footer class="py-12 px-6 border-t border-neutral-800">
+    <div class="max-w-6xl mx-auto text-center text-sm text-neutral-500 space-y-2">
+      <p>&copy; 2026 mmmaxwwwell. All rights reserved. Kanix™ designs are original works by mmmaxwwwell.</p>
+    </div>
+  </footer>
+</Base>

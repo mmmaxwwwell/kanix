@@ -1,0 +1,24 @@
+{
+  "task_id": "T090",
+  "status": "complete",
+  "summary": "Implemented SSG product catalog with listing page, detail pages (variants, pricing, media, material warnings), SEO/OpenGraph metadata, and STL viewer integration for 3D model products",
+  "commands_run": [
+    {"command": "cd site && pnpm install", "exit_code": 0},
+    {"command": "npx astro build", "exit_code": 0},
+    {"command": "bash scripts/check-links.sh", "exit_code": 0}
+  ],
+  "files_created": [
+    "site/src/data/products.ts",
+    "site/src/pages/products/index.astro",
+    "site/src/pages/products/[slug].astro",
+    "specs/admin/claims/completion-T090.json"
+  ],
+  "files_modified": [
+    "site/src/layouts/Base.astro",
+    "site/src/pages/index.astro",
+    "specs/admin/learnings.md",
+    "specs/admin/tasks.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
