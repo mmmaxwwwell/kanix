@@ -37,3 +37,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T095b — Register MCP servers + required permissions in `.claude/settings.json`
 - MCP server registrations go in `.mcp.json` (project root), not in `.claude/settings.json` — the settings schema does not accept `mcpServers` directly
 - `enableAllProjectMcpServers: true` in settings.json auto-approves all servers from `.mcp.json` so agents don't get prompted
+
+## T095c — KVM + emulator prereq verification + backend setup/teardown scripts
+- `kvm-ok` is not always installed (not in the Nix devshell); the prereqs script falls back to checking `/dev/kvm` readability when `kvm-ok` is unavailable
+- Astro dev server default port is 4321 (not 3000) — setup.sh uses `--port 4321` explicitly to avoid conflicts with the API on port 3000
+- `pg_ctl start` is idempotent-safe (returns 0 even if already running) making the setup script re-runnable without killing existing services first

@@ -409,7 +409,7 @@
 - [x] T095b Register MCP servers + required permissions in `.claude/settings.json`
   Done when: `.claude/settings.json` adds `permissions.allow` entries for: `Bash(nix run .#mcp-android:*)`, `Bash(nix run .#mcp-browser:*)`, `Bash(adb devices:*)`, `Bash(adb -s emulator-*:*)`, `Bash(adb shell:*)`, `Bash(adb logcat:*)`, `Bash(kvm-ok)`, and emulator screencap/pull commands; MCP server registrations point at the pinned config from T095a; smoke test: agent can call MCP tools without additional prompts
 
-- [ ] T095c KVM + emulator prereq verification + backend setup/teardown scripts
+- [x] T095c KVM + emulator prereq verification + backend setup/teardown scripts
   Done when: `scripts/e2e-check-prereqs.sh` verifies `kvm-ok` passes and `egrep -c '(vmx|svm)' /proc/cpuinfo` > 0 (fail fast with clear message otherwise); `test/e2e/setup.sh` starts backend services in idempotent order: postgres → supertokens → api → astro site; kills orphan processes on known ports (3000, 3567, 4321, 5432); cleans stale sockets; writes `$STATE_DIR/env` with service URLs, test admin credentials, Stripe test key presence flag; `test/e2e/teardown.sh` reverses cleanly; the Android emulator itself is managed by the spec-kit runner's PlatformManager (not this script); mirror of nix-key `test/e2e/setup.sh`
 
 - [ ] T095d APK install + app launch scripts consumed by MCP runner

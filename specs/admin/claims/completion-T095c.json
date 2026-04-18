@@ -1,0 +1,22 @@
+{
+  "task_id": "T095c",
+  "status": "complete",
+  "summary": "Created e2e-check-prereqs.sh (KVM/CPU virtualization verification), test/e2e/setup.sh (idempotent backend startup: postgres->supertokens->api->astro with orphan cleanup and state file), and test/e2e/teardown.sh (reverse-order clean shutdown)",
+  "commands_run": [
+    {"command": "bash -n scripts/e2e-check-prereqs.sh", "exit_code": 0},
+    {"command": "bash -n test/e2e/setup.sh", "exit_code": 0},
+    {"command": "bash -n test/e2e/teardown.sh", "exit_code": 0},
+    {"command": "bash scripts/e2e-check-prereqs.sh", "exit_code": 0}
+  ],
+  "files_created": [
+    "scripts/e2e-check-prereqs.sh",
+    "test/e2e/setup.sh",
+    "test/e2e/teardown.sh"
+  ],
+  "files_modified": [
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
