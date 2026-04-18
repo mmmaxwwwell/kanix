@@ -33,3 +33,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T095a — Add nix-mcp-debugkit flake input + re-export packages + config writers
 - Config writers use `pkgs.writeTextFile` with `destination` to produce a directory containing `mcp/*.json` — `nix build .#mcp-android-config` outputs a store path with `mcp/android.json` inside it
 - MCP config JSON pins commands to Nix store paths via string interpolation (`"${mcp-android}/bin/mcp-android"`) so the config is reproducible and doesn't rely on PATH
+
+## T095b — Register MCP servers + required permissions in `.claude/settings.json`
+- MCP server registrations go in `.mcp.json` (project root), not in `.claude/settings.json` — the settings schema does not accept `mcpServers` directly
+- `enableAllProjectMcpServers: true` in settings.json auto-approves all servers from `.mcp.json` so agents don't get prompted

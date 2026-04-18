@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "mcp-android": {
+      "command": "nix",
+      "args": ["run", ".#mcp-android"]
+    },
+    "mcp-browser": {
+      "command": "nix",
+      "args": ["run", ".#mcp-browser"]
+    }
+  }
+}

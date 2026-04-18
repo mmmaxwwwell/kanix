@@ -406,7 +406,7 @@
 - [x] T095a Add `nix-mcp-debugkit` flake input + re-export packages + config writers
   Done when: root `flake.nix` adds `nix-mcp-debugkit.url = "github:mmmaxwwwell/nix-mcp-debugkit"` input; re-exports `packages.mcp-android = nix-mcp-debugkit.packages.${system}.mcp-android` and `packages.mcp-browser = nix-mcp-debugkit.packages.${system}.mcp-browser`; adds `packages.mcp-android-config` and `packages.mcp-browser-config` writers that emit `mcp/android.json` and `mcp/browser.json` pinning MCP commands to Nix store paths (mirror of nix-key `flake.nix`); `nix build .#mcp-android-config` produces a pinned config file; `nix run .#mcp-android -- --help` works; (iOS / `mcp-ios` deferred)
 
-- [ ] T095b Register MCP servers + required permissions in `.claude/settings.json`
+- [x] T095b Register MCP servers + required permissions in `.claude/settings.json`
   Done when: `.claude/settings.json` adds `permissions.allow` entries for: `Bash(nix run .#mcp-android:*)`, `Bash(nix run .#mcp-browser:*)`, `Bash(adb devices:*)`, `Bash(adb -s emulator-*:*)`, `Bash(adb shell:*)`, `Bash(adb logcat:*)`, `Bash(kvm-ok)`, and emulator screencap/pull commands; MCP server registrations point at the pinned config from T095a; smoke test: agent can call MCP tools without additional prompts
 
 - [ ] T095c KVM + emulator prereq verification + backend setup/teardown scripts

@@ -1,0 +1,10 @@
+{
+  "task_id": "T095b",
+  "status": "complete",
+  "summary": "Added MCP server registrations in .mcp.json and permission allow entries in .claude/settings.json for mcp-android, mcp-browser, adb, kvm-ok, and emulator screencap/pull commands",
+  "commands_run": [],
+  "files_created": [".mcp.json", "specs/admin/claims/completion-T095b.json"],
+  "files_modified": [".claude/settings.json", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
