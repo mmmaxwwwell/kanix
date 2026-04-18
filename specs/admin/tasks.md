@@ -394,7 +394,7 @@
 - [x] T094 Add warranty, returns, and care instructions pages [FR-091, FR-092] [P]
   Done when: warranty page with material-specific disclaimers (TPU heat >60°C, TPC 130°C rating); returns policy (30 days, conditions); safety disclaimer; care instructions per material tier; pages linked from footer and product detail pages
 
-- [ ] T095 Update README with contributions model
+- [x] T095 Update README with contributions model
   Done when: README includes contributions model table (milestones + rewards), link to Astro contributions page, CLA instructions
 
 ---

@@ -63,3 +63,6 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T094 — Add warranty, returns, and care instructions pages
 - Material temperature thresholds already defined in `MATERIAL_WARNINGS` in `site/src/data/products.ts` — reuse these values (TPU 60°C, TPC 130°C, PLA 50°C, PETG 80°C, ABS 100°C) for consistency across warranty and care pages
 - Footer links must be added to every page individually since there's no shared footer component — 10 pages total needed updating (7 existing + 3 new)
+
+## T095 — Update README with contributions model
+- T093 already added the full Contributions Model section to README (milestones table, contributions page link, CLA instructions) — T095 was redundant and required no code changes

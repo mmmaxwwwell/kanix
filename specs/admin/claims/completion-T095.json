@@ -1,0 +1,10 @@
+{
+  "task_id": "T095",
+  "status": "complete",
+  "summary": "README already contains contributions model table (milestones + rewards), link to Astro contributions page, and CLA instructions — added by T093",
+  "commands_run": [],
+  "files_created": [],
+  "files_modified": ["specs/admin/tasks.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
