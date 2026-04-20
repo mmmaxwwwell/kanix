@@ -578,14 +578,9 @@ export interface CatalogKit {
   requirements: CatalogKitRequirement[];
 }
 
-export async function findActiveKitsWithDetails(
-  db: PostgresJsDatabase,
-): Promise<CatalogKit[]> {
+export async function findActiveKitsWithDetails(db: PostgresJsDatabase): Promise<CatalogKit[]> {
   // 1. Fetch active kit definitions
-  const kits = await db
-    .select()
-    .from(kitDefinition)
-    .where(eq(kitDefinition.status, "active"));
+  const kits = await db.select().from(kitDefinition).where(eq(kitDefinition.status, "active"));
 
   if (kits.length === 0) return [];
 
@@ -624,10 +619,7 @@ export async function findActiveKitsWithDetails(
               .select()
               .from(productVariant)
               .where(
-                and(
-                  eq(productVariant.productId, prod.id),
-                  eq(productVariant.status, "active"),
-                ),
+                and(eq(productVariant.productId, prod.id), eq(productVariant.status, "active")),
               );
 
             const variantResults = await Promise.all(

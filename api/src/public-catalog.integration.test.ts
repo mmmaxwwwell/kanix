@@ -293,7 +293,9 @@ describeWithDeps("public catalog API (T044)", () => {
           .where(eq(inventoryBalance.variantId, outOfStockVariantId));
         await dbConn.db.delete(inventoryLocation).where(eq(inventoryLocation.id, locationId));
         await dbConn.db.delete(productMedia).where(eq(productMedia.id, mediaId));
-        await dbConn.db.delete(productClassMembership).where(eq(productClassMembership.productId, activeProductId));
+        await dbConn.db
+          .delete(productClassMembership)
+          .where(eq(productClassMembership.productId, activeProductId));
         await dbConn.db.delete(productVariant).where(eq(productVariant.productId, activeProductId));
         await dbConn.db.delete(product).where(eq(product.id, activeProductId));
         await dbConn.db.delete(product).where(eq(product.id, draftProductId));
