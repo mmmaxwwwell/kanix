@@ -1,0 +1,1 @@
+Same root cause as BUG-001. Product detail pages 404'd because `getStaticPaths()` in `[slug].astro` calls `fetchProducts()`, which returned `[]` when `PUBLIC_API_URL` was unset. Adding the env var to `.env` and `.env.example` (BUG-001 fix) resolves this — once `fetchProducts()` can reach the API, `getStaticPaths()` generates routes for all products.

@@ -32,8 +32,7 @@ export interface Cart {
 }
 
 function getApiUrl(): string {
-  // @ts-expect-error -- injected at build time via Astro's define
-  return window.__KANIX_API_URL__ || "";
+  return import.meta.env.PUBLIC_API_URL || "";
 }
 
 export function getCartToken(): string | null {

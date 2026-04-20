@@ -1,0 +1,1 @@
+Same root cause as BUG-001. The kits page showed "Coming Soon" because `fetchKits()` in `kits.ts` returns `[]` when `PUBLIC_API_URL` is unset, identical to the products pattern. Adding `PUBLIC_API_URL` to `.env` and `.env.example` (BUG-001 fix) resolves this with no code changes needed.
