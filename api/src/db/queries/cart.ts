@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { cart, cartLine } from "../schema/cart.js";
+import { cart, cartLine, cartKitSelection } from "../schema/cart.js";
 import { productVariant } from "../schema/catalog.js";
 import { inventoryBalance } from "../schema/inventory.js";
 import type { KitValidationWarning } from "./kit.js";
@@ -26,6 +26,9 @@ export interface CartLineWithDetails {
   inStock: boolean;
   priceChanged: boolean;
   insufficientStock: boolean;
+  isKit: boolean;
+  kitTitle: string | null;
+  kitComponents: Array<{ variantId: string; variantTitle: string }> | null;
 }
 
 export interface CartWithItems {
@@ -224,11 +227,40 @@ export async function getCartWithItems(
     const priceChanged = currentPriceMinor !== line.unitPriceMinor;
     const insufficientStock = totalAvailable < line.quantity;
 
+    // Populate kit display info if this is a kit line
+    let isKit = false;
+    let kitTitle: string | null = null;
+    let kitComponents: Array<{ variantId: string; variantTitle: string }> | null = null;
+
+    if (kitInfo) {
+      isKit = true;
+      const { findKitDefinitionById } = await import("./kit.js");
+      const kitDef = await findKitDefinitionById(db, kitInfo.kitDefinitionId);
+      kitTitle = kitDef?.title ?? "Kit";
+
+      const kitSelections = await db
+        .select()
+        .from(cartKitSelection)
+        .where(eq(cartKitSelection.cartLineId, line.id));
+
+      kitComponents = [];
+      for (const sel of kitSelections) {
+        const [selVariant] = await db
+          .select()
+          .from(productVariant)
+          .where(eq(productVariant.id, sel.variantId));
+        kitComponents.push({
+          variantId: sel.variantId,
+          variantTitle: selVariant?.title ?? "Unknown",
+        });
+      }
+    }
+
     items.push({
       id: line.id,
       variantId: line.variantId,
       sku: variant?.sku ?? "UNKNOWN",
-      variantTitle: variant?.title ?? "Unknown variant",
+      variantTitle: isKit ? (kitTitle ?? "Kit") : (variant?.title ?? "Unknown variant"),
       productId: variant?.productId ?? "",
       quantity: line.quantity,
       unitPriceMinor: line.unitPriceMinor,
@@ -238,6 +270,9 @@ export async function getCartWithItems(
       inStock: totalAvailable > 0,
       priceChanged,
       insufficientStock,
+      isKit,
+      kitTitle,
+      kitComponents,
     });
   }
 

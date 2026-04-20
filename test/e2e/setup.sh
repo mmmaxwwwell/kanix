@@ -182,10 +182,11 @@ if ! nc -z 127.0.0.1 "$PORT_API" 2>/dev/null; then
     export SUPERTOKENS_API_KEY="e2e-test-key"
     export STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-sk_test_e2e_placeholder_key}"
     export STRIPE_WEBHOOK_SECRET="${STRIPE_WEBHOOK_SECRET:-whsec_e2e_placeholder_secret}"
-    export EASYPOST_API_KEY="${EASYPOST_API_KEY:-EZAK_e2e_placeholder_key}"
+    export EASYPOST_API_KEY="${EASYPOST_API_KEY:-EZAK_REPLACE_ME}"
     export EASYPOST_WEBHOOK_SECRET="${EASYPOST_WEBHOOK_SECRET:-whsec_e2e_easypost}"
     export GITHUB_OAUTH_CLIENT_ID="${GITHUB_OAUTH_CLIENT_ID:-e2e-github-client-id}"
     export GITHUB_OAUTH_CLIENT_SECRET="${GITHUB_OAUTH_CLIENT_SECRET:-e2e-github-client-secret}"
+    export PUBLIC_STRIPE_PUBLISHABLE_KEY="${PUBLIC_STRIPE_PUBLISHABLE_KEY:-pk_test_e2e_placeholder_key}"
     PORT="$PORT_API" pnpm dev
   ) > "$STATE_DIR/api.log" 2>&1 &
   echo $! > "$STATE_DIR/api.pid"

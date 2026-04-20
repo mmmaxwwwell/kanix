@@ -18,6 +18,9 @@ export interface CartLineItem {
   inStock: boolean;
   priceChanged: boolean;
   insufficientStock: boolean;
+  isKit: boolean;
+  kitTitle: string | null;
+  kitComponents: Array<{ variantId: string; variantTitle: string }> | null;
 }
 
 export interface Cart {
