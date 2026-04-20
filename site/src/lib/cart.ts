@@ -81,6 +81,7 @@ async function apiRequest<T>(
 export async function createCart(): Promise<Cart> {
   const data = await apiRequest<{ cart: Cart }>("/api/cart", {
     method: "POST",
+    body: JSON.stringify({}),
   });
   setCartToken(data.cart.token);
   return data.cart;

@@ -396,7 +396,7 @@ import Base from "../layouts/Base.astro";
     let valid = true;
 
     // Reset all errors
-    document.querySelectorAll("[id$='-error']").forEach((el) => {
+    document.querySelectorAll("#shipping-form [id$='-error']:not(#checkout-error):not(#stripe-card-error)").forEach((el) => {
       el.classList.add("hidden");
       el.textContent = "";
     });
@@ -464,8 +464,7 @@ import Base from "../layouts/Base.astro";
   // -----------------------------------------------------------------------
   // Submit address → initiate checkout
   // -----------------------------------------------------------------------
-  shippingForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  async function handleCheckoutSubmit() {
     hideError();
 
     if (!validateForm()) return;
@@ -524,6 +523,16 @@ import Base from "../layouts/Base.astro";
       submitBtn.disabled = false;
       submitBtn.textContent = "Continue to Payment";
     }
+  }
+
+  shippingForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    handleCheckoutSubmit();
+  });
+
+  submitBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    handleCheckoutSubmit();
   });
 
   // -----------------------------------------------------------------------

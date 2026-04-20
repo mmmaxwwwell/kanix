@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { adminUser, adminRole, adminUserRole } from "./db/schema/admin.js";
 import { product, productVariant, productMedia } from "./db/schema/catalog.js";
 import { inventoryBalance, inventoryLocation } from "./db/schema/inventory.js";
+import { productClass, productClassMembership } from "./db/schema/product-class.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
 
 const DATABASE_URL = process.env["DATABASE_URL"];
@@ -92,6 +93,7 @@ describeWithDeps("public catalog API (T044)", () => {
   let outOfStockVariantId = "";
   let mediaId = "";
   let locationId = "";
+  let testClassId = "";
 
   const activeSlug = `test-active-product-${ts}`;
   const draftSlug = `test-draft-product-${ts}`;
@@ -142,6 +144,17 @@ describeWithDeps("public catalog API (T044)", () => {
 
     // --- Seed test data ---
 
+    // 0. Product class (needed for public catalog filtering)
+    const [testClass] = await dbConn.db
+      .insert(productClass)
+      .values({
+        name: `Test Class ${ts}`,
+        slug: `test-class-${ts}`,
+        sortOrder: 0,
+      })
+      .returning();
+    testClassId = testClass.id;
+
     // 1. Active product with active variant (in stock) + draft variant + out-of-stock variant + media
     const [activeProd] = await dbConn.db
       .insert(product)
@@ -155,6 +168,12 @@ describeWithDeps("public catalog API (T044)", () => {
       })
       .returning();
     activeProductId = activeProd.id;
+
+    // Add class membership so it appears in public catalog
+    await dbConn.db.insert(productClassMembership).values({
+      productId: activeProductId,
+      productClassId: testClassId,
+    });
 
     const [activeVar] = await dbConn.db
       .insert(productVariant)
@@ -274,10 +293,12 @@ describeWithDeps("public catalog API (T044)", () => {
           .where(eq(inventoryBalance.variantId, outOfStockVariantId));
         await dbConn.db.delete(inventoryLocation).where(eq(inventoryLocation.id, locationId));
         await dbConn.db.delete(productMedia).where(eq(productMedia.id, mediaId));
+        await dbConn.db.delete(productClassMembership).where(eq(productClassMembership.productId, activeProductId));
         await dbConn.db.delete(productVariant).where(eq(productVariant.productId, activeProductId));
         await dbConn.db.delete(product).where(eq(product.id, activeProductId));
         await dbConn.db.delete(product).where(eq(product.id, draftProductId));
         await dbConn.db.delete(product).where(eq(product.id, archivedProductId));
+        await dbConn.db.delete(productClass).where(eq(productClass.id, testClassId));
         await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, adminUserId));
         await dbConn.db.delete(adminUser).where(eq(adminUser.id, adminUserId));
         await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));

@@ -43,9 +43,21 @@ if ! command -v stripe >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! stripe config --list >/dev/null 2>&1; then
-  echo "error: stripe CLI not logged in (run: stripe login)" >&2
-  exit 1
+# Load STRIPE_SECRET_KEY from .env if available
+if [ -f "$ENV_FILE" ]; then
+  STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-$(grep '^STRIPE_SECRET_KEY=' "$ENV_FILE" | cut -d= -f2- || true)}"
+fi
+API_KEY_FLAG=()
+if [ -n "${STRIPE_SECRET_KEY:-}" ] && [[ ! "$STRIPE_SECRET_KEY" =~ REPLACE_ME ]]; then
+  API_KEY_FLAG=(--api-key "$STRIPE_SECRET_KEY")
+fi
+
+if [ ${#API_KEY_FLAG[@]} -eq 0 ]; then
+  if ! stripe config --list >/dev/null 2>&1; then
+    echo "error: stripe CLI not logged in and STRIPE_SECRET_KEY not set" >&2
+    echo "  either run 'stripe login' or set STRIPE_SECRET_KEY in .env" >&2
+    exit 1
+  fi
 fi
 
 # --- helpers ----------------------------------------------------------------
@@ -64,7 +76,7 @@ is_live_listener() {
 
 fetch_secret() {
   local secret
-  secret="$(stripe listen --print-secret 2>/dev/null || true)"
+  secret="$(stripe listen "${API_KEY_FLAG[@]}" --print-secret 2>/dev/null || true)"
   if [[ -z "$secret" || ! "$secret" =~ ^whsec_ ]]; then
     echo "error: failed to retrieve webhook secret from stripe CLI" >&2
     exit 1
@@ -114,7 +126,7 @@ write_env "$SECRET"
 
 # Start listener in background; nohup so it survives the parent shell exit.
 # Redirect output to the log file for debugging.
-nohup stripe listen --forward-to "$FORWARD_TO" >"$LOG_FILE" 2>&1 &
+nohup stripe listen "${API_KEY_FLAG[@]}" --forward-to "$FORWARD_TO" >"$LOG_FILE" 2>&1 &
 PID=$!
 echo "$PID" > "$PID_FILE"
 

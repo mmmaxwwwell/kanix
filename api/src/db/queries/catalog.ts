@@ -1,7 +1,8 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { product, productVariant, productMedia } from "../schema/catalog.js";
 import { inventoryBalance } from "../schema/inventory.js";
+import { productClassMembership } from "../schema/product-class.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,11 +53,20 @@ export interface CatalogProduct {
 export async function findActiveProductsWithDetails(
   db: PostgresJsDatabase,
 ): Promise<CatalogProduct[]> {
-  // Fetch active products
+  // Only include products that belong to at least one product class
+  // (test products created by integration tests lack class membership)
+  const memberRows = await db
+    .selectDistinct({ productId: productClassMembership.productId })
+    .from(productClassMembership);
+  const memberIds = memberRows.map((r) => r.productId);
+
+  if (memberIds.length === 0) return [];
+
+  // Fetch active products that have class membership
   const products = await db
     .select()
     .from(product)
-    .where(eq(product.status, "active"))
+    .where(and(eq(product.status, "active"), inArray(product.id, memberIds)))
     .orderBy(product.createdAt);
 
   if (products.length === 0) return [];

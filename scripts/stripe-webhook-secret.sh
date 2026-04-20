@@ -17,14 +17,25 @@ if ! command -v stripe >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! stripe config --list >/dev/null 2>&1 || ! stripe config --list 2>/dev/null | grep -q 'test_mode_api_key\|live_mode_api_key'; then
-  echo "error: stripe CLI is not logged in" >&2
-  echo "  run: stripe login" >&2
-  exit 1
+# Load STRIPE_SECRET_KEY from .env if available
+if [ -f "$ENV_FILE" ]; then
+  STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-$(grep '^STRIPE_SECRET_KEY=' "$ENV_FILE" | cut -d= -f2- || true)}"
+fi
+API_KEY_FLAG=()
+if [ -n "${STRIPE_SECRET_KEY:-}" ] && [[ ! "$STRIPE_SECRET_KEY" =~ REPLACE_ME ]]; then
+  API_KEY_FLAG=(--api-key "$STRIPE_SECRET_KEY")
+fi
+
+if [ ${#API_KEY_FLAG[@]} -eq 0 ]; then
+  if ! stripe config --list >/dev/null 2>&1 || ! stripe config --list 2>/dev/null | grep -q 'test_mode_api_key\|live_mode_api_key'; then
+    echo "error: stripe CLI is not logged in and STRIPE_SECRET_KEY not set" >&2
+    echo "  either run 'stripe login' or set STRIPE_SECRET_KEY in .env" >&2
+    exit 1
+  fi
 fi
 
 echo "Fetching webhook signing secret from Stripe CLI..."
-SECRET="$(stripe listen --print-secret 2>/dev/null)"
+SECRET="$(stripe listen "${API_KEY_FLAG[@]}" --print-secret 2>/dev/null)"
 
 if [[ -z "$SECRET" || ! "$SECRET" =~ ^whsec_ ]]; then
   echo "error: failed to retrieve webhook secret (got: '$SECRET')" >&2
