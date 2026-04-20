@@ -45,6 +45,7 @@ export function initSuperTokens(config: SuperTokensConfig): void {
           {
             id: "password",
           },
+          { id: "name", optional: true },
         ],
       },
       override: {
