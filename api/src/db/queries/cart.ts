@@ -175,6 +175,11 @@ export async function removeCartItem(
   cartLineId: string,
   cartId: string,
 ): Promise<boolean> {
+  // Delete any kit selections referencing this cart line first (FK constraint)
+  await db
+    .delete(cartKitSelection)
+    .where(eq(cartKitSelection.cartLineId, cartLineId));
+
   const [deleted] = await db
     .delete(cartLine)
     .where(and(eq(cartLine.id, cartLineId), eq(cartLine.cartId, cartId)))

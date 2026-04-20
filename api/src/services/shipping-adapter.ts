@@ -373,7 +373,7 @@ export interface CreateShippingAdapterOptions {
 
 export function createShippingAdapter(options: CreateShippingAdapterOptions): ShippingAdapter {
   const key = options.easyPostApiKey;
-  if (key && key !== "test-key" && !key.includes("REPLACE_ME")) {
+  if (key && key !== "test-key" && !key.includes("REPLACE_ME") && !key.includes("placeholder")) {
     return createEasyPostShippingAdapter(key);
   }
   return createStubShippingAdapter();
