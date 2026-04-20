@@ -13,6 +13,7 @@ function validEnv(): Record<string, string> {
     DATABASE_URL: "postgresql://user:pass@localhost:5432/kanix",
     STRIPE_SECRET_KEY: "sk_test_abc123",
     STRIPE_WEBHOOK_SECRET: "whsec_abc123",
+    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_abc123",
     STRIPE_TAX_ENABLED: "false",
     SUPERTOKENS_API_KEY: "supertokens-key",
     SUPERTOKENS_CONNECTION_URI: "http://localhost:3567",

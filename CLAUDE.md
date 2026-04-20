@@ -89,7 +89,9 @@ kanix/
 1. Copy `.env.example` to `.env`: `cp .env.example .env`
 2. Fill in real values for services you need:
    - **DATABASE_URL** — PostgreSQL connection string (default works with `process-compose up`)
-   - **STRIPE_SECRET_KEY** / **STRIPE_WEBHOOK_SECRET** — from Stripe dashboard
+   - **STRIPE_SECRET_KEY** — from Stripe dashboard (`sk_test_…`)
+   - **PUBLIC_STRIPE_PUBLISHABLE_KEY** — from Stripe dashboard (`pk_test_…`); `site/.env` is auto-synced from root `.env` by [scripts/sync-env.sh](scripts/sync-env.sh)
+   - **STRIPE_WEBHOOK_SECRET** — managed by the listener scripts (see E2E section below); don't set manually
    - **STRIPE_TAX_ENABLED** — `true` or `false` for Stripe Tax
    - **SUPERTOKENS_API_KEY** / **SUPERTOKENS_CONNECTION_URI** — auth service
    - **EASYPOST_API_KEY** — shipping integration
@@ -108,6 +110,28 @@ kanix/
 | Customer app| `flutter test`                  | `customer/`       |
 | OpenSCAD    | `bash scripts/test-scad.sh`     | root              |
 | Security    | `bash scripts/security-scan.sh` | root              |
+
+## E2E Tests with Stripe
+
+Tests that drive real Stripe payments (T096, T097, T104c, T104f) need a
+`stripe listen` process forwarding webhooks to `localhost:3000/webhooks/stripe`.
+Agents manage the listener lifecycle explicitly:
+
+```bash
+# Start (idempotent). Prints JSON {pid, secret, forward_to, log, reused}.
+# Writes STRIPE_WEBHOOK_SECRET to root .env — restart the API after.
+pnpm --dir api stripe:listen:start
+
+# Stop (safe when nothing is running).
+pnpm --dir api stripe:listen:stop
+```
+
+First-time setup:
+1. Get test keys at https://dashboard.stripe.com/test/apikeys and set
+   `STRIPE_SECRET_KEY` + `PUBLIC_STRIPE_PUBLISHABLE_KEY` in root `.env`.
+2. Run `stripe login` once (opens a browser to pair the CLI with your account).
+
+See [test/e2e/README.md](test/e2e/README.md) for the full agent workflow.
 
 ## Adding a New Module Checklist
 

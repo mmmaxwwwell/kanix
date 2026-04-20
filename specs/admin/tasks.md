@@ -418,10 +418,12 @@
 - [x] T095e Set up Playwright + Patrol regression harnesses
   Done when: `site/tests/e2e/` has Playwright config running against local Astro served by `test/e2e/setup.sh`; `admin/integration_test/` and `customer/integration_test/` have Patrol config wired to `flutter test integration_test/`; both emit structured JSON to `test-logs/e2e/` for agent + CI consumption; `.github/workflows/e2e.yml` runs Playwright headless + Patrol on Android CI emulator on push
 
-- [ ] T096 E2E: guest checkout on Astro [SC-001] [needs: mcp-browser, e2e-loop]
+- [ ] T096 E2E: guest checkout on Astro [SC-001] [needs: mcp-browser, e2e-loop, stripe-listen]
+  Prereq: `pnpm --dir api stripe:listen:start` before running (see [test/e2e/README.md](../../test/e2e/README.md)); tear down with `stripe:listen:stop` after.
   Done when: MCP agent drives live Astro site: navigate to product → select variant → add to cart → checkout with email + address → pay via Stripe test → order confirmation; completes in <3 minutes; order exists in DB with correct snapshots; Playwright regression test exists for the full flow; every bug found during exploration has its own Playwright regression test
 
-- [ ] T097 E2E: authenticated checkout on Flutter customer app [SC-001] [needs: mcp-android, e2e-loop]
+- [ ] T097 E2E: authenticated checkout on Flutter customer app [SC-001] [needs: mcp-android, e2e-loop, stripe-listen]
+  Prereq: `pnpm --dir api stripe:listen:start` before running (see [test/e2e/README.md](../../test/e2e/README.md)); tear down with `stripe:listen:stop` after.
   Done when: MCP agent drives customer app on Android emulator: login → browse catalog → add to cart → checkout with saved address → Stripe test pay → order appears in history with real-time status update; Patrol regression test exists; each fixed bug has its own Patrol test; (iOS coverage deferred)
 
 - [ ] T098 E2E: kit purchase [SC-010] [needs: mcp-browser, mcp-android, e2e-loop]
@@ -451,7 +453,8 @@
 - [ ] T104b E2E: warranty claim submission [FR-055] [needs: mcp-android, e2e-loop]
   Done when: MCP agent on Flutter customer app: login → order history → select delivered order within warranty window → file warranty claim (describe defect, upload 2 photos via MCP file-picker interaction) → verify support_ticket created with category=warranty_claim, priority=high, attachments accessible; MCP switches to admin app and verifies ticket in queue via WebSocket update; expired-warranty claim rejected with clear error (separate case); Patrol regression test
 
-- [ ] T104c E2E: admin refund (full + partial) through Stripe [FR-030] [needs: mcp-android, e2e-loop]
+- [ ] T104c E2E: admin refund (full + partial) through Stripe [FR-030] [needs: mcp-android, e2e-loop, stripe-listen]
+  Prereq: `pnpm --dir api stripe:listen:start` before running (see [test/e2e/README.md](../../test/e2e/README.md)); tear down with `stripe:listen:stop` after.
   Done when: MCP agent on admin app: open paid order → issue full refund → Stripe test refund processed → payment_status=refunded; MCP switches to customer app and verifies refund in order timeline via WebSocket; second test: partial refund → payment_status=partially_refunded; over-refund attempt rejected with ERR_REFUND_EXCEEDS_PAYMENT; audit log entries exist for both; Patrol regression tests for admin refund UI
 
 - [ ] T104d E2E: reservation expiry → late payment race [FR-E008]
@@ -460,7 +463,8 @@
 - [ ] T104e E2E: low-stock alert → notification delivery [FR-038, FR-085] [needs: mcp-android, e2e-loop]
   Done when: set variant safety_stock=10 → MCP agent opens admin app with email preference → scripted actor adjusts inventory so available drops below threshold → MCP verifies in-app notification appears in admin UI within 2s AND email logged to `logs/emails.jsonl` with correct variant SKU, product title, available count, threshold; Patrol regression test
 
-- [ ] T104f E2E: Stripe Tax calculation with live test key [FR-117, FR-118] [needs: mcp-browser, e2e-loop]
+- [ ] T104f E2E: Stripe Tax calculation with live test key [FR-117, FR-118] [needs: mcp-browser, e2e-loop, stripe-listen]
+  Prereq: `pnpm --dir api stripe:listen:start` before running (see [test/e2e/README.md](../../test/e2e/README.md)); tear down with `stripe:listen:stop` after.
   Done when: MCP agent drives Astro checkout with TX shipping address (gated on STRIPE_TAX_ENABLED=true + Stripe test key present) → verify Stripe Tax API called → non-zero tax displayed in UI → tax reflected in PaymentIntent metadata and order totals; separate MCP run with tax-exempt state → correct tax displayed; test skipped cleanly when Stripe test key unavailable; Playwright regression test
 
 - [ ] T104g E2E: cross-app real-time propagation [FR-081, FR-082] [needs: mcp-android, e2e-loop]
@@ -490,7 +494,8 @@
 ## Phase 16: Operations Runbook + Final Validation [FR-102]
 
 - [ ] T110 Write RUNBOOK.md [FR-102]
-  Done when: RUNBOOK.md documents: day-1 developer setup, day-2 ops with cadence (DB backups daily, vacuum weekly, dep updates weekly, cert monitoring, inventory cleanup, Stripe health, log rotation), failure recovery per component (Postgres down, Stripe webhook failures, SuperTokens unreachable, EasyPost errors), escalation procedures, Liquibase rollback procedures, OpenTofu plan/apply workflow
+  Done when: RUNBOOK.md documents: day-1 developer setup, day-2 ops with cadence (DB backups daily, vacuum weekly, dep updates weekly, cert monitoring, inventory cleanup, Stripe health, log rotation), failure recovery per component (Postgres down, Stripe webhook failures, SuperTokens unreachable, EasyPost errors), escalation procedures, Liquibase rollback procedures, OpenTofu plan/apply workflow.
+  Required Stripe section must cover: (1) dev webhook forwarding lifecycle — `pnpm --dir api stripe:listen:start` / `stop` scripts, why the secret rotates per session, API restart requirement; (2) test vs. live mode — how to identify current mode from `STRIPE_SECRET_KEY` prefix, guardrails preventing live keys in dev, separate `whsec_` per environment; (3) production webhook endpoint setup — registering the endpoint in Stripe dashboard, selecting event types (payment_intent.succeeded, charge.refunded, charge.dispute.created, etc.), copying the persistent `whsec_` into prod env; (4) webhook delivery failure recovery — how to detect failed deliveries via Stripe dashboard's Event log, replaying events, idempotency guarantees of our handler; (5) secret rotation — rotating `sk_live_` without downtime (dual-key window in Stripe dashboard), updating `STRIPE_WEBHOOK_SECRET` after rotation, verifying with a test payment; (6) fraud / dispute response — identifying unusual charges, initiating refunds via admin app vs. Stripe dashboard, dispute evidence submission; (7) monitoring — key Stripe dashboard panels to watch (failed webhooks, high dispute rate, payment success rate), alerting hookup points in our observability stack; (8) common errors — ERR_EXTERNAL_SERVICE_UNAVAILABLE causes, PaymentIntent state machine gotchas, tax calculation failures with STRIPE_TAX_ENABLED.
 
 - [ ] T111 Final security scan + vulnerability review [SC-008]
   Done when: full security scan (Trivy + Semgrep + Gitleaks + npm audit) passes with zero critical findings; SARIF uploaded to GitHub Security tab; any findings documented with justification or fix

@@ -35,6 +35,7 @@ function testConfig(): Config {
     DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
+    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
     STRIPE_TAX_ENABLED: false,
     SUPERTOKENS_API_KEY: "test-key",
     SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,

@@ -17,7 +17,10 @@
     "db:migrate": "liquibase update",
     "db:rollback": "liquibase rollback-count 1",
     "db:seed": "tsx src/db/scripts/seed.ts",
-    "db:reset": "tsx src/db/scripts/reset.ts"
+    "db:reset": "tsx src/db/scripts/reset.ts",
+    "stripe:webhook-secret": "bash ../scripts/stripe-webhook-secret.sh",
+    "stripe:listen:start": "bash ../scripts/stripe-listen-start.sh",
+    "stripe:listen:stop": "bash ../scripts/stripe-listen-stop.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

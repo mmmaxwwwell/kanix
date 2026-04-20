@@ -7,6 +7,9 @@
   },
   "scripts": {
     "render": "bash scripts/render-stl.sh",
+    "sync-env": "bash ../scripts/sync-env.sh",
+    "predev": "npm run sync-env",
+    "prebuild": "npm run sync-env",
     "dev": "astro dev",
     "build": "npm run render && astro build",
     "test": "bash scripts/check-links.sh && bash scripts/test-checkout.sh",
@@ -22,5 +25,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1"
+  },
+  "overrides": {
+    "vite": "^7"
   }
 }

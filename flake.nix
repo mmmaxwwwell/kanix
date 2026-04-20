@@ -78,6 +78,9 @@
             trivy
             semgrep
             gitleaks
+
+            # Stripe CLI — for local webhook forwarding during dev + E2E tests
+            stripe-cli
           ];
 
           inputsFrom = [ scadShell siteShell apiShell adminShell customerShell deployShell ];

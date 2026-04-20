@@ -1,17 +1,35 @@
 # kanix_customer
 
-A new Flutter project.
+Customer-facing Flutter app for the Kanix commerce platform.
 
-## Getting Started
+## Stripe configuration
 
-This project is a starting point for a Flutter application.
+The app reads the Stripe publishable key in two ways (in order):
 
-A few resources to get you started if this is your first Flutter project:
+1. **At runtime** — from the API via `GET /api/customer/stripe/config`. This is the normal path; no build-time config is needed when the API is reachable.
+2. **At build/launch time** — via `--dart-define=STRIPE_PUBLISHABLE_KEY=…` as a fallback used before the API call completes.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+### Running locally
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter run \
+  --dart-define=STRIPE_PUBLISHABLE_KEY=pk_test_REPLACE_ME
+```
+
+Or use a gitignored JSON file:
+
+```bash
+# dart-define.json (add to .gitignore)
+# { "STRIPE_PUBLISHABLE_KEY": "pk_test_…" }
+
+flutter run --dart-define-from-file=dart-define.json
+```
+
+Use a Stripe **test** key (`pk_test_…`) for development. Get one at
+https://dashboard.stripe.com/test/apikeys.
+
+## Tests
+
+```bash
+flutter test
+```

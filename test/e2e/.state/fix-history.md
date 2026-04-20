@@ -1,0 +1,2 @@
+- attempt 1: service=Astro site port=4321 patterns=port-timeout-but-service-ready at=2026-04-17T23:09:39
+- attempt 2: service=? port=? patterns=service-crash-on-boot at=2026-04-17T23:16:39

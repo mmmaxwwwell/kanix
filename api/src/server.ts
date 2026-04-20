@@ -493,6 +493,16 @@ export async function createServer(options: CreateServerOptions): Promise<Server
   );
 
   // -------------------------------------------------------------------------
+  // Public Stripe config — publishable key for client-side SDK init
+  // -------------------------------------------------------------------------
+
+  app.get("/api/customer/stripe/config", async (_request, reply) => {
+    return reply.status(200).send({
+      publishableKey: config.PUBLIC_STRIPE_PUBLISHABLE_KEY,
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Link GitHub Account endpoint — requires verified email
   // -------------------------------------------------------------------------
 

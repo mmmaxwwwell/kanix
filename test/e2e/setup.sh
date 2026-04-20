@@ -146,9 +146,8 @@ if ! nc -z 127.0.0.1 "$PORT_SUPERTOKENS" 2>/dev/null; then
   (
     cd "$ST_DIR"
     java -classpath "core/*:plugin-interface/*:plugin/*:ee/*" \
-      io.supertokens.Main "$ST_DIR" DEV \
-      > "$STATE_DIR/supertokens.log" 2>&1
-  ) &
+      io.supertokens.Main "$ST_DIR" DEV
+  ) > "$STATE_DIR/supertokens.log" 2>&1 &
   echo $! > "$STATE_DIR/supertokens.pid"
 fi
 wait_for_http "http://127.0.0.1:${PORT_SUPERTOKENS}/hello" "SuperTokens" 60
@@ -176,8 +175,19 @@ fi
 if ! nc -z 127.0.0.1 "$PORT_API" 2>/dev/null; then
   (
     cd "$PROJECT_ROOT/api"
-    PORT="$PORT_API" pnpm dev > "$STATE_DIR/api.log" 2>&1
-  ) &
+    # Secret keys must be real env vars (config.ts ignores them from .env).
+    # DATABASE_URL and SUPERTOKENS_API_KEY point at local services started above.
+    # Third-party keys use test-mode dummies — E2E tests don't call real APIs.
+    export DATABASE_URL="postgresql://kanix:kanix@127.0.0.1:${PORT_POSTGRES}/kanix"
+    export SUPERTOKENS_API_KEY="e2e-test-key"
+    export STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-sk_test_e2e_placeholder_key}"
+    export STRIPE_WEBHOOK_SECRET="${STRIPE_WEBHOOK_SECRET:-whsec_e2e_placeholder_secret}"
+    export EASYPOST_API_KEY="${EASYPOST_API_KEY:-EZAK_e2e_placeholder_key}"
+    export EASYPOST_WEBHOOK_SECRET="${EASYPOST_WEBHOOK_SECRET:-whsec_e2e_easypost}"
+    export GITHUB_OAUTH_CLIENT_ID="${GITHUB_OAUTH_CLIENT_ID:-e2e-github-client-id}"
+    export GITHUB_OAUTH_CLIENT_SECRET="${GITHUB_OAUTH_CLIENT_SECRET:-e2e-github-client-secret}"
+    PORT="$PORT_API" pnpm dev
+  ) > "$STATE_DIR/api.log" 2>&1 &
   echo $! > "$STATE_DIR/api.pid"
 fi
 wait_for_port "$PORT_API" "API server" 30
@@ -189,13 +199,18 @@ log "API server ready."
 log "Starting Astro site..."
 
 if ! nc -z 127.0.0.1 "$PORT_ASTRO" 2>/dev/null; then
+  # Ensure site dependencies are installed before starting
+  log "  Installing site dependencies..."
+  (cd "$PROJECT_ROOT/site" && npm install --prefer-offline) >> "$STATE_DIR/astro.log" 2>&1 || {
+    log "  WARNING: npm install had issues, attempting to start anyway"
+  }
   (
     cd "$PROJECT_ROOT/site"
-    npm run dev -- --port "$PORT_ASTRO" > "$STATE_DIR/astro.log" 2>&1
-  ) &
+    npm run dev -- --port "$PORT_ASTRO" --host 127.0.0.1
+  ) >> "$STATE_DIR/astro.log" 2>&1 &
   echo $! > "$STATE_DIR/astro.pid"
 fi
-wait_for_port "$PORT_ASTRO" "Astro site" 30
+wait_for_port "$PORT_ASTRO" "Astro site" 60
 log "Astro site ready."
 
 # -------------------------------------------------------------------

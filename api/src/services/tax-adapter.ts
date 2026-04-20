@@ -35,6 +35,7 @@ export interface TaxAdapter {
   /**
    * Calculate tax for the given line items and shipping address.
    *
+   PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
    * - When STRIPE_TAX_ENABLED=true: calls the Stripe Tax API.
    * - When STRIPE_TAX_ENABLED=false: returns 0 tax (stub mode).
    */
