@@ -27,8 +27,8 @@ importers:
         specifier: ^22.0.2
         version: 22.0.2(@types/node@22.19.17)
       supertokens-node:
-        specifier: ^24.0.2
-        version: 24.0.2
+        specifier: ^23.1.0
+        version: 23.1.0
       ws:
         specifier: ^8.20.0
         version: 8.20.0
@@ -753,8 +753,8 @@ packages:
     resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
     engines: {node: '>=18'}
 
-  cross-fetch@4.1.0:
-    resolution: {integrity: sha512-uKm5PU+MHTootlWEY+mZ4vvXoCn4fLQxT9dSc1sXVMSFkINTJVN8cAQROpwcKm8bJ/c7rgZVIBWzH5T78sNZZw==}
+  cross-fetch@3.2.0:
+    resolution: {integrity: sha512-Q+xVJLoGOeIMXZmbUK4HYk+69cQH6LudR0Vu/pRm2YlU/hDV9CiS0gKUMaWY5f2NeUH9C1nV3bsTlCo0FsTV1Q==}
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -1321,8 +1321,8 @@ packages:
       encoding:
         optional: true
 
-  nodemailer@8.0.5:
-    resolution: {integrity: sha512-0PF8Yb1yZuQfQbq+5/pZJrtF6WQcjTd5/S4JOHs9PGFxuTqoB/icwuB44pOdURHJbRKX1PPoJZtY7R4VUoCC8w==}
+  nodemailer@6.10.1:
+    resolution: {integrity: sha512-Z+iLaBGVaSjbIzQ4pX6XV41HrooLsQ10ZWPUehGmuantvzWoDVBnmsdUcOIDM1t+yPor5pDhVlDESgOMEGxhHA==}
     engines: {node: '>=6.0.0'}
 
   object-inspect@1.13.4:
@@ -1595,8 +1595,8 @@ packages:
   supertokens-js-override@0.0.4:
     resolution: {integrity: sha512-r0JFBjkMIdep3Lbk3JA+MpnpuOtw4RSyrlRAbrzMcxwiYco3GFWl/daimQZ5b1forOiUODpOlXbSOljP/oyurg==}
 
-  supertokens-node@24.0.2:
-    resolution: {integrity: sha512-L4n0zchL3K36aMgUWT5WVuNCw7KWWGtZq//Ti+jWcyRphb/sVaKM76fI8I2/JBqTIGXre9dAQx3myETRSA+etQ==}
+  supertokens-node@23.1.0:
+    resolution: {integrity: sha512-hXcG4xuHlVFIVwETHLg1g8q2hZ50rBkI+FGsrSDqMOL3SVmxfvWKaR2RmnsmS6n5/63KwrA8vFcPAzv4PY+Uag==}
 
   supports-color@7.2.0:
     resolution: {integrity: sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==}
@@ -2420,7 +2420,7 @@ snapshots:
 
   cookie@1.1.1: {}
 
-  cross-fetch@4.1.0:
+  cross-fetch@3.2.0:
     dependencies:
       node-fetch: 2.7.0
     transitivePeerDependencies:
@@ -2943,7 +2943,7 @@ snapshots:
     dependencies:
       whatwg-url: 5.0.0
 
-  nodemailer@8.0.5: {}
+  nodemailer@6.10.1: {}
 
   object-inspect@1.13.4: {}
 
@@ -3206,16 +3206,16 @@ snapshots:
 
   supertokens-js-override@0.0.4: {}
 
-  supertokens-node@24.0.2:
+  supertokens-node@23.1.0:
     dependencies:
       buffer: 6.0.3
       content-type: 1.0.5
       cookie: 0.7.2
-      cross-fetch: 4.1.0
+      cross-fetch: 3.2.0
       debug: 4.4.3
       jose: 4.15.9
       libphonenumber-js: 1.12.41
-      nodemailer: 8.0.5
+      nodemailer: 6.10.1
       pako: 2.1.0
       pkce-challenge: 3.1.0
       process: 0.11.10

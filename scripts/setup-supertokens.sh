@@ -4,7 +4,7 @@
 set -euo pipefail
 
 ST_DIR="${PROJECT_ROOT:-.}/.dev/supertokens"
-ST_CORE_VERSION="11.1.0"
+ST_CORE_VERSION="11.0.2"
 ST_MARKER="$ST_DIR/.setup-done"
 
 if [ -f "$ST_MARKER" ]; then

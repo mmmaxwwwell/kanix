@@ -41,7 +41,7 @@
     "pino": "^10.3.1",
     "postgres": "^3.4.9",
     "stripe": "^22.0.2",
-    "supertokens-node": "^24.0.2",
+    "supertokens-node": "^23.1.0",
     "ws": "^8.20.0"
   }
 }
