@@ -17,7 +17,7 @@ export function registerCors(app: FastifyInstance, config: Config): void {
         void reply
           .header("Access-Control-Allow-Origin", origin)
           .header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-          .header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Correlation-Id")
+          .header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Correlation-Id, X-Cart-Token")
           .header("Access-Control-Max-Age", "86400")
           .header("Vary", "Origin")
           .status(204)

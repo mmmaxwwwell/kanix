@@ -1,0 +1,1 @@
+Added a PA11 entry to the `MATERIAL_WARNINGS` dictionary in `site/src/data/products.ts`. The product detail page template already handles rendering descriptions when present via `getMaterialWarning()` -- the data was simply missing. The new entry follows the same pattern as the five existing materials (TPU, TPC, PLA, PETG, ABS).

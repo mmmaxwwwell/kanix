@@ -16,6 +16,7 @@ const kits = await fetchKits();
       <div class="hidden sm:flex items-center gap-6">
         <a href={import.meta.env.BASE_URL} class="text-sm text-neutral-400 hover:text-white transition-colors">Home</a>
         <a href={`${import.meta.env.BASE_URL}products/`} class="text-sm text-neutral-400 hover:text-white transition-colors">Shop</a>
+        <a href={`${import.meta.env.BASE_URL}kits/`} class="text-sm text-white font-medium">Kits</a>
         <a href={`${import.meta.env.BASE_URL}checkout/`} class="text-sm text-neutral-400 hover:text-white transition-colors" id="cart-link">
           Cart <span id="cart-count" class="hidden ml-1 px-1.5 py-0.5 bg-amber-500 text-neutral-950 text-xs font-bold rounded-full"></span>
         </a>

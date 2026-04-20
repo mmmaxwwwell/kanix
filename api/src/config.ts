@@ -49,7 +49,7 @@ const DEFAULTS: Record<string, string> = {
   SUPERTOKENS_CONNECTION_URI: "http://localhost:3567",
   STRIPE_TAX_ENABLED: "false",
   EASYPOST_WEBHOOK_SECRET: "",
-  CORS_ALLOWED_ORIGINS: "http://localhost:3000",
+  CORS_ALLOWED_ORIGINS: "http://localhost:3000,http://127.0.0.1:4321,http://localhost:4321",
   RATE_LIMIT_MAX: "100",
   RATE_LIMIT_WINDOW_MS: "60000",
 };

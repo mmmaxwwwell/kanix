@@ -1,0 +1,1 @@
+Updated the default `CORS_ALLOWED_ORIGINS` in `api/src/config.ts` from `"http://localhost:3000"` to `"http://localhost:3000,http://127.0.0.1:4321,http://localhost:4321"` so the Astro dev server origin is included by default. Also added `CORS_ALLOWED_ORIGINS` to `.env.example` with the same multi-origin value so new setups get the correct configuration out of the box.

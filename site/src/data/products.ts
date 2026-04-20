@@ -37,6 +37,7 @@ const MATERIAL_WARNINGS: Record<string, string> = {
   PLA: "PLA is rigid and easy to print but has low heat resistance. May warp or deform above 50\u00B0C (122\u00B0F). Not recommended for high-temperature environments.",
   PETG: "PETG offers good strength and moderate heat resistance up to 80\u00B0C (176\u00B0F). Good balance of durability and printability.",
   ABS: "ABS is impact-resistant with heat tolerance up to 100\u00B0C (212\u00B0F). Requires enclosed printer and good ventilation during printing.",
+  PA11: "PA11 (Nylon 11) is a bio-based nylon with excellent impact resistance, chemical resistance, and flexibility. Heat resistant up to 180\u00B0C (356\u00B0F). Ideal for functional parts requiring durability and long-term performance.",
 };
 
 export function getMaterialWarning(material: string): string | null {

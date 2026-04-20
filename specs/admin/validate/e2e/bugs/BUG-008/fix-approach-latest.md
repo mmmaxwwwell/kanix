@@ -1,0 +1,1 @@
+Inserted the missing "Kits" navigation link in `site/src/pages/kits.astro` between the Shop and Cart links. The link uses `text-white font-medium` styling to indicate the active page, matching the pattern used for the "Shop" link on the products page. This is a single-line HTML insertion.

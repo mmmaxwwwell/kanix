@@ -1,0 +1,1 @@
+Added `X-Cart-Token` to the `Access-Control-Allow-Headers` list in the CORS preflight handler at `api/src/security.ts:20`. The client-side cart library sends this custom header on every cart/checkout request, but the CORS config did not list it, causing browsers to block the preflight. The fix is a single addition to the comma-separated header list.
