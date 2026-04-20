@@ -369,8 +369,8 @@ import Base from "../layouts/Base.astro";
             renderCart(currentCart);
             updateSummary(currentCart);
           }
-        } catch {
-          // ignore remove errors
+        } catch (err) {
+          console.error("Failed to remove cart item:", err);
         }
       });
     });
