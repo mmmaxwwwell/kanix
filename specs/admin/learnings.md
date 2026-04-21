@@ -241,3 +241,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `order_line.variant_id` has FK constraint `fk_order_line_variant` to `product_variant` — fake UUIDs like `00000000-...-000001` cause FK violations. Must create real product + variant rows first (same pattern as T231 shipment tests).
 - `support_ticket` has a self-referencing FK (`fk_support_ticket_linked_ticket` on `linked_ticket_id`) — cleanup must `UPDATE SET linked_ticket_id = NULL` before deleting tickets, otherwise deletion fails with FK violation.
 - The warranty claim HTTP endpoint (`POST /api/support/warranty-claims`) returns `material_limitation_flagged` / `material_limitation_note` (snake_case) in the HTTP response, but the `createWarrantyClaim` function returns `materialLimitationFlagged` / `materialLimitationNote` (camelCase) — the server handler maps between the two.
+
+## T243 — Harden evidence-auto-collection.integration.test.ts
+- The DELETE immutability test (`trg_evidence_record_no_delete`) failed because other test files' `afterAll` cleanup disables the trigger and may not re-enable it if the process crashes. Fix: re-enable both triggers in `beforeAll` before any tests run.
+- `DISABLE TRIGGER USER` is safer than disabling individual trigger names for cleanup — it disables all user triggers in one statement, avoiding issues with mismatched trigger names.
+- `generateEvidenceBundle` attaches a `_content` property (the full bundle JSON) to the return value but it's not in the TypeScript interface — cast to `any` to access it for bundle size assertions.

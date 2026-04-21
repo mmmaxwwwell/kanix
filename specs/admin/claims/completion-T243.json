@@ -1,0 +1,16 @@
+{
+  "task_id": "T243",
+  "status": "complete",
+  "summary": "Hardened evidence-auto-collection.integration.test.ts: fixed trigger reliability, added dispute creation + bundle generation + idempotency + size limit + readiness + error-path tests, strengthened all assertions to concrete values",
+  "commands_run": [
+    {"command": "npx vitest run src/evidence-auto-collection.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T243.json"],
+  "files_modified": [
+    "api/src/evidence-auto-collection.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 1
+}
