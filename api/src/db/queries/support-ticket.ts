@@ -1,4 +1,4 @@
-import { eq, and, desc, gte, inArray, isNull } from "drizzle-orm";
+import { eq, and, desc, gte, lt, inArray, isNull, notExists } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import {
   supportTicket,
@@ -85,6 +85,7 @@ export interface TicketRecord {
   createdAt: Date;
   updatedAt: Date;
   resolvedAt: Date | null;
+  slaBreachedAt: Date | null;
 }
 
 export async function createSupportTicket(
@@ -164,6 +165,7 @@ const ticketColumns = {
   createdAt: supportTicket.createdAt,
   updatedAt: supportTicket.updatedAt,
   resolvedAt: supportTicket.resolvedAt,
+  slaBreachedAt: supportTicket.slaBreachedAt,
 };
 
 export async function findTicketById(
@@ -709,6 +711,81 @@ export async function deleteTicketAttachment(
     .where(eq(supportTicketAttachment.id, id))
     .returning(attachmentColumns);
   return row ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// SLA breach detection (FR-050)
+// ---------------------------------------------------------------------------
+
+/** Default SLA threshold: 4 hours without an admin response */
+export const DEFAULT_SLA_THRESHOLD_HOURS = 4;
+
+export interface SlaBreachResult {
+  ticketId: string;
+  ticketNumber: string;
+  slaBreachedAt: Date;
+}
+
+/**
+ * Find open tickets without any admin response past the SLA threshold and
+ * mark them as SLA-breached. Already-breached tickets are skipped.
+ */
+export async function findAndMarkSlaOverdueTickets(
+  db: PostgresJsDatabase,
+  thresholdHours: number = DEFAULT_SLA_THRESHOLD_HOURS,
+): Promise<SlaBreachResult[]> {
+  const cutoff = new Date(Date.now() - thresholdHours * 60 * 60 * 1000);
+  const activeStatuses = ["open", "waiting_on_customer", "waiting_on_internal"];
+
+  // Find tickets that are:
+  // 1. In an active status
+  // 2. Created before the cutoff (older than threshold)
+  // 3. Have no admin messages
+  // 4. Not already marked as SLA-breached
+  const overdueTickets = await db
+    .select({
+      id: supportTicket.id,
+      ticketNumber: supportTicket.ticketNumber,
+    })
+    .from(supportTicket)
+    .where(
+      and(
+        inArray(supportTicket.status, activeStatuses),
+        lt(supportTicket.createdAt, cutoff),
+        isNull(supportTicket.slaBreachedAt),
+        notExists(
+          db
+            .select({ id: supportTicketMessage.id })
+            .from(supportTicketMessage)
+            .where(
+              and(
+                eq(supportTicketMessage.ticketId, supportTicket.id),
+                eq(supportTicketMessage.authorType, "admin"),
+              ),
+            ),
+        ),
+      ),
+    );
+
+  if (overdueTickets.length === 0) return [];
+
+  const now = new Date();
+  const results: SlaBreachResult[] = [];
+
+  for (const ticket of overdueTickets) {
+    await db
+      .update(supportTicket)
+      .set({ slaBreachedAt: now, updatedAt: now })
+      .where(eq(supportTicket.id, ticket.id));
+
+    results.push({
+      ticketId: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+      slaBreachedAt: now,
+    });
+  }
+
+  return results;
 }
 
 // ---------------------------------------------------------------------------

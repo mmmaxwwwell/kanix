@@ -226,3 +226,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - No circuit breaker existed — created `api/src/services/circuit-breaker.ts` (closed/open/half-open states) and wired it into `CreateServerOptions`/`ServerInstance`. Tests override `paymentCircuitBreaker` with a low threshold + short reset for speed.
 - Changed Stripe unreachable from 502 to 503 + `Retry-After: 30` header. The circuit breaker short-circuits requests when open (returns 503 without calling the adapter).
 - Health endpoint `dependencies.payment` field added: `"ok"` when circuit closed, `"degraded"` when open or half-open. Checkout `recordSuccess()` resets the breaker on successful payment.
+
+## T240 — Harden support-ticket.integration.test.ts
+- The lifecycle test used a fake admin UUID (`00000000-...`) for `createTicketMessage`'s `adminUserId` which violates FK constraint `fk_stm_admin` on `support_ticket_message`. Must create a real `admin_user` row in `beforeAll`.
+- Cleanup must handle `evidence_record` (FK `fk_er_ticket` + immutability triggers) and `linked_ticket_id` self-referencing FK — disable triggers with `ALTER TABLE evidence_record DISABLE TRIGGER USER`, null out `linkedTicketId` before deleting tickets.
+- No SLA breach column existed — added `sla_breached_at` timestamp to schema + Liquibase migration `013-support-ticket-sla.xml`. The `findAndMarkSlaOverdueTickets` query uses `notExists` subquery on admin messages + `lt(createdAt, cutoff)` + `isNull(slaBreachedAt)` for idempotent breach marking.

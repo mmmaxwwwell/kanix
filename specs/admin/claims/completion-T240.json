@@ -1,0 +1,24 @@
+{
+  "task_id": "T240",
+  "status": "complete",
+  "summary": "Hardened support-ticket.integration.test.ts with 31 tests covering ticket CRUD, state machine transitions, message threading, SLA breach detection, and search filters — added sla_breached_at column + findAndMarkSlaOverdueTickets query + Liquibase migration",
+  "commands_run": [
+    {"command": "pnpm db:migrate", "exit_code": 0},
+    {"command": "npx vitest run src/support-ticket.integration.test.ts", "exit_code": 0},
+    {"command": "npx tsc --noEmit", "exit_code": 0},
+    {"command": "npx eslint src/db/queries/support-ticket.ts", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/migrations/changesets/013-support-ticket-sla.xml",
+    "specs/admin/claims/completion-T240.json"
+  ],
+  "files_modified": [
+    "api/src/support-ticket.integration.test.ts",
+    "api/src/db/queries/support-ticket.ts",
+    "api/src/db/schema/support.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 2
+}

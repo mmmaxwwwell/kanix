@@ -26,6 +26,7 @@ export const supportTicket = pgTable("support_ticket", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  slaBreachedAt: timestamp("sla_breached_at", { withTimezone: true }),
 });
 
 // ---------------------------------------------------------------------------

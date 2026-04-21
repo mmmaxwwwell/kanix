@@ -549,7 +549,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 
 ### Support + warranty (tickets)
 
-- [ ] T240 Harden `support-ticket.integration.test.ts` — support ticket CRUD [T061, FR-050]
+- [x] T240 Harden `support-ticket.integration.test.ts` — support ticket CRUD [T061, FR-050]
   Done when: customer creates ticket linked to order; admin replies thread into ticket; ticket state transitions (open → pending → resolved) audit correctly; SLA overdue flag set after N hours without admin response; ticket search by order/customer/status verified.
 
 - [ ] T241 Harden `ticket-attachment.integration.test.ts` — ticket attachments [T062]
