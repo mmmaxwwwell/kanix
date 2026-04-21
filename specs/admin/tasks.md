@@ -425,10 +425,10 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T203 Harden `auth/auth.integration.test.ts` — customer email/password + email verification [T032, FR-064]
   Done when: signup creates user + customer row (assert both); unverified user gets 401 on protected routes; verified user can access protected routes; login returns valid session tokens (assert token shape); bad credentials return 401 with correct error code; integration covers rate-limit rejection on repeated bad attempts.
 
-- [ ] T204 Harden `auth/admin-auth.integration.test.ts` — admin auth + role-based access
+- [x] T204 Harden `auth/admin-auth.integration.test.ts` — admin auth + role-based access
   Done when: admin login succeeds with correct role claim; non-admin users get 403 on admin routes (not 401); capability checks verified for each role tier (super_admin vs operator vs support); session expiry path tested.
 
-- [ ] T205 Harden `auth/email-conflict.integration.test.ts` — email collision handling [T054e]
+- [x] T205 Harden `auth/email-conflict.integration.test.ts` — email collision handling [T054e]
   Done when: signup with an existing email returns 409 with `ERR_EMAIL_CONFLICT`; existing user's password/session unaffected; the conflict response doesn't leak whether the email exists at a different tier (enumeration defense); case-insensitive conflict detection verified.
 
 - [ ] T206 Harden `auth/github-link.integration.test.ts` — GitHub OAuth linking [T033, FR-068]

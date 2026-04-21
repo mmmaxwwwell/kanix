@@ -74,3 +74,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - SuperTokens `signIn` returns 200 with `status: "WRONG_CREDENTIALS_ERROR"` (not HTTP 401) — test both wrong-password and non-existent-email to prevent enumeration
 - Email verification uses `EmailVerification.createEmailVerificationToken` + `verifyEmailUsingToken` server-side; must re-sign-in after verification to get a session with the verified claim
 - Rate limit test needs a separate server instance with `RATE_LIMIT_MAX: 3` to avoid polluting the main test server's request counter
+
+## T205 — Harden auth/email-conflict.integration.test.ts
+- SuperTokens `signUpPOST` override `input.formFields` values are typed `unknown` — cast to `string` for drizzle `ilike()`
+- For consistent enumeration defense, both the pre-signup customer-table check AND the SuperTokens `EMAIL_ALREADY_EXISTS_ERROR` path must return the same `GENERAL_ERROR` / `ERR_EMAIL_CONFLICT` response shape
+- `ilike()` from drizzle-orm handles case-insensitive matching against the `text` column in Postgres without needing `citext` extension

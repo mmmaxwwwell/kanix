@@ -1,0 +1,21 @@
+{
+  "task_id": "T205",
+  "status": "complete",
+  "summary": "Hardened email-conflict integration test with 5 tests: signup conflict, existing user unaffected, case-insensitive detection, enumeration defense, and verification conflict. Added pre-signup email check in signUpPOST override for cross-method conflict detection.",
+  "commands_run": [
+    {"command": "npx vitest run src/auth/email-conflict.integration.test.ts --no-coverage", "exit_code": 0},
+    {"command": "npx vitest run src/auth/auth.integration.test.ts src/auth/admin-auth.integration.test.ts --no-coverage", "exit_code": 0},
+    {"command": "npx tsc --noEmit", "exit_code": 0}
+  ],
+  "files_created": [
+    "specs/admin/claims/completion-T205.json"
+  ],
+  "files_modified": [
+    "api/src/auth/email-conflict.integration.test.ts",
+    "api/src/auth/supertokens.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

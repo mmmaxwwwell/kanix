@@ -5,7 +5,7 @@ import EmailVerification from "supertokens-node/recipe/emailverification/index.j
 import ThirdParty from "supertokens-node/recipe/thirdparty/index.js";
 import type { TypeInput } from "supertokens-node/types";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, ilike } from "drizzle-orm";
 import { customer } from "../db/schema/customer.js";
 import { linkGuestOrdersByEmail } from "../db/queries/order.js";
 import type { AdminAlertService } from "../services/admin-alert.js";
@@ -56,7 +56,35 @@ export function initSuperTokens(config: SuperTokensConfig): void {
               throw new Error("signUpPOST not available");
             }
 
+            // Pre-check: reject if email already claimed by another customer
+            // (case-insensitive to prevent bypass via casing)
+            if (config.db) {
+              const emailField = input.formFields.find((f) => f.id === "email");
+              if (emailField) {
+                const existingByEmail = await config.db
+                  .select({ id: customer.id })
+                  .from(customer)
+                  .where(ilike(customer.email, emailField.value as string))
+                  .limit(1);
+
+                if (existingByEmail.length > 0) {
+                  return {
+                    status: "GENERAL_ERROR" as const,
+                    message: "ERR_EMAIL_CONFLICT",
+                  };
+                }
+              }
+            }
+
             const response = await originalImplementation.signUpPOST(input);
+
+            // Transform SuperTokens' native duplicate detection to consistent error
+            if (response.status === "EMAIL_ALREADY_EXISTS_ERROR") {
+              return {
+                status: "GENERAL_ERROR" as const,
+                message: "ERR_EMAIL_CONFLICT",
+              };
+            }
 
             if (response.status === "OK" && config.db) {
               const userId = response.user.id;
