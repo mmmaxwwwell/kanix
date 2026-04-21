@@ -1,0 +1,21 @@
+{
+  "task_id": "T239",
+  "status": "complete",
+  "summary": "Hardened stripe-unreachable test: 503+Retry-After, circuit breaker (open/half-open/closed), health degradation, rollback assertions — 8 tests all green",
+  "commands_run": [
+    {"command": "npx vitest run src/stripe-unreachable.integration.test.ts --reporter=verbose", "exit_code": 0},
+    {"command": "npx vitest run src/checkout.integration.test.ts src/ready.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/src/services/circuit-breaker.ts",
+    "specs/admin/claims/completion-T239.json"
+  ],
+  "files_modified": [
+    "api/src/server.ts",
+    "api/src/stripe-unreachable.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 3
+}

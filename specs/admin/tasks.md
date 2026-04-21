@@ -544,7 +544,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T238 Harden `refund.integration.test.ts` — admin refund (full + partial) through Stripe [FR-030]
   Done when: full refund against a paid order succeeds + updates order status + fires event; partial refund with specific amount verified; refund on already-refunded order returns 409; refund failure from Stripe logged + order kept in pending-refund state; admin audit entry for each refund with actor + reason.
 
-- [ ] T239 Harden `stripe-unreachable.integration.test.ts` — Stripe API outage handling
+- [x] T239 Harden `stripe-unreachable.integration.test.ts` — Stripe API outage handling
   Done when: checkout with Stripe unreachable returns 503 with retry-after header (not 500); partially-processed orders roll back cleanly; circuit-breaker triggers after N consecutive failures; health endpoint reflects degraded payment state.
 
 ### Support + warranty (tickets)

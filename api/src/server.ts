@@ -116,6 +116,7 @@ import { createShippingAdapter, type ShippingAdapter } from "./services/shipping
 import { sql, eq } from "drizzle-orm";
 import { customer } from "./db/schema/customer.js";
 import { createPaymentAdapter, type PaymentAdapter } from "./services/payment-adapter.js";
+import { createCircuitBreaker, type CircuitBreaker } from "./services/circuit-breaker.js";
 import { generateOrderNumber, createCheckoutOrder } from "./db/queries/checkout.js";
 import type { CheckoutAddress } from "./db/queries/checkout.js";
 import {
@@ -266,6 +267,7 @@ export interface HealthResponse {
   ready: boolean;
   dependencies: {
     database: "connected" | "disconnected";
+    payment?: "ok" | "degraded";
   };
 }
 
@@ -306,6 +308,8 @@ export interface CreateServerOptions {
   notificationDispatch?: NotificationDispatchService;
   /** Override the storage adapter (useful for testing). */
   storageAdapter?: StorageAdapter;
+  /** Override the payment circuit breaker (useful for testing). */
+  paymentCircuitBreaker?: CircuitBreaker;
 }
 
 export interface ServerInstance {
@@ -319,6 +323,7 @@ export interface ServerInstance {
   notificationService: NotificationService;
   notificationDispatch: NotificationDispatchService;
   storageAdapter: StorageAdapter;
+  paymentCircuitBreaker: CircuitBreaker;
   wsManager?: WsManager;
   domainEvents: import("./ws/events.js").DomainEventPublisher;
   start(): Promise<string>;
@@ -375,6 +380,8 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     createPaymentAdapter({
       stripeSecretKey: config.STRIPE_SECRET_KEY,
     });
+  const paymentCircuitBreaker =
+    options.paymentCircuitBreaker ?? createCircuitBreaker({ failureThreshold: 5, resetTimeoutMs: 30_000 });
   const notificationService = options.notificationService ?? createNotificationService();
   const storageAdapter = options.storageAdapter ?? createStorageAdapter();
 
@@ -450,6 +457,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
 
   app.get("/health", async () => {
     const dbConnected = database ? await checkDatabaseConnectivity(database.db) : false;
+    const paymentState = paymentCircuitBreaker.state();
     const response: HealthResponse = {
       status: "ok",
       uptime: process.uptime(),
@@ -457,6 +465,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       ready: isReady(),
       dependencies: {
         database: dbConnected ? "connected" : "disconnected",
+        payment: paymentState === "closed" ? "ok" : "degraded",
       },
     };
     return response;
@@ -5948,9 +5957,29 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       const subtotalMinor = cartWithItems.subtotalMinor;
       const totalMinor = subtotalMinor + taxAmountMinor + shippingAmountMinor;
 
-      // 5. Create Stripe PaymentIntent via payment adapter
+      // 5. Create Stripe PaymentIntent via payment adapter (with circuit breaker)
       let paymentIntentId: string;
       let clientSecret: string;
+
+      // Check circuit breaker before attempting payment
+      if (!paymentCircuitBreaker.allowRequest()) {
+        // Release reservations — circuit is open
+        for (const rid of reservationIds) {
+          try {
+            await releaseReservation(db, rid);
+          } catch {
+            /* best-effort */
+          }
+        }
+        return reply
+          .status(503)
+          .header("Retry-After", "30")
+          .send({
+            error: "ERR_EXTERNAL_SERVICE_UNAVAILABLE",
+            message: "Payment service is temporarily unavailable",
+          });
+      }
+
       try {
         const piResult = await paymentAdapter.createPaymentIntent({
           amountMinor: totalMinor,
@@ -5962,6 +5991,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         });
         paymentIntentId = piResult.id;
         clientSecret = piResult.clientSecret;
+        paymentCircuitBreaker.recordSuccess();
       } catch (err) {
         // Release reservations on failure
         for (const rid of reservationIds) {
@@ -5979,10 +6009,14 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           stripeErr.code === "ECONNREFUSED" ||
           stripeErr.code === "ETIMEDOUT"
         ) {
-          return reply.status(502).send({
-            error: "ERR_EXTERNAL_SERVICE_UNAVAILABLE",
-            message: "Payment service is temporarily unavailable",
-          });
+          paymentCircuitBreaker.recordFailure();
+          return reply
+            .status(503)
+            .header("Retry-After", "30")
+            .send({
+              error: "ERR_EXTERNAL_SERVICE_UNAVAILABLE",
+              message: "Payment service is temporarily unavailable",
+            });
         }
         throw err;
       }
@@ -7395,6 +7429,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     notificationService,
     notificationDispatch,
     storageAdapter,
+    paymentCircuitBreaker,
     wsManager,
     domainEvents,
     start,

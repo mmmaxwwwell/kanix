@@ -221,3 +221,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The refund handler had no explicit check for already-refunded orders — `processRefund` would catch it as `ERR_REFUND_EXCEEDS_PAYMENT` (remaining=0). Added an explicit 409 `ERR_ORDER_ALREADY_REFUNDED` check on `paymentStatus === "refunded"` before calling `processRefund`.
 - Stripe adapter failures were unhandled (re-thrown → 500 via Fastify error handler). Added catch-all returning 502 `ERR_REFUND_PROVIDER_FAILURE` to distinguish provider failures from validation errors. The refund record is NOT inserted since `processRefund` calls the adapter before the DB insert.
 - Audit log `onResponse` hook fires asynchronously — need ~200ms delay before querying `admin_audit_log` in tests (same pattern as T228, T229).
+
+## T239 — Harden stripe-unreachable.integration.test.ts
+- No circuit breaker existed — created `api/src/services/circuit-breaker.ts` (closed/open/half-open states) and wired it into `CreateServerOptions`/`ServerInstance`. Tests override `paymentCircuitBreaker` with a low threshold + short reset for speed.
+- Changed Stripe unreachable from 502 to 503 + `Retry-After: 30` header. The circuit breaker short-circuits requests when open (returns 503 without calling the adapter).
+- Health endpoint `dependencies.payment` field added: `"ok"` when circuit closed, `"degraded"` when open or half-open. Checkout `recordSuccess()` resets the breaker on successful payment.
