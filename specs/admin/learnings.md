@@ -251,3 +251,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - No `GET /api/admin/disputes` endpoint existed — had to create one with a `listDisputes` query that LEFT JOINs `evidence_record` on `disputeId` and groups by all dispute columns to get per-dispute `evidenceCount`.
 - The `listDisputes` evidence count only includes records directly linked via `disputeId` FK, NOT all evidence for the order. So dispute 1 gets count=2 (r4+r7 linked by disputeId), not count=6 (all order evidence).
 - `DISABLE TRIGGER USER` is the safest cleanup approach for `evidence_record` (same as T243) — always re-enable in `beforeAll` in case prior runs crashed.
+
+## T245 — Harden evidence-bundle.integration.test.ts
+- `evidence_bundle.status` CHECK constraint (`ck_eb_status`) allows only `'generating'`, `'generated'`, `'submitted'`, `'failed'` — using "rejected" violates the constraint. Use `'failed'` for Stripe rejection scenarios.
+- `findDisputeById` in `db/queries/evidence.ts` didn't include `providerDisputeId` — needed to add it to submit evidence to Stripe (the adapter requires the provider-facing dispute ID, not the internal UUID).
+- POSTing with `Content-Type: application/json` and no body triggers Fastify `FST_ERR_CTP_EMPTY_JSON_BODY` (500) — for admin action endpoints that take no body (generate-bundle, submit-bundle), omit the Content-Type header (same pattern as T219).

@@ -203,6 +203,8 @@ import {
   listEvidence,
   listDisputes,
 } from "./db/queries/evidence.js";
+import { transitionDisputeStatus } from "./db/queries/dispute.js";
+import { evidenceBundle } from "./db/schema/evidence.js";
 import {
   createContributor,
   findContributorById,
@@ -3388,6 +3390,132 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       },
     );
 
+    // POST /api/admin/disputes/:id/submit-bundle — submit evidence bundle to Stripe
+    app.post(
+      "/api/admin/disputes/:id/submit-bundle",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.DISPUTES_MANAGE)],
+      },
+      async (request, reply) => {
+        const { id: disputeId } = request.params as { id: string };
+
+        const disputeRow = await findDisputeById(database.db, disputeId);
+        if (!disputeRow) {
+          return reply.status(404).send({
+            error: "ERR_DISPUTE_NOT_FOUND",
+            message: `Dispute ${disputeId} not found`,
+          });
+        }
+
+        // Find the latest generated bundle for this dispute
+        const bundles = await database.db
+          .select()
+          .from(evidenceBundle)
+          .where(eq(evidenceBundle.disputeId, disputeId));
+
+        const latestBundle = bundles
+          .filter((b) => b.status === "generated" || b.status === "failed")
+          .sort(
+            (a, b) =>
+              (b.generatedAt?.getTime() ?? 0) - (a.generatedAt?.getTime() ?? 0),
+          )[0];
+
+        if (!latestBundle) {
+          return reply.status(422).send({
+            error: "ERR_NO_BUNDLE",
+            message: "No generated evidence bundle found for this dispute. Generate a bundle first.",
+          });
+        }
+
+        // Gather evidence for the submission text
+        const records = await findEvidenceByOrderId(database.db, disputeRow.orderId);
+        const uncategorizedText = records
+          .filter((r) => r.textContent)
+          .map((r) => {
+            try {
+              return typeof r.textContent === "string" ? r.textContent : JSON.stringify(r.textContent);
+            } catch {
+              return String(r.textContent);
+            }
+          })
+          .join("\n---\n");
+
+        try {
+          const result = await paymentAdapter.submitDisputeEvidence({
+            providerDisputeId: disputeRow.providerDisputeId ?? "",
+            evidence: {
+              customer_email_address: undefined,
+              uncategorized_text: uncategorizedText || "Evidence bundle submitted. See attached documents.",
+            },
+          });
+
+          // Update bundle status to "submitted"
+          await database.db
+            .update(evidenceBundle)
+            .set({ status: "submitted" })
+            .where(eq(evidenceBundle.id, latestBundle.id));
+
+          // Transition dispute status to "submitted" if currently in ready_to_submit or evidence_gathering
+          try {
+            if (disputeRow.status === "evidence_gathering") {
+              await transitionDisputeStatus(database.db, {
+                disputeId,
+                newStatus: "ready_to_submit",
+              });
+              await transitionDisputeStatus(database.db, {
+                disputeId,
+                newStatus: "submitted",
+              });
+            } else if (disputeRow.status === "ready_to_submit") {
+              await transitionDisputeStatus(database.db, {
+                disputeId,
+                newStatus: "submitted",
+              });
+            }
+          } catch {
+            // If already submitted or in another terminal state, ignore transition error
+          }
+
+          request.auditContext = {
+            action: "dispute.submit_bundle",
+            entityType: "dispute",
+            entityId: disputeId,
+            afterJson: {
+              bundleId: latestBundle.id,
+              providerStatus: result.status,
+            },
+          };
+
+          return {
+            bundle_id: latestBundle.id,
+            dispute_id: disputeId,
+            provider_dispute_id: result.id,
+            provider_status: result.status,
+            status: "submitted",
+          };
+        } catch (err) {
+          const stripeErr = err as { type?: string; message?: string; code?: string };
+
+          // Mark bundle as rejected on Stripe error
+          if (stripeErr.type?.startsWith("Stripe") || stripeErr.code?.startsWith("ERR_")) {
+            await database.db
+              .update(evidenceBundle)
+              .set({ status: "failed" })
+              .where(eq(evidenceBundle.id, latestBundle.id));
+
+            return reply.status(422).send({
+              error: "ERR_STRIPE_REJECTION",
+              message: stripeErr.message ?? "Stripe rejected the evidence submission",
+              provider_error: stripeErr.type ?? stripeErr.code,
+              bundle_id: latestBundle.id,
+            });
+          }
+
+          throw err;
+        }
+      },
+    );
+
     // POST /api/admin/disputes/:id/evidence — attach manual evidence
     app.post(
       "/api/admin/disputes/:id/evidence",
@@ -3423,6 +3551,19 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           return reply.status(404).send({
             error: "ERR_DISPUTE_NOT_FOUND",
             message: `Dispute ${disputeId} not found`,
+          });
+        }
+
+        // Check if bundle has been submitted — lock further edits
+        const existingBundles = await database.db
+          .select()
+          .from(evidenceBundle)
+          .where(eq(evidenceBundle.disputeId, disputeId));
+        const hasSubmittedBundle = existingBundles.some((b) => b.status === "submitted");
+        if (hasSubmittedBundle) {
+          return reply.status(409).send({
+            error: "ERR_EVIDENCE_LOCKED",
+            message: "Evidence edits are locked after bundle submission to Stripe",
           });
         }
 

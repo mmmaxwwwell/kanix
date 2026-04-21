@@ -215,6 +215,7 @@ export async function findDisputeById(
   id: string;
   paymentId: string;
   orderId: string;
+  providerDisputeId: string;
   status: string;
   amountMinor: number;
   reason: string | null;
@@ -225,6 +226,7 @@ export async function findDisputeById(
       id: dispute.id,
       paymentId: dispute.paymentId,
       orderId: dispute.orderId,
+      providerDisputeId: dispute.providerDisputeId,
       status: dispute.status,
       amountMinor: dispute.amountMinor,
       reason: dispute.reason,

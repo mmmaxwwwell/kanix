@@ -1,0 +1,21 @@
+{
+  "task_id": "T245",
+  "status": "complete",
+  "summary": "Hardened evidence-bundle.integration.test.ts with HTTP-level tests: bundle generation, Stripe submission, rejection handling, resubmit path, and edit-locking after submission",
+  "commands_run": [
+    {"command": "npx vitest run src/evidence-bundle.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": [
+    "specs/admin/claims/completion-T245.json"
+  ],
+  "files_modified": [
+    "api/src/evidence-bundle.integration.test.ts",
+    "api/src/server.ts",
+    "api/src/services/payment-adapter.ts",
+    "api/src/db/queries/evidence.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

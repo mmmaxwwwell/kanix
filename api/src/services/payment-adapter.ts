@@ -26,9 +26,28 @@ export interface RefundResult {
   status: string;
 }
 
+export interface SubmitDisputeEvidenceInput {
+  providerDisputeId: string;
+  evidence: {
+    customer_name?: string;
+    customer_email_address?: string;
+    shipping_tracking_number?: string;
+    shipping_carrier?: string;
+    shipping_date?: string;
+    shipping_address?: string;
+    uncategorized_text?: string;
+  };
+}
+
+export interface SubmitDisputeEvidenceResult {
+  id: string;
+  status: string;
+}
+
 export interface PaymentAdapter {
   createPaymentIntent(input: CreatePaymentIntentInput): Promise<PaymentIntentResult>;
   createRefund(input: CreateRefundInput): Promise<RefundResult>;
+  submitDisputeEvidence(input: SubmitDisputeEvidenceInput): Promise<SubmitDisputeEvidenceResult>;
 }
 
 // ---------------------------------------------------------------------------
@@ -61,6 +80,16 @@ function createStripePaymentAdapter(stripeSecretKey: string): PaymentAdapter {
         status: refund.status ?? "pending",
       };
     },
+    async submitDisputeEvidence(input: SubmitDisputeEvidenceInput): Promise<SubmitDisputeEvidenceResult> {
+      const updated = await stripe.disputes.update(input.providerDisputeId, {
+        evidence: input.evidence,
+        submit: true,
+      });
+      return {
+        id: updated.id,
+        status: updated.status,
+      };
+    },
   };
 }
 
@@ -84,6 +113,13 @@ function createStubPaymentAdapter(): PaymentAdapter {
       return {
         id: `re_stub_${stubCounter}_${Date.now()}`,
         status: "succeeded",
+      };
+    },
+    async submitDisputeEvidence(input: SubmitDisputeEvidenceInput): Promise<SubmitDisputeEvidenceResult> {
+      stubCounter++;
+      return {
+        id: input.providerDisputeId,
+        status: "under_review",
       };
     },
   };

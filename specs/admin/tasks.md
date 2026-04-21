@@ -566,7 +566,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T244 Harden `evidence-browsing.integration.test.ts` — admin evidence browser [T066b]
   Done when: admin can list open disputes with evidence status; drill-down shows each piece of evidence with source; filter by status (pending, submitted, won, lost) returns correct counts.
 
-- [ ] T245 Harden `evidence-bundle.integration.test.ts` — submitting evidence bundle to Stripe [T066]
+- [x] T245 Harden `evidence-bundle.integration.test.ts` — submitting evidence bundle to Stripe [T066]
   Done when: bundle submission to Stripe test mode succeeds; Stripe rejection (bad format) captured with specific error; resubmit after correction path verified; bundle submission locks further evidence edits.
 
 - [ ] T246 Harden `manual-evidence.integration.test.ts` — admin-added manual evidence [T066a]
