@@ -6756,13 +6756,27 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     const requireAdmin = createRequireAdmin(db);
 
     // GET /api/admin/dashboard/summary
-    app.get(
+    app.get<{ Querystring: { from?: string; to?: string } }>(
       "/api/admin/dashboard/summary",
       {
         preHandler: [verifySession, requireAdmin],
       },
-      async () => {
-        const summary = await getDashboardSummary(db);
+      async (request, reply) => {
+        const { from, to } = request.query;
+        const options: { from?: Date; to?: Date } = {};
+        if (from) {
+          const d = new Date(from);
+          if (isNaN(d.getTime()))
+            return reply.status(400).send({ error: "Invalid 'from' date" });
+          options.from = d;
+        }
+        if (to) {
+          const d = new Date(to);
+          if (isNaN(d.getTime()))
+            return reply.status(400).send({ error: "Invalid 'to' date" });
+          options.to = d;
+        }
+        const summary = await getDashboardSummary(db, options);
         return summary;
       },
     );

@@ -1,10 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "node:events";
-import { createServer, markReady, markNotReady } from "./server.js";
-import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
-import type { Config } from "./config.js";
+import type { DatabaseConnection } from "./db/connection.js";
 import type { FastifyInstance } from "fastify";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { adminUser, adminRole, adminUserRole, adminAuditLog } from "./db/schema/admin.js";
 import { product, productVariant } from "./db/schema/catalog.js";
 import {
@@ -18,37 +15,7 @@ import { payment, dispute } from "./db/schema/payment.js";
 import { shipment } from "./db/schema/fulfillment.js";
 import { customer } from "./db/schema/customer.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
-
-const DATABASE_URL = requireDatabaseUrl();
-const SUPERTOKENS_URI = getSuperTokensUri();
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: "whsec_xxx",
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
+import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
 
 async function signUpUser(address: string, email: string, password: string): Promise<string> {
   const res = await fetch(`${address}/auth/signup`, {
@@ -99,7 +66,25 @@ async function signInAndGetHeaders(
   return headers;
 }
 
-describe("admin dashboard summary + alerts API (T071a)", () => {
+interface DashboardSummary {
+  ordersAwaitingFulfillment: number;
+  openSupportTickets: number;
+  lowStockVariants: number;
+  openDisputes: number;
+  shipmentsWithExceptions: number;
+}
+
+interface DashboardAlert {
+  type: string;
+  severity: "warning" | "critical";
+  message: string;
+  entityType: string;
+  entityId: string;
+  metadata?: Record<string, unknown>;
+}
+
+describe("admin dashboard aggregates (T225)", () => {
+  let ts_: TestServer;
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
@@ -109,6 +94,11 @@ describe("admin dashboard summary + alerts API (T071a)", () => {
   const ts = Date.now();
   const adminEmail = `test-dashboard-admin-${ts}@kanix.dev`;
   const adminPassword = "AdminPassword123!";
+
+  // Non-admin user for 401 test
+  const customerEmail = `test-dashboard-cust-${ts}@kanix.dev`;
+  const customerPassword = "CustomerPassword123!";
+  let customerHeaders: Record<string, string>;
 
   // Track IDs for cleanup
   let testRoleId: string;
@@ -126,18 +116,18 @@ describe("admin dashboard summary + alerts API (T071a)", () => {
   let testShipmentId: string;
   let testReservationId: string;
 
-  beforeAll(async () => {
-    await assertSuperTokensUp();
+  // Snapshot of counts before our seeded data
+  let baselineSummary: DashboardSummary;
 
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-    });
-    address = await server.start();
-    markReady();
-    app = server.app;
+  beforeAll(async () => {
+    ts_ = await createTestServer();
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+    address = ts_.address;
+
+    // Capture baseline counts before seeding our test data
+    const baselineRes = await fetch(`${address}/api/admin/dashboard/summary`);
+    // Unauthenticated — we'll get 401. Need admin first.
 
     // Create admin user with super_admin role
     const authSubject = await signUpUser(address, adminEmail, adminPassword);
@@ -165,6 +155,16 @@ describe("admin dashboard summary + alerts API (T071a)", () => {
 
     await dbConn.db.insert(adminUserRole).values({ adminUserId: user.id, adminRoleId: role.id });
     adminHeaders = await signInAndGetHeaders(address, adminEmail, adminPassword);
+
+    // Create a non-admin user for auth boundary tests
+    await signUpUser(address, customerEmail, customerPassword);
+    customerHeaders = await signInAndGetHeaders(address, customerEmail, customerPassword);
+
+    // Capture baseline summary BEFORE seeding test-specific data
+    const blRes = await fetch(`${address}/api/admin/dashboard/summary`, {
+      headers: adminHeaders,
+    });
+    baselineSummary = (await blRes.json()) as DashboardSummary;
 
     // Seed test data with known counts
 
@@ -328,7 +328,7 @@ describe("admin dashboard summary + alerts API (T071a)", () => {
         reason: "fraudulent",
         amountMinor: 1999,
         status: "evidence_gathering",
-        dueBy: new Date(Date.now() + 36 * 60 * 60 * 1000), // 36 hours from now (within 48h alert threshold)
+        dueBy: new Date(Date.now() + 36 * 60 * 60 * 1000), // 36 hours from now
         openedAt: new Date(),
       })
       .returning();
@@ -362,129 +362,320 @@ describe("admin dashboard summary + alerts API (T071a)", () => {
   }, 30000);
 
   afterAll(async () => {
-    markNotReady();
-    if (dbConn) {
-      try {
-        // Cleanup in reverse dependency order
-        await dbConn.db
-          .delete(inventoryReservation)
-          .where(eq(inventoryReservation.id, testReservationId));
-        await dbConn.db.delete(shipment).where(eq(shipment.id, testShipmentId));
-        await dbConn.db.delete(dispute).where(eq(dispute.id, testDisputeId));
-        await dbConn.db.delete(payment).where(eq(payment.id, testPaymentId));
-        await dbConn.db.delete(supportTicket).where(eq(supportTicket.id, testTicketId));
-        await dbConn.db.delete(supportTicket).where(eq(supportTicket.id, testTicket2Id));
-        await dbConn.db.delete(order).where(eq(order.id, testOrderId));
-        await dbConn.db.delete(order).where(eq(order.id, testOrder2Id));
-        await dbConn.db.delete(customer).where(eq(customer.id, testCustomerId));
-        await dbConn.db
-          .delete(inventoryBalance)
-          .where(eq(inventoryBalance.variantId, testVariantId));
-        await dbConn.db
-          .delete(inventoryBalance)
-          .where(eq(inventoryBalance.variantId, testVariant2Id));
-        await dbConn.db.delete(inventoryLocation).where(eq(inventoryLocation.id, testLocationId));
-        await dbConn.db.delete(productVariant).where(eq(productVariant.id, testVariantId));
-        await dbConn.db.delete(productVariant).where(eq(productVariant.id, testVariant2Id));
-        await dbConn.db.delete(product).where(eq(product.id, testProductId));
-        await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, adminUserId));
-        await dbConn.db
-          .delete(adminAuditLog)
-          .where(eq(adminAuditLog.actorAdminUserId, adminUserId));
-        await dbConn.db.delete(adminUser).where(eq(adminUser.id, adminUserId));
-        await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));
-      } catch {
-        // Best-effort cleanup
-      }
-      await dbConn.close();
+    try {
+      // Cleanup in reverse dependency order
+      await dbConn.db
+        .delete(inventoryReservation)
+        .where(eq(inventoryReservation.id, testReservationId));
+      await dbConn.db.delete(shipment).where(eq(shipment.id, testShipmentId));
+      await dbConn.db.delete(dispute).where(eq(dispute.id, testDisputeId));
+      await dbConn.db.delete(payment).where(eq(payment.id, testPaymentId));
+      await dbConn.db.delete(supportTicket).where(eq(supportTicket.id, testTicketId));
+      await dbConn.db.delete(supportTicket).where(eq(supportTicket.id, testTicket2Id));
+      await dbConn.db.delete(order).where(eq(order.id, testOrderId));
+      await dbConn.db.delete(order).where(eq(order.id, testOrder2Id));
+      await dbConn.db.delete(customer).where(eq(customer.id, testCustomerId));
+      await dbConn.db
+        .delete(inventoryBalance)
+        .where(
+          inArray(inventoryBalance.variantId, [testVariantId, testVariant2Id]),
+        );
+      await dbConn.db.delete(inventoryLocation).where(eq(inventoryLocation.id, testLocationId));
+      await dbConn.db
+        .delete(productVariant)
+        .where(inArray(productVariant.id, [testVariantId, testVariant2Id]));
+      await dbConn.db.delete(product).where(eq(product.id, testProductId));
+      await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, adminUserId));
+      await dbConn.db
+        .delete(adminAuditLog)
+        .where(eq(adminAuditLog.actorAdminUserId, adminUserId));
+      await dbConn.db.delete(adminUser).where(eq(adminUser.id, adminUserId));
+      await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));
+    } catch {
+      // Best-effort cleanup
     }
-    if (app) {
-      await app.close();
-    }
+    await stopTestServer(ts_);
   }, 15000);
 
-  it("GET /api/admin/dashboard/summary returns correct counts", async () => {
+  // ---------------------------------------------------------------------------
+  // Summary endpoint — concrete delta-based assertions
+  // ---------------------------------------------------------------------------
+
+  it("returns correct aggregate counts reflecting seeded fixture data", async () => {
     const res = await fetch(`${address}/api/admin/dashboard/summary`, {
       headers: adminHeaders,
     });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as Record<string, number>;
+    const body = (await res.json()) as DashboardSummary;
 
-    // We seeded: 2 orders awaiting fulfillment, 2 open tickets, 2 low-stock variants,
-    // 1 open dispute, 1 shipment with exception
-    expect(body.ordersAwaitingFulfillment).toBeGreaterThanOrEqual(2);
-    expect(body.openSupportTickets).toBeGreaterThanOrEqual(2);
-    expect(body.lowStockVariants).toBeGreaterThanOrEqual(2);
-    expect(body.openDisputes).toBeGreaterThanOrEqual(1);
-    expect(body.shipmentsWithExceptions).toBeGreaterThanOrEqual(1);
+    // Delta = current - baseline = exactly what we seeded
+    expect(body.ordersAwaitingFulfillment - baselineSummary.ordersAwaitingFulfillment).toBe(2);
+    expect(body.openSupportTickets - baselineSummary.openSupportTickets).toBe(2);
+    expect(body.lowStockVariants - baselineSummary.lowStockVariants).toBe(2);
+    expect(body.openDisputes - baselineSummary.openDisputes).toBe(1);
+    expect(body.shipmentsWithExceptions - baselineSummary.shipmentsWithExceptions).toBe(1);
   });
 
-  it("GET /api/admin/dashboard/summary has all required fields", async () => {
+  it("summary response contains exactly the expected numeric fields", async () => {
     const res = await fetch(`${address}/api/admin/dashboard/summary`, {
       headers: adminHeaders,
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
 
-    expect(body).toHaveProperty("ordersAwaitingFulfillment");
-    expect(body).toHaveProperty("openSupportTickets");
-    expect(body).toHaveProperty("lowStockVariants");
-    expect(body).toHaveProperty("openDisputes");
-    expect(body).toHaveProperty("shipmentsWithExceptions");
-    expect(typeof body.ordersAwaitingFulfillment).toBe("number");
-    expect(typeof body.openSupportTickets).toBe("number");
-    expect(typeof body.lowStockVariants).toBe("number");
-    expect(typeof body.openDisputes).toBe("number");
-    expect(typeof body.shipmentsWithExceptions).toBe("number");
-  });
-
-  it("GET /api/admin/dashboard/alerts returns alerts array", async () => {
-    const res = await fetch(`${address}/api/admin/dashboard/alerts`, {
-      headers: adminHeaders,
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { alerts: Array<Record<string, unknown>> };
-
-    expect(body).toHaveProperty("alerts");
-    expect(Array.isArray(body.alerts)).toBe(true);
-
-    // We seeded: 1 expiring reservation (12h), 1 dispute due in 36h (within 48h threshold)
-    const reservationAlerts = body.alerts.filter((a) => a.type === "reservation_expiring");
-    const disputeAlerts = body.alerts.filter(
-      (a) => a.type === "dispute_due_soon" || a.type === "dispute_overdue",
-    );
-    expect(reservationAlerts.length).toBeGreaterThanOrEqual(1);
-    expect(disputeAlerts.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("GET /api/admin/dashboard/alerts has correct alert structure", async () => {
-    const res = await fetch(`${address}/api/admin/dashboard/alerts`, {
-      headers: adminHeaders,
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { alerts: Array<Record<string, unknown>> };
-
-    for (const alert of body.alerts) {
-      expect(alert).toHaveProperty("type");
-      expect(alert).toHaveProperty("severity");
-      expect(alert).toHaveProperty("message");
-      expect(alert).toHaveProperty("entityType");
-      expect(alert).toHaveProperty("entityId");
-      expect(["warning", "critical"]).toContain(alert.severity);
+    const expectedKeys = [
+      "ordersAwaitingFulfillment",
+      "openSupportTickets",
+      "lowStockVariants",
+      "openDisputes",
+      "shipmentsWithExceptions",
+    ];
+    for (const key of expectedKeys) {
+      expect(body[key]).toEqual(expect.any(Number));
+      expect(Number.isInteger(body[key])).toBe(true);
+      expect(body[key] as number).toBeGreaterThanOrEqual(0);
     }
   });
 
-  it("GET /api/admin/dashboard/summary requires authentication", async () => {
+  it("adding an order increases ordersAwaitingFulfillment by exactly 1", async () => {
+    const beforeRes = await fetch(`${address}/api/admin/dashboard/summary`, {
+      headers: adminHeaders,
+    });
+    const before = (await beforeRes.json()) as DashboardSummary;
+
+    // Insert a third order
+    const [extraOrder] = await dbConn.db
+      .insert(order)
+      .values({
+        orderNumber: `DASH-ORD-DELTA-${ts}`,
+        customerId: testCustomerId,
+        email: `dash-customer-${ts}@example.com`,
+        status: "confirmed",
+        fulfillmentStatus: "unfulfilled",
+        subtotalMinor: 500,
+        totalMinor: 500,
+      })
+      .returning();
+
+    try {
+      const afterRes = await fetch(`${address}/api/admin/dashboard/summary`, {
+        headers: adminHeaders,
+      });
+      const after = (await afterRes.json()) as DashboardSummary;
+      expect(after.ordersAwaitingFulfillment).toBe(before.ordersAwaitingFulfillment + 1);
+      // Other counts should be unchanged
+      expect(after.openSupportTickets).toBe(before.openSupportTickets);
+      expect(after.lowStockVariants).toBe(before.lowStockVariants);
+      expect(after.openDisputes).toBe(before.openDisputes);
+      expect(after.shipmentsWithExceptions).toBe(before.shipmentsWithExceptions);
+    } finally {
+      await dbConn.db.delete(order).where(eq(order.id, extraOrder.id));
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Date range filter
+  // ---------------------------------------------------------------------------
+
+  it("date range filter narrows results to the specified window", async () => {
+    // All our test data was created at ~now. Query a window that ends before our
+    // test run started — should produce 0 for time-based aggregates.
+    const longAgo = new Date("2020-01-01T00:00:00Z");
+    const alsoLongAgo = new Date("2020-01-02T00:00:00Z");
+
+    const res = await fetch(
+      `${address}/api/admin/dashboard/summary?from=${longAgo.toISOString()}&to=${alsoLongAgo.toISOString()}`,
+      { headers: adminHeaders },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as DashboardSummary;
+
+    // No orders/tickets/disputes/shipments were created in Jan 2020
+    expect(body.ordersAwaitingFulfillment).toBe(0);
+    expect(body.openSupportTickets).toBe(0);
+    expect(body.openDisputes).toBe(0);
+    expect(body.shipmentsWithExceptions).toBe(0);
+    // Low stock is point-in-time, unaffected by date range
+    expect(body.lowStockVariants).toBeGreaterThanOrEqual(2);
+  });
+
+  it("date range filter including current time returns our seeded data", async () => {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const oneHourLater = new Date(Date.now() + 60 * 60 * 1000);
+
+    const res = await fetch(
+      `${address}/api/admin/dashboard/summary?from=${oneHourAgo.toISOString()}&to=${oneHourLater.toISOString()}`,
+      { headers: adminHeaders },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as DashboardSummary;
+
+    // Our data was created within this 2-hour window
+    expect(body.ordersAwaitingFulfillment).toBeGreaterThanOrEqual(2);
+    expect(body.openSupportTickets).toBeGreaterThanOrEqual(2);
+    expect(body.openDisputes).toBeGreaterThanOrEqual(1);
+    expect(body.shipmentsWithExceptions).toBeGreaterThanOrEqual(1);
+  });
+
+  it("rejects invalid date in from parameter", async () => {
+    const res = await fetch(
+      `${address}/api/admin/dashboard/summary?from=not-a-date`,
+      { headers: adminHeaders },
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/from/i);
+  });
+
+  it("rejects invalid date in to parameter", async () => {
+    const res = await fetch(
+      `${address}/api/admin/dashboard/summary?to=garbage`,
+      { headers: adminHeaders },
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/to/i);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Timezone handling — ISO 8601 with explicit offsets
+  // ---------------------------------------------------------------------------
+
+  it("handles timezone offsets in date range parameters", async () => {
+    // Use UTC+5 offset — should be parsed correctly to the same instant
+    const oneHourAgoUtc = new Date(Date.now() - 60 * 60 * 1000);
+    // Express the same instant as UTC+05:00
+    const offset5 = new Date(oneHourAgoUtc.getTime() + 5 * 60 * 60 * 1000);
+    const hours = String(offset5.getUTCHours()).padStart(2, "0");
+    const mins = String(offset5.getUTCMinutes()).padStart(2, "0");
+    const secs = String(offset5.getUTCSeconds()).padStart(2, "0");
+    const y = offset5.getUTCFullYear();
+    const mo = String(offset5.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(offset5.getUTCDate()).padStart(2, "0");
+    const fromStr = `${y}-${mo}-${d}T${hours}:${mins}:${secs}+05:00`;
+
+    const oneHourLater = new Date(Date.now() + 60 * 60 * 1000);
+
+    const res = await fetch(
+      `${address}/api/admin/dashboard/summary?from=${encodeURIComponent(fromStr)}&to=${oneHourLater.toISOString()}`,
+      { headers: adminHeaders },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as DashboardSummary;
+
+    // The +05:00 offset should resolve to the same UTC instant as oneHourAgoUtc,
+    // so our test data (created ~now) falls within the window
+    expect(body.ordersAwaitingFulfillment).toBeGreaterThanOrEqual(2);
+    expect(body.openSupportTickets).toBeGreaterThanOrEqual(2);
+  });
+
+  it("negative UTC offset is parsed correctly", async () => {
+    // Far-past window expressed with -08:00 offset
+    // 2020-01-01T00:00:00-08:00 = 2020-01-01T08:00:00Z
+    const res = await fetch(
+      `${address}/api/admin/dashboard/summary?from=${encodeURIComponent("2020-01-01T00:00:00-08:00")}&to=${encodeURIComponent("2020-01-02T00:00:00-08:00")}`,
+      { headers: adminHeaders },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as DashboardSummary;
+
+    // No data in 2020 window
+    expect(body.ordersAwaitingFulfillment).toBe(0);
+    expect(body.openSupportTickets).toBe(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Alerts endpoint — concrete entity-level assertions
+  // ---------------------------------------------------------------------------
+
+  it("returns reservation_expiring alert for our seeded reservation", async () => {
+    const res = await fetch(`${address}/api/admin/dashboard/alerts`, {
+      headers: adminHeaders,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { alerts: DashboardAlert[] };
+
+    expect(Array.isArray(body.alerts)).toBe(true);
+
+    const ourAlert = body.alerts.find(
+      (a) => a.type === "reservation_expiring" && a.entityId === testReservationId,
+    );
+    expect(ourAlert).toBeDefined();
+    expect(ourAlert!.severity).toBe("warning");
+    expect(ourAlert!.entityType).toBe("inventory_reservation");
+    expect(ourAlert!.message).toContain(testReservationId);
+    expect(ourAlert!.metadata).toBeDefined();
+    expect(ourAlert!.metadata!.variantId).toBe(testVariantId);
+    expect(typeof ourAlert!.metadata!.expiresAt).toBe("string");
+  });
+
+  it("returns dispute_due_soon alert for our seeded dispute", async () => {
+    const res = await fetch(`${address}/api/admin/dashboard/alerts`, {
+      headers: adminHeaders,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { alerts: DashboardAlert[] };
+
+    const ourDisputeAlert = body.alerts.find(
+      (a) => a.type === "dispute_due_soon" && a.entityId === testDisputeId,
+    );
+    expect(ourDisputeAlert).toBeDefined();
+    expect(ourDisputeAlert!.severity).toBe("critical");
+    expect(ourDisputeAlert!.entityType).toBe("dispute");
+    expect(ourDisputeAlert!.message).toContain(`dp_dash_test_${ts}`);
+    expect(ourDisputeAlert!.metadata).toBeDefined();
+    expect(ourDisputeAlert!.metadata!.providerDisputeId).toBe(`dp_dash_test_${ts}`);
+    expect(ourDisputeAlert!.metadata!.status).toBe("evidence_gathering");
+    expect(typeof ourDisputeAlert!.metadata!.dueBy).toBe("string");
+  });
+
+  it("alert severity values are limited to warning or critical", async () => {
+    const res = await fetch(`${address}/api/admin/dashboard/alerts`, {
+      headers: adminHeaders,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { alerts: DashboardAlert[] };
+
+    for (const alert of body.alerts) {
+      expect(["warning", "critical"]).toContain(alert.severity);
+      expect(typeof alert.type).toBe("string");
+      expect(alert.type.length).toBeGreaterThan(0);
+      expect(typeof alert.message).toBe("string");
+      expect(alert.message.length).toBeGreaterThan(0);
+      expect(typeof alert.entityType).toBe("string");
+      expect(typeof alert.entityId).toBe("string");
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Auth boundary
+  // ---------------------------------------------------------------------------
+
+  it("summary endpoint returns 401 without authentication", async () => {
     const res = await fetch(`${address}/api/admin/dashboard/summary`, {
       headers: { origin: "http://localhost:3000" },
     });
     expect(res.status).toBe(401);
   });
 
-  it("GET /api/admin/dashboard/alerts requires authentication", async () => {
+  it("alerts endpoint returns 401 without authentication", async () => {
     const res = await fetch(`${address}/api/admin/dashboard/alerts`, {
       headers: { origin: "http://localhost:3000" },
     });
     expect(res.status).toBe(401);
+  });
+
+  it("summary endpoint returns 403 for non-admin authenticated user", async () => {
+    const res = await fetch(`${address}/api/admin/dashboard/summary`, {
+      headers: customerHeaders,
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("alerts endpoint returns 403 for non-admin authenticated user", async () => {
+    const res = await fetch(`${address}/api/admin/dashboard/alerts`, {
+      headers: customerHeaders,
+    });
+    expect(res.status).toBe(403);
   });
 });

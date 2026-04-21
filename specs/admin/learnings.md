@@ -171,3 +171,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The existing admin customer endpoints had no capability gating — added `CUSTOMERS_READ`, `CUSTOMERS_MANAGE`, and `CUSTOMERS_PII` capabilities. `super_admin` gets all (via `Object.values(CAPABILITIES)`); `support` role gets `CUSTOMERS_READ` only. PII redaction is driven by checking `CUSTOMERS_PII` in the route handler, not middleware.
 - Search by order number uses a subquery `customer.id IN (SELECT order.customerId FROM order WHERE ilike(order.orderNumber, pattern))` — this joins via the `or()` alongside email/name search without duplicating customer rows.
 - The audit trail endpoint looks up the customer's `authSubject` from the customer table, then queries `auth_event_log` by `actorId` — the auth events use SuperTokens user IDs, not customer table UUIDs.
+
+## T225 — Harden admin-dashboard.integration.test.ts
+- The `dispute` table has NO `createdAt` column — it uses `openedAt` instead. When adding date filters to dashboard queries, use `dispute.openedAt` for the time dimension.
+- `inventoryBalance` has no `createdAt` either (only `updatedAt`) — low stock counts are point-in-time by nature, so date range filtering is intentionally skipped for that aggregate.
+- For delta-based assertions on shared DB: capture a "baseline" summary before seeding test-specific data, then assert `(after - baseline) == expectedDelta` for each count field.

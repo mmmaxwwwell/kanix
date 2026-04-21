@@ -1,4 +1,4 @@
-import { eq, and, sql, lt, gte, inArray } from "drizzle-orm";
+import { eq, and, sql, lt, gte, inArray, type Column } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { order } from "../schema/order.js";
 import { supportTicket } from "../schema/support.js";
@@ -18,7 +18,22 @@ export interface DashboardSummary {
   shipmentsWithExceptions: number;
 }
 
-export async function getDashboardSummary(db: PostgresJsDatabase): Promise<DashboardSummary> {
+export interface DashboardSummaryOptions {
+  from?: Date;
+  to?: Date;
+}
+
+export async function getDashboardSummary(
+  db: PostgresJsDatabase,
+  options?: DashboardSummaryOptions,
+): Promise<DashboardSummary> {
+  const dateFilters = (col: Column) => {
+    const conditions = [];
+    if (options?.from) conditions.push(gte(col, options.from));
+    if (options?.to) conditions.push(lt(col, options.to));
+    return conditions;
+  };
+
   const [ordersResult, ticketsResult, lowStockResult, disputesResult, shipmentsResult] =
     await Promise.all([
       db
@@ -28,14 +43,19 @@ export async function getDashboardSummary(db: PostgresJsDatabase): Promise<Dashb
           and(
             inArray(order.status, ["confirmed", "pending_payment"]),
             eq(order.fulfillmentStatus, "unfulfilled"),
+            ...dateFilters(order.createdAt),
           ),
         ),
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(supportTicket)
         .where(
-          inArray(supportTicket.status, ["open", "waiting_on_customer", "waiting_on_internal"]),
+          and(
+            inArray(supportTicket.status, ["open", "waiting_on_customer", "waiting_on_internal"]),
+            ...dateFilters(supportTicket.createdAt),
+          ),
         ),
+      // Low stock is point-in-time, not filtered by date range
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(inventoryBalance)
@@ -44,12 +64,20 @@ export async function getDashboardSummary(db: PostgresJsDatabase): Promise<Dashb
         .select({ count: sql<number>`count(*)::int` })
         .from(dispute)
         .where(
-          inArray(dispute.status, ["opened", "evidence_gathering", "ready_to_submit", "submitted"]),
+          and(
+            inArray(dispute.status, [
+              "opened",
+              "evidence_gathering",
+              "ready_to_submit",
+              "submitted",
+            ]),
+            ...dateFilters(dispute.openedAt),
+          ),
         ),
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(shipment)
-        .where(eq(shipment.status, "exception")),
+        .where(and(eq(shipment.status, "exception"), ...dateFilters(shipment.createdAt))),
     ]);
 
   return {

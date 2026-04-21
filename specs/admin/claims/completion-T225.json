@@ -1,0 +1,19 @@
+{
+  "task_id": "T225",
+  "status": "complete",
+  "summary": "Hardened admin-dashboard.integration.test.ts with delta-based aggregate assertions, date range filter support (from/to query params), timezone offset handling, concrete alert entity checks, and auth boundary tests (401/403)",
+  "commands_run": [
+    {"command": "npx tsc --noEmit --pretty", "exit_code": 0},
+    {"command": "npx vitest run src/admin-dashboard.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T225.json"],
+  "files_modified": [
+    "api/src/admin-dashboard.integration.test.ts",
+    "api/src/db/queries/dashboard.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 2
+}
