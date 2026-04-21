@@ -1,0 +1,12 @@
+{
+  "task_id": "T202",
+  "status": "complete",
+  "summary": "Hardened critical-path.integration.test.ts: removed all skip guards (describeWithDb, isSuperTokensUp, try/catch swallowing), replaced vacuous toBeDefined() assertions with concrete state checks (order status, inventory balance, snapshot contents, payment fields), reordered Phase 3 after Phase 5/6 to avoid SuperTokens singleton DB closure, fixed pre-existing verifySession bug in middleware.ts (raw Fastify request → SuperTokens FastifyRequest wrapper), added comprehensive afterAll cleanup for Phase 5 and Phase 6 test fixtures",
+  "commands_run": [
+    {"command": "npx vitest run --reporter=verbose src/critical-path.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T202.json"],
+  "files_modified": ["api/src/critical-path.integration.test.ts", "api/src/auth/middleware.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

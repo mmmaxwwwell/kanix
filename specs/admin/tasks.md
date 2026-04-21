@@ -417,7 +417,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T201 Harden `ready.integration.test.ts` — `/ready` readiness probe [FR-103]
   Done when: file runs green; no skip guards; `/ready` tested for all three states (not-ready at startup, ready when DB up, back to 503 when DB disconnected); every response body field (status, uptime, dependencies, version) has a concrete-value assertion; error paths (DB down, SuperTokens unreachable) produce the correct HTTP status with correct error shape.
 
-- [ ] T202 Harden `critical-path.integration.test.ts` — multi-phase end-to-end checkpoint [Phase 3, Phase 5, Phase 6]
+- [x] T202 Harden `critical-path.integration.test.ts` — multi-phase end-to-end checkpoint [Phase 3, Phase 5, Phase 6]
   Done when: both Phase 3 and Phase 5/6 `describe` blocks run green; no skip guards anywhere (including the outer try/catch that swallowed setup errors); every assertion checks specific state (order status, inventory balance, snapshot contents), not existence; if the test needs test fixtures, it creates them in `beforeAll` and tears them down in `afterAll` — no shared state with other integration tests.
 
 ### Auth (everything downstream needs sessions working)

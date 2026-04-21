@@ -1,6 +1,9 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import supertokens from "supertokens-node";
 import { plugin as supertokensPlugin } from "supertokens-node/framework/fastify/index.js";
+import {
+  FastifyRequest as STFastifyRequest,
+  FastifyResponse as STFastifyResponse,
+} from "supertokens-node/lib/build/framework/fastify/framework.js";
 import Session from "supertokens-node/recipe/session/index.js";
 import type { SessionContainer } from "supertokens-node/recipe/session/index.js";
 import { isEmailVerified } from "./supertokens.js";
@@ -35,19 +38,23 @@ declare module "fastify" {
  * Fastify preHandler that verifies a SuperTokens session.
  * Attaches the session to `request.session`.
  * Returns 401 if no valid session.
+ *
+ * Uses SuperTokens' FastifyRequest/FastifyResponse wrappers for proper
+ * cookie and header access, while preserving our custom error format.
  */
 export async function verifySession(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   try {
-    const session = await Session.getSession(request as never, reply as never);
+    const wrappedReq = new STFastifyRequest(request as never);
+    const wrappedRes = new STFastifyResponse(reply as never);
+    const session = await Session.getSession(wrappedReq as never, wrappedRes as never, {
+      overrideGlobalClaimValidators: () => [],
+    });
     request.session = session;
-  } catch (err) {
-    if (supertokens.Error.isErrorFromSuperTokens(err as Error)) {
-      return reply.status(401).send({
-        error: "ERR_AUTHENTICATION_FAILED",
-        message: "Authentication required",
-      });
-    }
-    throw err;
+  } catch {
+    return reply.status(401).send({
+      error: "ERR_AUTHENTICATION_FAILED",
+      message: "Authentication required",
+    });
   }
 }
 

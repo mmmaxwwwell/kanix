@@ -62,3 +62,10 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The `/ready` endpoint returns only `{ status, dependencies? }` — `uptime` and `version` are on `/health` (HealthResponse), not `/ready` (ReadyResponse)
 - When `isReady()` is false (before `markReady()` or during shutdown), `/ready` short-circuits to 503 without checking dependencies — the response body has no `dependencies` field in this case
 - The old test used `describeWithDb = DATABASE_URL ? describe : describe.skip` — replaced with `requireDatabaseUrl()` + `assertSuperTokensUp()` for loud failures
+
+## T202 — Harden critical-path.integration.test.ts
+- **SuperTokens singleton trap**: `initSuperTokens` uses `if (initialized) return;` — Phase 3's SIGTERM closes the DB connection captured by the singleton. Reordered tests so Phase 5/6 run before Phase 3 to avoid stale DB references.
+- **verifySession bug fix**: The custom `verifySession` in `middleware.ts` passed raw Fastify request/reply to `Session.getSession()`, causing `getCookieValue is not a function` (500 error). Fixed by importing `FastifyRequest`/`FastifyResponse` wrappers from `supertokens-node/lib/build/framework/fastify/framework.js` and wrapping before calling `getSession`.
+- **SuperTokens claim validators**: When using SuperTokens `Session.getSession` with proper wrappers, EmailVerification in REQUIRED mode causes 403 for unverified users. Must pass `overrideGlobalClaimValidators: () => []` since `requireVerifiedEmail` is a separate preHandler.
+- **Public products API requires class membership**: `findActiveProductsWithDetails` filters products by `productClassMembership`. Test products without class membership won't appear in listings — use the detail endpoint (`/api/products/:slug`) instead, which has no class membership requirement.
+- **Admin API responses use Drizzle camelCase**: Balance responses use `onHand`/`reserved`/`available` (not snake_case), and movement responses use `movementType`/`quantityDelta`.
