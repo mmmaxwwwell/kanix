@@ -1,0 +1,17 @@
+{
+  "task_id": "T241",
+  "status": "complete",
+  "summary": "Hardened ticket-attachment.integration.test.ts with 24 HTTP-level tests covering upload with downloadUrl, 413 size limit, content-type whitelist, cross-tenant isolation, deletion revoking access, auth enforcement, and max-per-message limits",
+  "commands_run": [
+    {"command": "npx vitest run src/ticket-attachment.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T241.json"],
+  "files_modified": [
+    "api/src/ticket-attachment.integration.test.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 2
+}

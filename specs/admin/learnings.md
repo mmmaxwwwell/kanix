@@ -231,3 +231,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The lifecycle test used a fake admin UUID (`00000000-...`) for `createTicketMessage`'s `adminUserId` which violates FK constraint `fk_stm_admin` on `support_ticket_message`. Must create a real `admin_user` row in `beforeAll`.
 - Cleanup must handle `evidence_record` (FK `fk_er_ticket` + immutability triggers) and `linked_ticket_id` self-referencing FK — disable triggers with `ALTER TABLE evidence_record DISABLE TRIGGER USER`, null out `linkedTicketId` before deleting tickets.
 - No SLA breach column existed — added `sla_breached_at` timestamp to schema + Liquibase migration `013-support-ticket-sla.xml`. The `findAndMarkSlaOverdueTickets` query uses `notExists` subquery on admin messages + `lt(createdAt, cutoff)` + `isNull(slaBreachedAt)` for idempotent breach marking.
+
+## T241 — Harden ticket-attachment.integration.test.ts
+- Attachment upload endpoints need `bodyLimit: 15 * 1024 * 1024` because base64 encoding inflates 10MB files to ~14MB, exceeding Fastify's default 1MB body limit. Without this, the server returns 500 before the handler runs.
+- The `evidence_record` table FK column referencing `support_ticket` is `support_ticket_id` (not `ticket_id`). Cleanup requires `ALTER TABLE evidence_record DISABLE TRIGGER USER` before deleting tickets.
+- `admin_role.capabilitiesJson` is the Drizzle field name (maps to `capabilities_json` column), not `capabilities` — using the wrong field silently inserts `null` causing FK/NOT NULL violations downstream.

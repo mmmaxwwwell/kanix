@@ -187,6 +187,7 @@ import {
   createTicketAttachment,
   findAttachmentById,
   listAttachmentsByTicketId,
+  deleteTicketAttachment,
   createWarrantyClaim,
   ALLOWED_ATTACHMENT_TYPES,
   MAX_ATTACHMENT_SIZE_BYTES,
@@ -2889,6 +2890,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       "/api/admin/support-tickets/:id/attachments",
       {
         preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SUPPORT_MANAGE)],
+        bodyLimit: 15 * 1024 * 1024, // 15MB to accommodate base64 encoding of 10MB files
         schema: {
           body: {
             type: "object",
@@ -2920,7 +2922,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
 
         const fileBuffer = Buffer.from(body.data, "base64");
         if (fileBuffer.length > MAX_ATTACHMENT_SIZE_BYTES) {
-          return reply.status(400).send({
+          return reply.status(413).send({
             error: "ERR_FILE_TOO_LARGE",
             message: `File size exceeds maximum of ${MAX_ATTACHMENT_SIZE_BYTES} bytes`,
           });
@@ -2945,7 +2947,8 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             entityId: attachment.id,
           };
 
-          return reply.status(201).send({ attachment });
+          const downloadUrl = `/api/admin/support-tickets/${id}/attachments/${attachment.id}/download`;
+          return reply.status(201).send({ attachment, downloadUrl });
         } catch (err: unknown) {
           // Clean up stored file on DB failure
           await storageAdapter.delete(storageKey);
@@ -3011,11 +3014,41 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       },
     );
 
+    // DELETE /api/admin/support-tickets/:id/attachments/:attachmentId — admin deletes attachment
+    app.delete(
+      "/api/admin/support-tickets/:id/attachments/:attachmentId",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.SUPPORT_MANAGE)],
+      },
+      async (request, reply) => {
+        const { id, attachmentId } = request.params as { id: string; attachmentId: string };
+        const attachment = await findAttachmentById(database.db, attachmentId);
+        if (!attachment || attachment.ticketId !== id) {
+          return reply
+            .status(404)
+            .send({ error: "ERR_ATTACHMENT_NOT_FOUND", message: "Attachment not found" });
+        }
+
+        // Delete from storage first, then DB
+        await storageAdapter.delete(attachment.storageKey);
+        const deleted = await deleteTicketAttachment(database.db, attachmentId);
+
+        request.auditContext = {
+          action: "attachment.delete",
+          entityType: "support_ticket_attachment",
+          entityId: attachmentId,
+        };
+
+        return reply.status(200).send({ deleted });
+      },
+    );
+
     // POST /api/support/tickets/:id/attachments — customer uploads attachment
     app.post(
       "/api/support/tickets/:id/attachments",
       {
         preHandler: [verifySession, requireVerifiedEmail],
+        bodyLimit: 15 * 1024 * 1024, // 15MB to accommodate base64 encoding of 10MB files
         schema: {
           body: {
             type: "object",
@@ -3063,7 +3096,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
 
         const fileBuffer = Buffer.from(body.data, "base64");
         if (fileBuffer.length > MAX_ATTACHMENT_SIZE_BYTES) {
-          return reply.status(400).send({
+          return reply.status(413).send({
             error: "ERR_FILE_TOO_LARGE",
             message: `File size exceeds maximum of ${MAX_ATTACHMENT_SIZE_BYTES} bytes`,
           });
@@ -3082,7 +3115,8 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             sizeBytes: fileBuffer.length,
           });
 
-          return reply.status(201).send({ attachment });
+          const downloadUrl = `/api/support/tickets/${id}/attachments/${attachment.id}/download`;
+          return reply.status(201).send({ attachment, downloadUrl });
         } catch (err: unknown) {
           await storageAdapter.delete(storageKey);
           const errObj = err as { code?: string; message?: string };
