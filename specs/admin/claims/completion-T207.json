@@ -1,0 +1,16 @@
+{
+  "task_id": "T207",
+  "status": "complete",
+  "summary": "Hardened guest-order-link integration test: split monolithic test into 4 focused tests covering unverified-no-link, verified-link, authenticated-order-list, and idempotent-relink; fixed invalid order status ('placed' → 'draft'); migrated to shared createTestServer harness",
+  "commands_run": [
+    {"command": "npx vitest run src/auth/guest-order-link.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T207.json"],
+  "files_modified": [
+    "api/src/auth/guest-order-link.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 2
+}

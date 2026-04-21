@@ -1,210 +1,222 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "node:events";
 import { eq, and, isNull } from "drizzle-orm";
-import { createServer, markReady, markNotReady } from "../server.js";
-import { createDatabaseConnection, type DatabaseConnection } from "../db/connection.js";
-import type { Config } from "../config.js";
-import type { FastifyInstance } from "fastify";
+import type { DatabaseConnection } from "../db/connection.js";
 import { order } from "../db/schema/order.js";
 import { customer } from "../db/schema/customer.js";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "../test-helpers.js";
+import { createTestServer, stopTestServer, type TestServer } from "../test-server.js";
 
-const DATABASE_URL = requireDatabaseUrl();
-const SUPERTOKENS_URI = getSuperTokensUri();
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: "whsec_xxx",
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
-
-describe("guest order → account linking (T036)", () => {
-  let app: FastifyInstance;
+describe("guest order → account linking (T036, FR-066, T207)", () => {
+  let ts_: TestServer;
   let dbConn: DatabaseConnection;
   let address: string;
 
-  const guestEmail = `guest-${Date.now()}@example.com`;
+  const uniqueSuffix = Date.now();
   const testPassword = "TestPassword123!";
-  const guestOrderIds: string[] = [];
 
-  beforeAll(async () => {
-    await assertSuperTokensUp();
+  // --- Emails unique per run ---
+  const guestEmail = `guest-link-${uniqueSuffix}@example.com`;
+  const idempotentEmail = `guest-idemp-${uniqueSuffix}@example.com`;
 
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-    });
-    address = await server.start();
-    markReady();
-    app = server.app;
+  // Track order IDs for cleanup
+  const allOrderIds: string[] = [];
+  // Track state across sequential tests
+  let mainUserId: string;
+  let mainCustId: string;
 
-    // Create 3 guest orders (no customer_id) with the same email
-    for (let i = 1; i <= 3; i++) {
-      const rows = await dbConn.db
-        .insert(order)
-        .values({
-          orderNumber: `GUEST-${Date.now()}-${i}`,
-          email: guestEmail,
-          customerId: null,
-          status: "placed",
-          subtotalMinor: 1000 * i,
-          totalMinor: 1000 * i,
-        })
-        .returning({ id: order.id });
-      guestOrderIds.push(rows[0].id);
-    }
+  /** Helper: insert a guest order (no customer_id) with valid status */
+  async function insertGuestOrder(email: string, suffix: number): Promise<string> {
+    const rows = await dbConn.db
+      .insert(order)
+      .values({
+        orderNumber: `GUEST-${uniqueSuffix}-${suffix}`,
+        email,
+        customerId: null,
+        status: "draft",
+        subtotalMinor: 1000 * suffix,
+        totalMinor: 1000 * suffix,
+      })
+      .returning({ id: order.id });
+    allOrderIds.push(rows[0].id);
+    return rows[0].id;
+  }
 
-    // Verify the guest orders have no customer_id
-    const guestOrders = await dbConn.db
-      .select({ id: order.id, customerId: order.customerId })
-      .from(order)
-      .where(and(eq(order.email, guestEmail), isNull(order.customerId)));
-    expect(guestOrders.length).toBe(3);
-  });
-
-  afterAll(async () => {
-    markNotReady();
-    // Clean up test guest orders
-    if (dbConn) {
-      for (const id of guestOrderIds) {
-        await dbConn.db.delete(order).where(eq(order.id, id));
-      }
-      // Clean up test customer record
-      await dbConn.db.delete(customer).where(eq(customer.email, guestEmail));
-    }
-    if (app) await app.close();
-    if (dbConn) await dbConn.close();
-  });
-
-  it("on email verification, guest orders are linked to the new customer", async function () {
-    // Step 1: Sign up with the same email as the guest orders
-    const signupRes = await fetch(`${address}/auth/signup`, {
+  /** Helper: sign up via HTTP */
+  async function signup(email: string): Promise<{ status: string; user?: { id: string } }> {
+    const res = await fetch(`${address}/auth/signup`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        origin: "http://localhost:3000",
-      },
+      headers: { "Content-Type": "application/json", origin: "http://localhost:3000" },
       body: JSON.stringify({
         formFields: [
-          { id: "email", value: guestEmail },
+          { id: "email", value: email },
           { id: "password", value: testPassword },
         ],
       }),
     });
-    expect(signupRes.status).toBe(200);
-    const signupBody = (await signupRes.json()) as { status: string; user: { id: string } };
-    expect(signupBody.status).toBe("OK");
-    const userId = signupBody.user.id;
+    expect(res.status).toBe(200);
+    return res.json() as Promise<{ status: string; user?: { id: string } }>;
+  }
 
-    // At this point, orders should still have no customer_id (email not verified yet)
-    const unlinkedOrders = await dbConn.db
-      .select({ id: order.id, customerId: order.customerId })
-      .from(order)
-      .where(and(eq(order.email, guestEmail), isNull(order.customerId)));
-    expect(unlinkedOrders.length).toBe(3);
-
-    // Step 2: Verify email (triggers order linking)
+  /** Helper: verify email via HTTP (fires the override that links orders) */
+  async function verifyEmail(userId: string): Promise<void> {
     const { default: supertokens } = await import("supertokens-node");
-    const { default: EmailVerification } =
-      await import("supertokens-node/recipe/emailverification/index.js");
+    const { default: EmailVerification } = await import(
+      "supertokens-node/recipe/emailverification/index.js"
+    );
     const tokenRes = await EmailVerification.createEmailVerificationToken(
       "public",
       supertokens.convertToRecipeUserId(userId),
     );
     expect(tokenRes.status).toBe("OK");
+    if (tokenRes.status !== "OK") return;
 
-    if (tokenRes.status === "OK") {
-      // Use the HTTP API to verify email so the override fires
-      const verifyRes = await fetch(`${address}/auth/user/email/verify`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          origin: "http://localhost:3000",
-        },
-        body: JSON.stringify({
-          method: "token",
-          token: tokenRes.token,
-        }),
-      });
-      expect(verifyRes.status).toBe(200);
-      const verifyBody = (await verifyRes.json()) as { status: string };
-      expect(verifyBody.status).toBe("OK");
-    }
-
-    // Step 3: Verify the orders now have customer_id set
-    const linkedOrders = await dbConn.db
-      .select({ id: order.id, customerId: order.customerId })
-      .from(order)
-      .where(eq(order.email, guestEmail));
-    expect(linkedOrders.length).toBe(3);
-    for (const o of linkedOrders) {
-      expect(o.customerId).not.toBeNull();
-    }
-
-    // All orders should have the same customer_id
-    const customerIds = new Set(linkedOrders.map((o) => o.customerId));
-    expect(customerIds.size).toBe(1);
-
-    // Step 4: Sign in and verify orders appear in customer's order list
-    const signinRes = await fetch(`${address}/auth/signin`, {
+    const verifyRes = await fetch(`${address}/auth/user/email/verify`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        origin: "http://localhost:3000",
-      },
+      headers: { "Content-Type": "application/json", origin: "http://localhost:3000" },
+      body: JSON.stringify({ method: "token", token: tokenRes.token }),
+    });
+    expect(verifyRes.status).toBe(200);
+    const body = (await verifyRes.json()) as { status: string };
+    expect(body.status).toBe("OK");
+  }
+
+  /** Helper: sign in and return auth headers */
+  async function signinAndGetHeaders(email: string): Promise<Record<string, string>> {
+    const res = await fetch(`${address}/auth/signin`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", origin: "http://localhost:3000" },
       body: JSON.stringify({
         formFields: [
-          { id: "email", value: guestEmail },
+          { id: "email", value: email },
           { id: "password", value: testPassword },
         ],
       }),
     });
-    expect(signinRes.status).toBe(200);
-
-    const cookies = signinRes.headers.getSetCookie();
+    expect(res.status).toBe(200);
+    const cookies = res.headers.getSetCookie();
     const cookieHeader = cookies.map((c) => c.split(";")[0]).join("; ");
-    const accessToken = signinRes.headers.get("st-access-token");
-    const antiCsrf = signinRes.headers.get("anti-csrf");
-
+    const accessToken = res.headers.get("st-access-token");
+    const antiCsrf = res.headers.get("anti-csrf");
     const headers: Record<string, string> = {
       origin: "http://localhost:3000",
       cookie: cookieHeader,
     };
     if (accessToken) headers["authorization"] = `Bearer ${accessToken}`;
     if (antiCsrf) headers["anti-csrf"] = antiCsrf;
+    return headers;
+  }
+
+  beforeAll(async () => {
+    ts_ = await createTestServer();
+    dbConn = ts_.dbConn;
+    address = ts_.address;
+  });
+
+  afterAll(async () => {
+    try {
+      for (const id of allOrderIds) {
+        await dbConn.db.delete(order).where(eq(order.id, id));
+      }
+      await dbConn.db.delete(customer).where(eq(customer.email, guestEmail));
+      await dbConn.db.delete(customer).where(eq(customer.email, idempotentEmail));
+    } catch {
+      // Best-effort cleanup
+    }
+    await stopTestServer(ts_);
+  });
+
+  it("guest orders are NOT linked before email verification", async () => {
+    // Create guest orders
+    const oid1 = await insertGuestOrder(guestEmail, 1);
+    const oid2 = await insertGuestOrder(guestEmail, 2);
+    const oid3 = await insertGuestOrder(guestEmail, 3);
+
+    // Signup — creates customer row but email is unverified
+    const signupBody = await signup(guestEmail);
+    expect(signupBody.status).toBe("OK");
+    expect(signupBody.user).toBeDefined();
+    mainUserId = signupBody.user!.id;
+
+    // Orders must still be unlinked (customerId = null)
+    const unlinked = await dbConn.db
+      .select({ id: order.id, customerId: order.customerId })
+      .from(order)
+      .where(and(eq(order.email, guestEmail), isNull(order.customerId)));
+    expect(unlinked.length).toBe(3);
+    const unlinkedIds = unlinked.map((r) => r.id);
+    expect(unlinkedIds).toContain(oid1);
+    expect(unlinkedIds).toContain(oid2);
+    expect(unlinkedIds).toContain(oid3);
+  });
+
+  it("on email verification, guest orders are linked to the new customer", async () => {
+    // Get the customer row created by the signup in the previous test
+    const custRows = await dbConn.db
+      .select({ id: customer.id, authSubject: customer.authSubject })
+      .from(customer)
+      .where(eq(customer.email, guestEmail));
+    expect(custRows.length).toBe(1);
+    mainCustId = custRows[0].id;
+
+    // Verify email — triggers linkGuestOrdersByEmail in the override
+    await verifyEmail(mainUserId);
+
+    // All 3 guest orders should now be linked to this customer
+    const linked = await dbConn.db
+      .select({ id: order.id, customerId: order.customerId })
+      .from(order)
+      .where(eq(order.email, guestEmail));
+    expect(linked.length).toBe(3);
+    for (const o of linked) {
+      expect(o.customerId).toBe(mainCustId);
+    }
+  });
+
+  it("linked orders appear in the authenticated customer order list", async () => {
+    const headers = await signinAndGetHeaders(guestEmail);
 
     const ordersRes = await fetch(`${address}/api/customer/orders`, { headers });
     expect(ordersRes.status).toBe(200);
-    const ordersBody = (await ordersRes.json()) as {
+    const body = (await ordersRes.json()) as {
       orders: { id: string; orderNumber: string; email: string }[];
     };
-    expect(ordersBody.orders.length).toBe(3);
-    for (const o of ordersBody.orders) {
+    expect(body.orders.length).toBe(3);
+    for (const o of body.orders) {
       expect(o.email).toBe(guestEmail);
-      expect(guestOrderIds).toContain(o.id);
+      expect(allOrderIds).toContain(o.id);
     }
+  });
+
+  it("duplicate link attempts are idempotent", async () => {
+    // Insert a guest order for a new email
+    const oid = await insertGuestOrder(idempotentEmail, 100);
+
+    // Signup + verify
+    const signupBody = await signup(idempotentEmail);
+    expect(signupBody.status).toBe("OK");
+    const userId = signupBody.user!.id;
+    await verifyEmail(userId);
+
+    // Order should be linked
+    const afterFirst = await dbConn.db
+      .select({ id: order.id, customerId: order.customerId })
+      .from(order)
+      .where(eq(order.id, oid));
+    expect(afterFirst.length).toBe(1);
+    expect(afterFirst[0].customerId).not.toBeNull();
+    const linkedCustId = afterFirst[0].customerId;
+
+    // Call linkGuestOrdersByEmail again directly — should be a no-op
+    // (no unlinked orders remain, so 0 rows updated)
+    const { linkGuestOrdersByEmail } = await import("../db/queries/order.js");
+    const updated = await linkGuestOrdersByEmail(dbConn.db, idempotentEmail, linkedCustId!);
+    expect(updated).toBe(0);
+
+    // The order is still linked to the same customer (unchanged)
+    const afterSecond = await dbConn.db
+      .select({ id: order.id, customerId: order.customerId })
+      .from(order)
+      .where(eq(order.id, oid));
+    expect(afterSecond.length).toBe(1);
+    expect(afterSecond[0].customerId).toBe(linkedCustId);
   });
 });

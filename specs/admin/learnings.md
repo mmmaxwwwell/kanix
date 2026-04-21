@@ -83,3 +83,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T206 — Harden auth/github-link.integration.test.ts
 - Mock GitHub user IDs must be unique per run (use `Date.now()` offsets) — hardcoded IDs like `12345` or `99001` collide with data from prior test runs since the shared Postgres instance isn't wiped between runs
 - The test already used `createTestServer` with `serverOverrides: { githubUserFetcher }` to inject a mock GitHub API fetcher — this is the correct pattern for external API boundaries (mock the fetcher, not the DB/auth)
+
+## T207 — Harden auth/guest-order-link.integration.test.ts
+- Order status check constraint (`ck_order_status`) only allows: `draft`, `pending_payment`, `confirmed`, `completed`, `canceled`, `closed` — NOT `placed`. Use `"draft"` for test fixture orders.
+- Guest order linking happens in the `verifyEmailPOST` override (not `signUpPOST`), so orders remain unlinked until email verification — this is by design per FR-066.
+- The old test used inline `createServer`/`testConfig`/`createFakeProcess` boilerplate; replaced with the shared `createTestServer`/`stopTestServer` harness from `test-server.ts`.

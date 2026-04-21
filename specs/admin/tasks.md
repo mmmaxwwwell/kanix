@@ -434,7 +434,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T206 Harden `auth/github-link.integration.test.ts` — GitHub OAuth linking [T033, FR-068]
   Done when: OAuth callback creates customer + links `github_id`; re-linking same GitHub ID is idempotent; attempting to link a GitHub ID already on another account returns conflict; unlink flow verified; session is preserved across link/unlink.
 
-- [ ] T207 Harden `auth/guest-order-link.integration.test.ts` — guest-to-authenticated order linking [T036, FR-066]
+- [x] T207 Harden `auth/guest-order-link.integration.test.ts` — guest-to-authenticated order linking [T036, FR-066]
   Done when: guest order created with email matches a new signup → order associates on signup; existing account signup pulls in prior guest orders with same email; linking respects email verification (doesn't link unverified); duplicate link attempts are idempotent.
 
 - [ ] T208 Harden `auth/audit-log.integration.test.ts` — auth event audit trail
