@@ -1,0 +1,22 @@
+{
+  "task_id": "T224",
+  "status": "complete",
+  "summary": "Hardened admin-customers integration test with 23 tests covering search by email/name/order ID, customer detail with PII redaction, addresses, audit trail, ban/unban, and role-based access control",
+  "commands_run": [
+    {"command": "npx vitest run src/admin-customers.integration.test.ts --reporter=verbose", "exit_code": 0},
+    {"command": "npx vitest run src/admin-dashboard.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": [
+    "specs/admin/claims/completion-T224.json"
+  ],
+  "files_modified": [
+    "api/src/admin-customers.integration.test.ts",
+    "api/src/auth/admin.ts",
+    "api/src/db/queries/customer.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

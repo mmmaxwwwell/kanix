@@ -109,7 +109,8 @@ import { createAdminAlertService, type AdminAlertService } from "./services/admi
 import { createNotificationService, type NotificationService } from "./services/notification.js";
 import { createTaxAdapter, type TaxAdapter } from "./services/tax-adapter.js";
 import { createShippingAdapter, type ShippingAdapter } from "./services/shipping-adapter.js";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
+import { customer } from "./db/schema/customer.js";
 import { createPaymentAdapter, type PaymentAdapter } from "./services/payment-adapter.js";
 import { generateOrderNumber, createCheckoutOrder } from "./db/queries/checkout.js";
 import type { CheckoutAddress } from "./db/queries/checkout.js";
@@ -225,6 +226,11 @@ import {
   getCustomerDetail,
   getCustomerOrders,
   getCustomerTickets,
+  getCustomerAddresses,
+  getCustomerAuditTrail,
+  banCustomer,
+  unbanCustomer,
+  redactCustomerPII,
 } from "./db/queries/customer.js";
 import { getShippingSettings, updateShippingSettings } from "./db/queries/setting.js";
 import { listAuthEvents } from "./db/queries/auth-event.js";
@@ -6788,16 +6794,21 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     }>(
       "/api/admin/customers",
       {
-        preHandler: [verifySession, requireAdmin],
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.CUSTOMERS_READ)],
       },
       async (request) => {
         const { search, status, limit, offset } = request.query;
-        return listCustomers(db, {
+        const result = await listCustomers(db, {
           search,
           status,
           limit: limit ? parseInt(limit, 10) : undefined,
           offset: offset ? parseInt(offset, 10) : undefined,
         });
+        const hasPII = request.adminContext!.capabilities.includes(CAPABILITIES.CUSTOMERS_PII);
+        if (!hasPII) {
+          return { ...result, customers: result.customers.map(redactCustomerPII) };
+        }
+        return result;
       },
     );
 
@@ -6805,14 +6816,15 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     app.get<{ Params: { id: string } }>(
       "/api/admin/customers/:id",
       {
-        preHandler: [verifySession, requireAdmin],
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.CUSTOMERS_READ)],
       },
       async (request, reply) => {
         const detail = await getCustomerDetail(db, request.params.id);
         if (!detail) {
           return reply.status(404).send({ error: "Customer not found" });
         }
-        return detail;
+        const hasPII = request.adminContext!.capabilities.includes(CAPABILITIES.CUSTOMERS_PII);
+        return hasPII ? detail : redactCustomerPII(detail);
       },
     );
 
@@ -6820,7 +6832,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     app.get<{ Params: { id: string } }>(
       "/api/admin/customers/:id/orders",
       {
-        preHandler: [verifySession, requireAdmin],
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.CUSTOMERS_READ)],
       },
       async (request, reply) => {
         const detail = await getCustomerDetail(db, request.params.id);
@@ -6836,7 +6848,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     app.get<{ Params: { id: string } }>(
       "/api/admin/customers/:id/tickets",
       {
-        preHandler: [verifySession, requireAdmin],
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.CUSTOMERS_READ)],
       },
       async (request, reply) => {
         const detail = await getCustomerDetail(db, request.params.id);
@@ -6845,6 +6857,84 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         }
         const tickets = await getCustomerTickets(db, request.params.id);
         return { tickets };
+      },
+    );
+
+    // GET /api/admin/customers/:id/addresses
+    app.get<{ Params: { id: string } }>(
+      "/api/admin/customers/:id/addresses",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.CUSTOMERS_READ)],
+      },
+      async (request, reply) => {
+        const detail = await getCustomerDetail(db, request.params.id);
+        if (!detail) {
+          return reply.status(404).send({ error: "Customer not found" });
+        }
+        const addresses = await getCustomerAddresses(db, request.params.id);
+        return { addresses };
+      },
+    );
+
+    // GET /api/admin/customers/:id/audit-trail
+    app.get<{ Params: { id: string } }>(
+      "/api/admin/customers/:id/audit-trail",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.CUSTOMERS_READ)],
+      },
+      async (request, reply) => {
+        const detail = await getCustomerDetail(db, request.params.id);
+        if (!detail) {
+          return reply.status(404).send({ error: "Customer not found" });
+        }
+        // Look up authSubject from the customer record
+        const [custRow] = await db.select({ authSubject: customer.authSubject }).from(customer).where(eq(customer.id, request.params.id));
+        const events = custRow ? await getCustomerAuditTrail(db, custRow.authSubject) : [];
+        return { events };
+      },
+    );
+
+    // POST /api/admin/customers/:id/ban
+    app.post<{ Params: { id: string } }>(
+      "/api/admin/customers/:id/ban",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.CUSTOMERS_MANAGE)],
+      },
+      async (request, reply) => {
+        const result = await banCustomer(db, request.params.id);
+        if (!result) {
+          return reply.status(404).send({ error: "Customer not found" });
+        }
+        request.auditContext = {
+          action: "customer.ban",
+          entityType: "customer",
+          entityId: request.params.id,
+          beforeJson: null,
+          afterJson: { status: "banned" },
+        };
+        return result;
+      },
+    );
+
+    // POST /api/admin/customers/:id/unban
+    app.post<{ Params: { id: string } }>(
+      "/api/admin/customers/:id/unban",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.CUSTOMERS_MANAGE)],
+      },
+      async (request, reply) => {
+        const result = await unbanCustomer(db, request.params.id);
+        if (!result) {
+          return reply.status(404).send({ error: "Customer not found" });
+        }
+        request.auditContext = {
+          action: "customer.unban",
+          entityType: "customer",
+          entityId: request.params.id,
+          beforeJson: null,
+          afterJson: { status: "active" },
+        };
+        return result;
       },
     );
 

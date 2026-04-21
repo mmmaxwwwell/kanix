@@ -1,8 +1,9 @@
 import { eq, or, sql, desc, ilike } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { customer } from "../schema/customer.js";
+import { customer, customerAddress } from "../schema/customer.js";
 import { order } from "../schema/order.js";
 import { supportTicket } from "../schema/support.js";
+import { authEventLog } from "../schema/auth-event.js";
 
 // ---------------------------------------------------------------------------
 // List customers with search/filter
@@ -48,6 +49,7 @@ export async function listCustomers(
         ilike(customer.email, pattern),
         ilike(customer.firstName, pattern),
         ilike(customer.lastName, pattern),
+        sql`${customer.id} IN (SELECT ${order.customerId} FROM ${order} WHERE ${ilike(order.orderNumber, pattern)})`,
       ),
     );
   }
@@ -214,4 +216,77 @@ export async function getCustomerTickets(
     .from(supportTicket)
     .where(eq(supportTicket.customerId, customerId))
     .orderBy(desc(supportTicket.createdAt));
+}
+
+// ---------------------------------------------------------------------------
+// Customer addresses (admin view)
+// ---------------------------------------------------------------------------
+
+export async function getCustomerAddresses(
+  db: PostgresJsDatabase,
+  customerId: string,
+) {
+  return db
+    .select()
+    .from(customerAddress)
+    .where(eq(customerAddress.customerId, customerId))
+    .orderBy(customerAddress.createdAt);
+}
+
+// ---------------------------------------------------------------------------
+// Customer audit trail (auth events)
+// ---------------------------------------------------------------------------
+
+export async function getCustomerAuditTrail(
+  db: PostgresJsDatabase,
+  authSubject: string,
+) {
+  return db
+    .select()
+    .from(authEventLog)
+    .where(eq(authEventLog.actorId, authSubject))
+    .orderBy(desc(authEventLog.createdAt))
+    .limit(50);
+}
+
+// ---------------------------------------------------------------------------
+// Ban / unban customer
+// ---------------------------------------------------------------------------
+
+export async function banCustomer(
+  db: PostgresJsDatabase,
+  customerId: string,
+): Promise<{ id: string; status: string } | null> {
+  const [updated] = await db
+    .update(customer)
+    .set({ status: "banned", updatedAt: new Date() })
+    .where(eq(customer.id, customerId))
+    .returning({ id: customer.id, status: customer.status });
+  return updated ?? null;
+}
+
+export async function unbanCustomer(
+  db: PostgresJsDatabase,
+  customerId: string,
+): Promise<{ id: string; status: string } | null> {
+  const [updated] = await db
+    .update(customer)
+    .set({ status: "active", updatedAt: new Date() })
+    .where(eq(customer.id, customerId))
+    .returning({ id: customer.id, status: customer.status });
+  return updated ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// PII redaction for non-super_admin roles
+// ---------------------------------------------------------------------------
+
+export function redactCustomerPII<T extends Record<string, unknown>>(detail: T): T {
+  return {
+    ...detail,
+    email: "***@redacted",
+    phone: detail.phone ? "***-redacted" : null,
+    firstName: detail.firstName ? "***" : null,
+    lastName: detail.lastName ? "***" : null,
+  };
 }

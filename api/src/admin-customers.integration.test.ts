@@ -1,46 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "node:events";
-import { createServer, markReady, markNotReady } from "./server.js";
-import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
-import type { Config } from "./config.js";
+import type { DatabaseConnection } from "./db/connection.js";
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { adminUser, adminRole, adminUserRole, adminAuditLog } from "./db/schema/admin.js";
 import { order } from "./db/schema/order.js";
 import { supportTicket } from "./db/schema/support.js";
-import { customer } from "./db/schema/customer.js";
-import { ROLE_CAPABILITIES } from "./auth/admin.js";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
-
-const DATABASE_URL = requireDatabaseUrl();
-const SUPERTOKENS_URI = getSuperTokensUri();
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: "whsec_xxx",
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
+import { customer, customerAddress } from "./db/schema/customer.js";
+import { authEventLog } from "./db/schema/auth-event.js";
+import { ROLE_CAPABILITIES, CAPABILITIES } from "./auth/admin.js";
+import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
 
 async function signUpUser(address: string, email: string, password: string): Promise<string> {
   const res = await fetch(`${address}/auth/signup`, {
@@ -91,70 +59,109 @@ async function signInAndGetHeaders(
   return headers;
 }
 
-describe("admin customer detail APIs (T071b)", () => {
+describe("admin customer APIs (T224)", () => {
+  let ts_: TestServer;
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let adminHeaders: Record<string, string>;
-  let adminUsrId: string;
+
+  // Super-admin (has CUSTOMERS_PII)
+  let superAdminHeaders: Record<string, string>;
+  let superAdminUserId: string;
+  let superAdminRoleId: string;
+
+  // Operator admin (support role — has CUSTOMERS_READ but NOT CUSTOMERS_PII / CUSTOMERS_MANAGE)
+  let operatorHeaders: Record<string, string>;
+  let operatorAdminUserId: string;
+  let operatorRoleId: string;
 
   const ts = Date.now();
-  const adminEmail = `test-cust-admin-${ts}@kanix.dev`;
+  const superAdminEmail = `test-cust-super-${ts}@kanix.dev`;
+  const operatorEmail = `test-cust-operator-${ts}@kanix.dev`;
   const adminPassword = "AdminPassword123!";
 
-  let testRoleId: string;
   let testCustomerId: string;
   let testCustomer2Id: string;
+  let testCustomerAuthSubject: string;
   let testOrderId: string;
   let testOrder2Id: string;
   let testTicketId: string;
   let testTicket2Id: string;
+  let testAddressId: string;
+  let testAuthEventId: string;
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
+    ts_ = await createTestServer();
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+    address = ts_.address;
 
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-    });
-    address = await server.start();
-    markReady();
-    app = server.app;
+    // -- Create super_admin user --
+    const superAuthSubject = await signUpUser(address, superAdminEmail, adminPassword);
 
-    // Create admin user
-    const authSubject = await signUpUser(address, adminEmail, adminPassword);
-
-    const [role] = await dbConn.db
+    const [superRole] = await dbConn.db
       .insert(adminRole)
       .values({
         name: `test_cust_super_admin_${ts}`,
-        description: "Test customer admin",
+        description: "Test super admin for customer tests",
         capabilitiesJson: ROLE_CAPABILITIES.super_admin,
       })
       .returning();
-    testRoleId = role.id;
+    superAdminRoleId = superRole.id;
 
-    const [user] = await dbConn.db
+    const [superUser] = await dbConn.db
       .insert(adminUser)
       .values({
-        authSubject,
-        email: adminEmail,
-        name: "Test Customer Admin",
+        authSubject: superAuthSubject,
+        email: superAdminEmail,
+        name: "Super Admin",
         status: "active",
       })
       .returning();
-    adminUsrId = user.id;
+    superAdminUserId = superUser.id;
 
-    await dbConn.db.insert(adminUserRole).values({ adminUserId: user.id, adminRoleId: role.id });
-    adminHeaders = await signInAndGetHeaders(address, adminEmail, adminPassword);
+    await dbConn.db.insert(adminUserRole).values({
+      adminUserId: superUser.id,
+      adminRoleId: superRole.id,
+    });
+    superAdminHeaders = await signInAndGetHeaders(address, superAdminEmail, adminPassword);
 
-    // Seed test customer with orders and tickets
+    // -- Create operator (support role) user --
+    const operatorAuthSubject = await signUpUser(address, operatorEmail, adminPassword);
+
+    const [opRole] = await dbConn.db
+      .insert(adminRole)
+      .values({
+        name: `test_cust_support_${ts}`,
+        description: "Test support role for customer tests",
+        capabilitiesJson: ROLE_CAPABILITIES.support,
+      })
+      .returning();
+    operatorRoleId = opRole.id;
+
+    const [opUser] = await dbConn.db
+      .insert(adminUser)
+      .values({
+        authSubject: operatorAuthSubject,
+        email: operatorEmail,
+        name: "Operator User",
+        status: "active",
+      })
+      .returning();
+    operatorAdminUserId = opUser.id;
+
+    await dbConn.db.insert(adminUserRole).values({
+      adminUserId: opUser.id,
+      adminRoleId: opRole.id,
+    });
+    operatorHeaders = await signInAndGetHeaders(address, operatorEmail, adminPassword);
+
+    // -- Seed test customer 1 with orders, tickets, address, and auth events --
+    testCustomerAuthSubject = `cust-detail-test-${ts}`;
     const [cust1] = await dbConn.db
       .insert(customer)
       .values({
-        authSubject: `cust-detail-test-${ts}`,
+        authSubject: testCustomerAuthSubject,
         email: `cust-detail-${ts}@example.com`,
         firstName: "Alice",
         lastName: "TestCustomer",
@@ -233,74 +240,130 @@ describe("admin customer detail APIs (T071b)", () => {
       })
       .returning();
     testTicket2Id = tk2.id;
+
+    // Create address for customer 1
+    const [addr] = await dbConn.db
+      .insert(customerAddress)
+      .values({
+        customerId: testCustomerId,
+        type: "shipping",
+        fullName: "Alice TestCustomer",
+        line1: "123 Main St",
+        city: "Austin",
+        state: "TX",
+        postalCode: "78701",
+        country: "US",
+        isDefault: true,
+      })
+      .returning();
+    testAddressId = addr.id;
+
+    // Create auth event log entry for customer 1
+    const [evt] = await dbConn.db
+      .insert(authEventLog)
+      .values({
+        eventType: "login",
+        actorId: testCustomerAuthSubject,
+        ipAddress: "127.0.0.1",
+        userAgent: "test-agent",
+      })
+      .returning();
+    testAuthEventId = evt.id;
   }, 30000);
 
   afterAll(async () => {
-    markNotReady();
     if (dbConn) {
       try {
+        await dbConn.db.delete(authEventLog).where(eq(authEventLog.id, testAuthEventId));
+        await dbConn.db.delete(customerAddress).where(eq(customerAddress.id, testAddressId));
         await dbConn.db.delete(supportTicket).where(eq(supportTicket.id, testTicketId));
         await dbConn.db.delete(supportTicket).where(eq(supportTicket.id, testTicket2Id));
         await dbConn.db.delete(order).where(eq(order.id, testOrderId));
         await dbConn.db.delete(order).where(eq(order.id, testOrder2Id));
+        // Reset customer status in case ban test changed it
+        await dbConn.db.update(customer).set({ status: "active" }).where(eq(customer.id, testCustomerId));
         await dbConn.db.delete(customer).where(eq(customer.id, testCustomerId));
         await dbConn.db.delete(customer).where(eq(customer.id, testCustomer2Id));
-        await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, adminUsrId));
-        await dbConn.db.delete(adminAuditLog).where(eq(adminAuditLog.actorAdminUserId, adminUsrId));
-        await dbConn.db.delete(adminUser).where(eq(adminUser.id, adminUsrId));
-        await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));
+        await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, superAdminUserId));
+        await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, operatorAdminUserId));
+        await dbConn.db.delete(adminAuditLog).where(eq(adminAuditLog.actorAdminUserId, superAdminUserId));
+        await dbConn.db.delete(adminAuditLog).where(eq(adminAuditLog.actorAdminUserId, operatorAdminUserId));
+        await dbConn.db.delete(adminUser).where(eq(adminUser.id, superAdminUserId));
+        await dbConn.db.delete(adminUser).where(eq(adminUser.id, operatorAdminUserId));
+        await dbConn.db.delete(adminRole).where(eq(adminRole.id, superAdminRoleId));
+        await dbConn.db.delete(adminRole).where(eq(adminRole.id, operatorRoleId));
       } catch {
         // Best-effort cleanup
       }
-      await dbConn.close();
     }
-    if (app) {
-      await app.close();
-    }
+    await stopTestServer(ts_);
   }, 15000);
 
-  // ---- GET /api/admin/customers ----
+  // ===================================================================
+  // GET /api/admin/customers — list + search
+  // ===================================================================
 
-  it("lists customers", async () => {
+  it("lists customers with concrete field assertions", async () => {
     const res = await fetch(`${address}/api/admin/customers`, {
-      headers: adminHeaders,
+      headers: superAdminHeaders,
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { customers: Array<Record<string, unknown>>; total: number };
 
-    expect(body).toHaveProperty("customers");
-    expect(body).toHaveProperty("total");
-    expect(Array.isArray(body.customers)).toBe(true);
     expect(body.total).toBeGreaterThanOrEqual(2);
+    expect(body.customers.length).toBeGreaterThanOrEqual(2);
+
+    const alice = body.customers.find((c) => c.id === testCustomerId);
+    expect(alice).toBeDefined();
+    expect(alice!.email).toBe(`cust-detail-${ts}@example.com`);
+    expect(alice!.firstName).toBe("Alice");
+    expect(alice!.lastName).toBe("TestCustomer");
+    expect(alice!.status).toBe("active");
+    expect(alice!.createdAt).toBeTruthy();
   });
 
   it("searches customers by name", async () => {
     const res = await fetch(`${address}/api/admin/customers?search=Alice`, {
-      headers: adminHeaders,
+      headers: superAdminHeaders,
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { customers: Array<Record<string, unknown>>; total: number };
 
     expect(body.total).toBeGreaterThanOrEqual(1);
-    const found = body.customers.find((c) => c.firstName === "Alice");
+    const found = body.customers.find((c) => c.id === testCustomerId);
     expect(found).toBeDefined();
+    expect(found!.firstName).toBe("Alice");
   });
 
   it("searches customers by email", async () => {
     const res = await fetch(`${address}/api/admin/customers?search=bob-detail-${ts}`, {
-      headers: adminHeaders,
+      headers: superAdminHeaders,
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { customers: Array<Record<string, unknown>>; total: number };
 
     expect(body.total).toBeGreaterThanOrEqual(1);
-    const found = body.customers.find((c) => c.firstName === "Bob");
+    const found = body.customers.find((c) => c.id === testCustomer2Id);
     expect(found).toBeDefined();
+    expect(found!.firstName).toBe("Bob");
+  });
+
+  it("searches customers by order number", async () => {
+    const res = await fetch(`${address}/api/admin/customers?search=CUST-ORD-1-${ts}`, {
+      headers: superAdminHeaders,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { customers: Array<Record<string, unknown>>; total: number };
+
+    expect(body.total).toBeGreaterThanOrEqual(1);
+    const found = body.customers.find((c) => c.id === testCustomerId);
+    expect(found).toBeDefined();
+    expect(found!.firstName).toBe("Alice");
   });
 
   it("filters customers by status", async () => {
     const res = await fetch(`${address}/api/admin/customers?status=active`, {
-      headers: adminHeaders,
+      headers: superAdminHeaders,
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { customers: Array<Record<string, unknown>>; total: number };
@@ -318,11 +381,13 @@ describe("admin customer detail APIs (T071b)", () => {
     expect(res.status).toBe(401);
   });
 
-  // ---- GET /api/admin/customers/:id ----
+  // ===================================================================
+  // GET /api/admin/customers/:id — detail
+  // ===================================================================
 
-  it("returns customer detail with stats", async () => {
+  it("returns customer detail with stats for super_admin (full PII)", async () => {
     const res = await fetch(`${address}/api/admin/customers/${testCustomerId}`, {
-      headers: adminHeaders,
+      headers: superAdminHeaders,
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
@@ -331,70 +396,257 @@ describe("admin customer detail APIs (T071b)", () => {
     expect(body.email).toBe(`cust-detail-${ts}@example.com`);
     expect(body.firstName).toBe("Alice");
     expect(body.lastName).toBe("TestCustomer");
-    expect(body).toHaveProperty("stats");
+    expect(body.phone).toBe("+15551234567");
+    expect(body.status).toBe("active");
 
     const stats = body.stats as Record<string, number>;
     expect(stats.totalOrders).toBe(2);
     expect(stats.totalSpentMinor).toBe(2999 + 4999);
-    expect(stats.openTickets).toBe(1); // only the "open" one, not the "resolved" one
+    expect(stats.openTickets).toBe(1);
   });
 
   it("returns 404 for non-existent customer", async () => {
     const res = await fetch(`${address}/api/admin/customers/00000000-0000-0000-0000-000000000000`, {
-      headers: adminHeaders,
+      headers: superAdminHeaders,
     });
     expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Customer not found");
   });
 
-  // ---- GET /api/admin/customers/:id/orders ----
+  // ===================================================================
+  // PII redaction for operator (non-super_admin)
+  // ===================================================================
 
-  it("returns customer orders", async () => {
+  it("redacts PII for operator (support role) on customer detail", async () => {
+    const res = await fetch(`${address}/api/admin/customers/${testCustomerId}`, {
+      headers: operatorHeaders,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body.id).toBe(testCustomerId);
+    // PII fields should be redacted
+    expect(body.email).toBe("***@redacted");
+    expect(body.firstName).toBe("***");
+    expect(body.lastName).toBe("***");
+    expect(body.phone).toBe("***-redacted");
+
+    // Non-PII fields should still be present
+    expect(body.status).toBe("active");
+    const stats = body.stats as Record<string, number>;
+    expect(stats.totalOrders).toBe(2);
+  });
+
+  it("redacts PII for operator on customer list", async () => {
+    const res = await fetch(`${address}/api/admin/customers`, {
+      headers: operatorHeaders,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { customers: Array<Record<string, unknown>>; total: number };
+
+    const alice = body.customers.find((c) => c.id === testCustomerId);
+    expect(alice).toBeDefined();
+    expect(alice!.email).toBe("***@redacted");
+    expect(alice!.firstName).toBe("***");
+    expect(alice!.lastName).toBe("***");
+  });
+
+  // ===================================================================
+  // GET /api/admin/customers/:id/orders
+  // ===================================================================
+
+  it("returns customer orders with concrete field assertions", async () => {
     const res = await fetch(`${address}/api/admin/customers/${testCustomerId}/orders`, {
-      headers: adminHeaders,
+      headers: superAdminHeaders,
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { orders: Array<Record<string, unknown>> };
 
-    expect(body).toHaveProperty("orders");
-    expect(Array.isArray(body.orders)).toBe(true);
     expect(body.orders.length).toBe(2);
 
-    const orderNumbers = body.orders.map((o) => o.orderNumber);
-    expect(orderNumbers).toContain(`CUST-ORD-1-${ts}`);
-    expect(orderNumbers).toContain(`CUST-ORD-2-${ts}`);
+    const ord1 = body.orders.find((o) => o.orderNumber === `CUST-ORD-1-${ts}`);
+    expect(ord1).toBeDefined();
+    expect(ord1!.status).toBe("confirmed");
+    expect(ord1!.fulfillmentStatus).toBe("unfulfilled");
+    expect(ord1!.totalMinor).toBe(2999);
+
+    const ord2 = body.orders.find((o) => o.orderNumber === `CUST-ORD-2-${ts}`);
+    expect(ord2).toBeDefined();
+    expect(ord2!.status).toBe("completed");
+    expect(ord2!.fulfillmentStatus).toBe("fulfilled");
+    expect(ord2!.totalMinor).toBe(4999);
   });
 
   it("returns 404 for orders of non-existent customer", async () => {
     const res = await fetch(
       `${address}/api/admin/customers/00000000-0000-0000-0000-000000000000/orders`,
-      { headers: adminHeaders },
+      { headers: superAdminHeaders },
     );
     expect(res.status).toBe(404);
   });
 
-  // ---- GET /api/admin/customers/:id/tickets ----
+  // ===================================================================
+  // GET /api/admin/customers/:id/tickets
+  // ===================================================================
 
-  it("returns customer tickets", async () => {
+  it("returns customer tickets with concrete field assertions", async () => {
     const res = await fetch(`${address}/api/admin/customers/${testCustomerId}/tickets`, {
-      headers: adminHeaders,
+      headers: superAdminHeaders,
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { tickets: Array<Record<string, unknown>> };
 
-    expect(body).toHaveProperty("tickets");
-    expect(Array.isArray(body.tickets)).toBe(true);
     expect(body.tickets.length).toBe(2);
 
-    const ticketNumbers = body.tickets.map((t) => t.ticketNumber);
-    expect(ticketNumbers).toContain(`CUST-TK-1-${ts}`);
-    expect(ticketNumbers).toContain(`CUST-TK-2-${ts}`);
+    const tk1 = body.tickets.find((t) => t.ticketNumber === `CUST-TK-1-${ts}`);
+    expect(tk1).toBeDefined();
+    expect(tk1!.subject).toBe("Need help with order");
+    expect(tk1!.category).toBe("order_issue");
+    expect(tk1!.priority).toBe("normal");
+    expect(tk1!.status).toBe("open");
+
+    const tk2 = body.tickets.find((t) => t.ticketNumber === `CUST-TK-2-${ts}`);
+    expect(tk2).toBeDefined();
+    expect(tk2!.subject).toBe("General question");
+    expect(tk2!.category).toBe("general");
+    expect(tk2!.status).toBe("resolved");
   });
 
   it("returns 404 for tickets of non-existent customer", async () => {
     const res = await fetch(
       `${address}/api/admin/customers/00000000-0000-0000-0000-000000000000/tickets`,
-      { headers: adminHeaders },
+      { headers: superAdminHeaders },
     );
     expect(res.status).toBe(404);
+  });
+
+  // ===================================================================
+  // GET /api/admin/customers/:id/addresses
+  // ===================================================================
+
+  it("returns customer addresses with concrete field assertions", async () => {
+    const res = await fetch(`${address}/api/admin/customers/${testCustomerId}/addresses`, {
+      headers: superAdminHeaders,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { addresses: Array<Record<string, unknown>> };
+
+    expect(body.addresses.length).toBeGreaterThanOrEqual(1);
+    const addr = body.addresses.find((a) => a.id === testAddressId);
+    expect(addr).toBeDefined();
+    expect(addr!.fullName).toBe("Alice TestCustomer");
+    expect(addr!.line1).toBe("123 Main St");
+    expect(addr!.city).toBe("Austin");
+    expect(addr!.state).toBe("TX");
+    expect(addr!.postalCode).toBe("78701");
+    expect(addr!.country).toBe("US");
+    expect(addr!.isDefault).toBe(true);
+  });
+
+  it("returns 404 for addresses of non-existent customer", async () => {
+    const res = await fetch(
+      `${address}/api/admin/customers/00000000-0000-0000-0000-000000000000/addresses`,
+      { headers: superAdminHeaders },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  // ===================================================================
+  // GET /api/admin/customers/:id/audit-trail
+  // ===================================================================
+
+  it("returns customer audit trail with auth events", async () => {
+    const res = await fetch(`${address}/api/admin/customers/${testCustomerId}/audit-trail`, {
+      headers: superAdminHeaders,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { events: Array<Record<string, unknown>> };
+
+    expect(body.events.length).toBeGreaterThanOrEqual(1);
+    const loginEvent = body.events.find((e) => e.id === testAuthEventId);
+    expect(loginEvent).toBeDefined();
+    expect(loginEvent!.eventType).toBe("login");
+    expect(loginEvent!.actorId).toBe(testCustomerAuthSubject);
+    expect(loginEvent!.ipAddress).toBe("127.0.0.1");
+    expect(loginEvent!.userAgent).toBe("test-agent");
+  });
+
+  it("returns 404 for audit trail of non-existent customer", async () => {
+    const res = await fetch(
+      `${address}/api/admin/customers/00000000-0000-0000-0000-000000000000/audit-trail`,
+      { headers: superAdminHeaders },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  // ===================================================================
+  // POST /api/admin/customers/:id/ban + /unban
+  // ===================================================================
+
+  it("bans a customer (super_admin)", async () => {
+    const res = await fetch(`${address}/api/admin/customers/${testCustomerId}/ban`, {
+      method: "POST",
+      headers: superAdminHeaders,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: string; status: string };
+    expect(body.id).toBe(testCustomerId);
+    expect(body.status).toBe("banned");
+
+    // Verify the customer is actually banned in the detail endpoint
+    const detailRes = await fetch(`${address}/api/admin/customers/${testCustomerId}`, {
+      headers: superAdminHeaders,
+    });
+    expect(detailRes.status).toBe(200);
+    const detail = (await detailRes.json()) as Record<string, unknown>;
+    expect(detail.status).toBe("banned");
+  });
+
+  it("unbans a customer (super_admin)", async () => {
+    const res = await fetch(`${address}/api/admin/customers/${testCustomerId}/unban`, {
+      method: "POST",
+      headers: superAdminHeaders,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: string; status: string };
+    expect(body.id).toBe(testCustomerId);
+    expect(body.status).toBe("active");
+
+    // Verify restoration
+    const detailRes = await fetch(`${address}/api/admin/customers/${testCustomerId}`, {
+      headers: superAdminHeaders,
+    });
+    expect(detailRes.status).toBe(200);
+    const detail = (await detailRes.json()) as Record<string, unknown>;
+    expect(detail.status).toBe("active");
+  });
+
+  it("returns 404 when banning non-existent customer", async () => {
+    const res = await fetch(
+      `${address}/api/admin/customers/00000000-0000-0000-0000-000000000000/ban`,
+      { method: "POST", headers: superAdminHeaders },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects ban from operator (missing CUSTOMERS_MANAGE)", async () => {
+    const res = await fetch(`${address}/api/admin/customers/${testCustomerId}/ban`, {
+      method: "POST",
+      headers: operatorHeaders,
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("ERR_INSUFFICIENT_PERMISSIONS");
+  });
+
+  it("rejects unban from operator (missing CUSTOMERS_MANAGE)", async () => {
+    const res = await fetch(`${address}/api/admin/customers/${testCustomerId}/unban`, {
+      method: "POST",
+      headers: operatorHeaders,
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("ERR_INSUFFICIENT_PERMISSIONS");
   });
 });

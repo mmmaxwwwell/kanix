@@ -166,3 +166,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T223 — Harden reservation-expiry-race.integration.test.ts
 - The old test had its own inline `testConfig`/`createFakeProcess` boilerplate but properly set `STRIPE_WEBHOOK_SECRET` to match the test's HMAC secret. When migrating to `createTestServer`, pass the custom secret via `configOverrides: { STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET }` — otherwise signature verification fails because the default is `"whsec_xxx"`.
 - `consumeReservation` decrements both `on_hand` and `reserved` — after re-reserve + consume the balance math is: onHand-=qty, reserved-=qty, available stays at onHand-reserved. Verify all three fields, not just `available`.
+
+## T224 — Harden admin-customers.integration.test.ts
+- The existing admin customer endpoints had no capability gating — added `CUSTOMERS_READ`, `CUSTOMERS_MANAGE`, and `CUSTOMERS_PII` capabilities. `super_admin` gets all (via `Object.values(CAPABILITIES)`); `support` role gets `CUSTOMERS_READ` only. PII redaction is driven by checking `CUSTOMERS_PII` in the route handler, not middleware.
+- Search by order number uses a subquery `customer.id IN (SELECT order.customerId FROM order WHERE ilike(order.orderNumber, pattern))` — this joins via the `or()` alongside email/name search without duplicating customer rows.
+- The audit trail endpoint looks up the customer's `authSubject` from the customer table, then queries `auth_event_log` by `actorId` — the auth events use SuperTokens user IDs, not customer table UUIDs.

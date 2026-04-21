@@ -495,7 +495,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 
 ### Admin (admin tooling over the product + order domain)
 
-- [ ] T224 Harden `admin-customers.integration.test.ts` — admin customer lookup + actions
+- [x] T224 Harden `admin-customers.integration.test.ts` — admin customer lookup + actions
   Done when: admin can search customers by email/name/order ID; customer detail view shows orders + addresses + audit trail; ban/unban customer endpoint verified; PII access gated by role (super_admin only for full PII, operator sees redacted).
 
 - [ ] T225 Harden `admin-dashboard.integration.test.ts` — admin dashboard aggregates

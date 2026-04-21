@@ -189,6 +189,11 @@ export const CAPABILITIES = {
   CONTRIBUTORS_READ: "contributors.read",
   CONTRIBUTORS_MANAGE: "contributors.manage",
 
+  // Customers
+  CUSTOMERS_READ: "customers.read",
+  CUSTOMERS_MANAGE: "customers.manage",
+  CUSTOMERS_PII: "customers.pii",
+
   // Admin management
   ADMIN_USERS_READ: "admin.users.read",
   ADMIN_USERS_MANAGE: "admin.users.manage",
@@ -212,6 +217,7 @@ export const ROLE_CAPABILITIES: Record<string, string[]> = {
     CAPABILITIES.DISPUTES_MANAGE,
     CAPABILITIES.PRODUCTS_READ,
     CAPABILITIES.INVENTORY_READ,
+    CAPABILITIES.CUSTOMERS_READ,
   ],
 
   fulfillment: [
