@@ -16,7 +16,15 @@
   outputs = { self, nixpkgs, flake-utils, nix-mcp-debugkit, scad, site, api, admin, customer, deploy }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = import nixpkgs {
+          inherit system;
+          config.android_sdk.accept_license = true;
+          # Android SDK components (emulator, system-images, platform-tools,
+          # build-tools, etc.) are published under Google's unfree license
+          # and each uses its own package name. Rather than enumerate dozens
+          # of per-version derivation names, allow unfree for this flake.
+          config.allowUnfree = true;
+        };
         scadShell = scad.devShells.${system}.default;
         siteShell = site.devShells.${system}.default;
         apiShell = api.devShells.${system}.default;
@@ -26,6 +34,251 @@
 
         mcp-android = nix-mcp-debugkit.packages.${system}.mcp-android;
         mcp-browser = nix-mcp-debugkit.packages.${system}.mcp-browser;
+
+        # Android emulator SDK for E2E tests (Linux only)
+        # Flutter 3.41.6 requires compileSdk=36, build-tools 35, NDK 28.2.13676358.
+        # Include all versions so Gradle never needs to auto-install (which fails
+        # on NixOS because downloaded binaries have /lib64 as ELF interpreter).
+        androidEmulatorSdk = (pkgs.androidenv.composeAndroidPackages {
+          platformVersions = [ "34" "35" "36" ];
+          buildToolsVersions = [ "34.0.0" "35.0.0" ];
+          cmakeVersions = [ "3.22.1" ];
+          includeEmulator = true;
+          includeSystemImages = true;
+          systemImageTypes = [ "google_apis" ];
+          abiVersions = [ "x86_64" ];
+          includeNDK = true;
+          ndkVersions = [ "28.2.13676358" ];
+          includeSources = false;
+        }).androidsdk;
+
+        androidHome = "${androidEmulatorSdk}/libexec/android-sdk";
+
+        # Wrapper for the `emulator` binary that always sets
+        # ANDROID_USER_HOME / ANDROID_AVD_HOME to the project-local AVD
+        # directory.  Inside bwrap sandboxes $HOME is tmpfs, so the
+        # default ~/.android/avd/ is empty.  Without this wrapper,
+        # `emulator -list-avds` returns nothing and the runner concludes
+        # the runtime is not booted.
+        emulator-wrapper = pkgs.writeShellScriptBin "emulator" ''
+          export ANDROID_USER_HOME="''${ANDROID_USER_HOME:-$PWD/.dev/android-user-home}"
+          export ANDROID_AVD_HOME="''${ANDROID_AVD_HOME:-$ANDROID_USER_HOME/avd}"
+          # Also create $HOME/.android/avd symlink so the raw SDK emulator
+          # (which may be called directly by the runner, bypassing this
+          # wrapper) can discover AVDs even inside bwrap sandboxes where
+          # $HOME is tmpfs and ~/.android/avd/ is empty.
+          if [ -d "$ANDROID_AVD_HOME" ] && [ -w "''${HOME:-/tmp}" ]; then
+            mkdir -p "''${HOME}/.android" 2>/dev/null || true
+            ln -sfn "$ANDROID_AVD_HOME" "''${HOME}/.android/avd" 2>/dev/null || true
+          fi
+          exec "${androidHome}/emulator/emulator" "$@"
+        '';
+
+        start-emulator = pkgs.writeShellScriptBin "start-emulator" ''
+          set -euo pipefail
+
+          export ANDROID_HOME="${androidHome}"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+
+          # Set project-local AVD dir early — before any emulator or adb
+          # commands — so that `emulator -list-avds` (and the idempotency
+          # check) can find the AVD inside bwrap sandboxes where $HOME is
+          # tmpfs and ~/.android/avd/ is empty.
+          export ANDROID_USER_HOME="''${ANDROID_USER_HOME:-$PWD/.dev/android-user-home}"
+          export ANDROID_AVD_HOME="''${ANDROID_AVD_HOME:-$ANDROID_USER_HOME/avd}"
+          mkdir -p "$ANDROID_AVD_HOME"
+
+          # Ensure $HOME/.android/avd symlink exists so any process that
+          # calls the raw SDK emulator (bypassing the wrapper) can find AVDs.
+          # Critical inside bwrap sandboxes where $HOME is tmpfs.
+          if [ -w "''${HOME:-/tmp}" ]; then
+            mkdir -p "''${HOME}/.android" 2>/dev/null || true
+            ln -sfn "$ANDROID_AVD_HOME" "''${HOME}/.android/avd" 2>/dev/null || true
+          fi
+
+          AVD_NAME="kanix-e2e"
+          BOOT_TIMEOUT=120
+          ACTION="start"
+          WIPE_DATA=false
+
+          for arg in "$@"; do
+            case "$arg" in
+              --no-wait) ACTION="start-no-wait" ;;
+              --kill)    ACTION="kill" ;;
+              --wipe-data) WIPE_DATA=true ;;
+              --help|-h)
+                echo "Usage: start-emulator [--no-wait] [--kill] [--wipe-data] [--help]"
+                exit 0
+                ;;
+              *) echo "Unknown argument: $arg" >&2; exit 1 ;;
+            esac
+          done
+
+          kill_emulator() {
+            echo "Killing emulator..."
+            adb -s emulator-5554 emu kill 2>/dev/null || true
+            for i in $(seq 1 10); do
+              if ! adb devices 2>/dev/null | grep -q "emulator-5554"; then
+                echo "Emulator stopped."
+                return 0
+              fi
+              sleep 1
+            done
+            echo "Warning: emulator may still be running" >&2
+            return 1
+          }
+
+          if [ "$ACTION" = "kill" ]; then
+            kill_emulator
+            exit $?
+          fi
+
+          # Idempotency: if an emulator is already running and fully booted, reuse it.
+          if adb devices 2>/dev/null | grep -q "emulator-5554.*device"; then
+            BOOT_PROP=$(adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null || echo "")
+            BOOT_PROP=$(echo "$BOOT_PROP" | tr -d '[:space:]')
+            if [ "$BOOT_PROP" = "1" ]; then
+              echo "Emulator already running and booted on emulator-5554."
+              exit 0
+            fi
+          fi
+
+          AVD_DIR="$ANDROID_AVD_HOME"
+
+          if [ ! -d "$AVD_DIR/$AVD_NAME.avd" ]; then
+            echo "Creating AVD: $AVD_NAME (API 34, x86_64, 2GB RAM)"
+            SYS_IMG="$ANDROID_HOME/system-images/android-34/google_apis/x86_64"
+            if [ ! -d "$SYS_IMG" ]; then
+              echo "ERROR: System image not found at $SYS_IMG" >&2
+              find "$ANDROID_HOME/system-images" -maxdepth 3 -type d 2>/dev/null || true
+              exit 1
+            fi
+
+            echo "no" | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd \
+              --name "$AVD_NAME" \
+              --package "system-images;android-34;google_apis;x86_64" \
+              --device "pixel_6" \
+              --force 2>&1 || {
+                echo "avdmanager failed, creating AVD manually..."
+                mkdir -p "$AVD_DIR/$AVD_NAME.avd"
+                cat > "$AVD_DIR/$AVD_NAME.ini" <<AVDINI
+          avd.ini.encoding=UTF-8
+          path=$AVD_DIR/$AVD_NAME.avd
+          path.rel=avd/$AVD_NAME.avd
+          target=android-34
+          AVDINI
+                cat > "$AVD_DIR/$AVD_NAME.avd/config.ini" <<CFGINI
+          AvdId=$AVD_NAME
+          PlayStore.enabled=false
+          abi.type=x86_64
+          avd.ini.displayname=$AVD_NAME
+          avd.ini.encoding=UTF-8
+          disk.dataPartition.size=2048M
+          hw.accelerator.isAccelerated=yes
+          hw.cpu.arch=x86_64
+          hw.cpu.ncore=2
+          hw.gpu.enabled=yes
+          hw.gpu.mode=swiftshader_indirect
+          hw.keyboard=yes
+          hw.lcd.density=420
+          hw.lcd.height=2400
+          hw.lcd.width=1080
+          hw.ramSize=2048
+          hw.sdCard.status=absent
+          image.sysdir.1=$SYS_IMG/
+          showDeviceFrame=no
+          skin.dynamic=yes
+          tag.display=Google APIs
+          tag.id=google_apis
+          vm.heapSize=576
+          CFGINI
+              }
+            echo "AVD created: $AVD_NAME"
+          else
+            echo "AVD already exists: $AVD_NAME"
+          fi
+
+          if [ -w /dev/kvm ]; then
+            echo "KVM: available"
+            KVM_FLAG="-accel on"
+          else
+            echo "Warning: /dev/kvm not accessible, emulator will be slow" >&2
+            KVM_FLAG="-accel off"
+            BOOT_TIMEOUT=600
+          fi
+
+          WIPE_FLAG=""
+          if [ "$WIPE_DATA" = "true" ]; then
+            WIPE_FLAG="-wipe-data"
+          fi
+
+          echo "Starting emulator: $AVD_NAME"
+          emulator @"$AVD_NAME" \
+            -no-window -no-audio -no-boot-anim \
+            -gpu swiftshader_indirect \
+            $KVM_FLAG -memory 2048 -no-snapshot \
+            $WIPE_FLAG -verbose \
+            &>"''${TMPDIR:-/tmp}/emulator-$AVD_NAME.log" &
+          EMU_PID=$!
+          echo "Emulator PID: $EMU_PID"
+          echo "Log: ''${TMPDIR:-/tmp}/emulator-$AVD_NAME.log"
+
+          if [ "$ACTION" = "start-no-wait" ]; then
+            echo "Emulator started (not waiting for boot)."
+            exit 0
+          fi
+
+          echo "Waiting for emulator boot (timeout: ''${BOOT_TIMEOUT}s)..."
+          ELAPSED=0
+          INTERVAL=5
+          DEVICE_READY=false
+
+          while [ "$ELAPSED" -lt "$BOOT_TIMEOUT" ]; do
+            if ! kill -0 "$EMU_PID" 2>/dev/null; then
+              echo "ERROR: Emulator process died. Check log:" >&2
+              tail -20 "''${TMPDIR:-/tmp}/emulator-$AVD_NAME.log" >&2
+              exit 1
+            fi
+            if adb devices 2>/dev/null | grep -q "emulator-5554.*device"; then
+              DEVICE_READY=true
+              break
+            fi
+            sleep "$INTERVAL"
+            ELAPSED=$((ELAPSED + INTERVAL))
+            echo "  Waiting for adb device... (''${ELAPSED}s)"
+          done
+
+          if [ "$DEVICE_READY" = "false" ]; then
+            echo "ERROR: Emulator device did not appear within ''${BOOT_TIMEOUT}s" >&2
+            kill "$EMU_PID" 2>/dev/null || true
+            tail -20 "''${TMPDIR:-/tmp}/emulator-$AVD_NAME.log" >&2
+            exit 1
+          fi
+
+          echo "ADB device connected. Waiting for boot_completed..."
+          while [ "$ELAPSED" -lt "$BOOT_TIMEOUT" ]; do
+            if ! kill -0 "$EMU_PID" 2>/dev/null; then
+              echo "ERROR: Emulator process died during boot." >&2
+              tail -20 "''${TMPDIR:-/tmp}/emulator-$AVD_NAME.log" >&2
+              exit 1
+            fi
+            BOOT_PROP=$(adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null || echo "")
+            BOOT_PROP=$(echo "$BOOT_PROP" | tr -d '[:space:]')
+            if [ "$BOOT_PROP" = "1" ]; then
+              echo "Emulator booted successfully in ''${ELAPSED}s."
+              exit 0
+            fi
+            sleep "$INTERVAL"
+            ELAPSED=$((ELAPSED + INTERVAL))
+            echo "  Waiting for boot_completed... (''${ELAPSED}s)"
+          done
+
+          echo "ERROR: Emulator did not finish booting within ''${BOOT_TIMEOUT}s" >&2
+          tail -20 "''${TMPDIR:-/tmp}/emulator-$AVD_NAME.log" >&2
+          kill "$EMU_PID" 2>/dev/null || true
+          exit 1
+        '';
 
         mcp-android-config = pkgs.writeTextFile {
           name = "mcp-android-config";
@@ -51,7 +304,8 @@
       in
       {
         packages = {
-          inherit mcp-android mcp-browser mcp-android-config mcp-browser-config;
+          inherit mcp-android mcp-browser mcp-android-config mcp-browser-config
+                  start-emulator emulator-wrapper;
         };
 
         devShells.default = pkgs.mkShell {
@@ -81,11 +335,54 @@
 
             # Stripe CLI — for local webhook forwarding during dev + E2E tests
             stripe-cli
+
+            # Process/port inspection — used by test/e2e/setup.sh to find and
+            # kill stale services bound to known ports.
+            lsof
+
+            # Android emulator for E2E tests — emulator-wrapper must come
+            # before android-tools so that `emulator` resolves to our
+            # wrapper (which sets ANDROID_USER_HOME) rather than the bare
+            # SDK binary that can't find AVDs inside bwrap sandboxes.
+            emulator-wrapper
+            android-tools
+            start-emulator
+
+            # MCP debug servers — on PATH so .mcp.json can invoke them
+            # directly without `nix run` (which needs nix-store write access
+            # that bwrap sandboxes don't provide).
+            mcp-android
+            mcp-browser
           ];
 
           inputsFrom = [ scadShell siteShell apiShell adminShell customerShell deployShell ];
           OPENSCADPATH = "${scad.packages.${system}.bosl2}";
           LIQUIBASE_CLASSPATH = "${pkgs.postgresql_jdbc}/share/java/postgresql-jdbc.jar";
+          ANDROID_HOME = androidHome;
+          ANDROID_SDK_ROOT = androidHome;
+          # Keep AVD data inside the project tree so it's visible inside
+          # bwrap sandboxes (which mount --tmpfs $HOME, hiding ~/.android).
+          ANDROID_USER_HOME = ".dev/android-user-home";
+          ANDROID_AVD_HOME = ".dev/android-user-home/avd";
+
+          shellHook = ''
+            # Do NOT prepend ${androidHome}/emulator to PATH here — it would
+            # shadow the emulator-wrapper (listed in packages above) which sets
+            # ANDROID_USER_HOME so that `emulator -list-avds` can find AVDs
+            # inside bwrap sandboxes.  platform-tools (adb) is already provided
+            # by the android-tools package.
+            export ANDROID_USER_HOME="$PWD/.dev/android-user-home"
+            export ANDROID_AVD_HOME="$PWD/.dev/android-user-home/avd"
+            # Disambiguate the Android build root for E2E tests — this repo has
+            # two Flutter apps (admin, customer) and the runner's build-detect
+            # phase fails with ambiguous_build_root without this hint.  The
+            # .mcp.json env block sets the same value for the MCP server process,
+            # but the runner reads its own shell env, not .mcp.json.
+            export ANDROID_BUILD_ROOT="''${ANDROID_BUILD_ROOT:-customer}"
+            # Symlink so raw SDK emulator can also discover AVDs.
+            mkdir -p "$HOME/.android" 2>/dev/null || true
+            ln -sfn "$ANDROID_AVD_HOME" "$HOME/.android/avd" 2>/dev/null || true
+          '';
         };
       }
     );
