@@ -1,2 +1,31 @@
 - attempt 1: service=Astro site port=4321 patterns=port-timeout-but-service-ready at=2026-04-17T23:09:39
 - attempt 2: service=? port=? patterns=service-crash-on-boot at=2026-04-17T23:16:39
+- attempt 1: service=API server port=3000 patterns=service-crash-on-boot,config-validation-missing-required at=2026-04-19T20:09:39
+- attempt 1: service=API server port=3000 patterns=port-timeout-but-service-ready at=2026-04-19T23:01:31
+- attempt 2: service=API server port=3000 patterns=port-timeout-but-service-ready at=2026-04-19T23:11:45
+- attempt 1: service=API server port=3000 patterns=port-timeout-but-service-ready at=2026-04-19T23:57:34
+- attempt 2: service=API server port=3000 patterns=port-timeout-but-service-ready at=2026-04-20T00:02:06
+- attempt 3: service=API server port=3000 patterns=port-timeout-but-service-ready at=2026-04-20T00:06:35
+- attempt 4: service=API server port=3000 patterns=port-timeout-but-service-ready at=2026-04-20T00:13:04
+- attempt 1: service=? port=? patterns=none at=2026-04-20T00:17:32
+- attempt 1: service=? port=? patterns=none at=2026-04-20T00:20:38
+- attempt 1: service=? port=? patterns=none at=2026-04-20T00:32:55
+- attempt 1: service=? port=? patterns=none at=2026-04-20T00:48:02
+- attempt 1: service=? port=? patterns=none at=2026-04-20T01:04:22
+- attempt 1: service=? port=? patterns=none at=2026-04-20T05:03:00 fix=added idempotency check to start-emulator in flake.nix to detect already-running emulator-5554 and skip starting a duplicate; killed extra emulator-5556 spawned by prior attempts
+- attempt 1: service=? port=? patterns=none at=2026-04-20T01:14:28
+- attempt 1: service=? port=? patterns=none at=2026-04-20T01:21:29
+- attempt 1: service=? port=? patterns=none at=2026-04-20T01:43:33
+- attempt 1: service=? port=? patterns=none at=2026-04-20T01:52:06
+- attempt 1: service=? port=? patterns=none at=2026-04-20T02:19:05
+- attempt 2: service=? port=? patterns=none at=2026-04-20T02:36:04
+- attempt 3: service=? port=? patterns=none at=2026-04-20T03:03:37
+- attempt 4: service=? port=? patterns=none at=2026-04-20T03:04:16
+- attempt 5: service=? port=? patterns=none at=2026-04-20T03:04:48
+- attempt 1: service=? port=? patterns=none at=2026-04-20T03:22:24
+- attempt 2: service=? port=? patterns=none at=2026-04-20T03:39:34
+- attempt 3: service=? port=? patterns=none at=2026-04-20T03:43:56
+- attempt 4: service=? port=? patterns=none at=2026-04-20T13:42:34
+- attempt 5: service=? port=? patterns=none at=2026-04-20T13:49:35
+- attempt 6: service=? port=? patterns=service-crash-on-boot at=2026-04-20T14:52:09
+- attempt 1: service=? port=? patterns=none at=2026-04-20T18:33:32

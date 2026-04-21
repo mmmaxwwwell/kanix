@@ -1,9 +1,24 @@
-=== timed out after 300s ===
+=== exit code: -2 ===
 === stdout ===
 [e2e-setup] Checking for orphan processes on known ports...
+[e2e-setup]   Killing orphan process(es) on port 5432: 124360
+124384
+124429
+124436
+124437
+124438
+124439
+124440
+124442
+124446
+124451
+124452
+[e2e-setup]   Killing orphan process(es) on port 3000: 124663
+[e2e-setup]   Killing orphan process(es) on port 4321: 124756
 [e2e-setup] Cleaning stale sockets...
 [e2e-setup] Starting PostgreSQL...
-waiting for server to start.... stopped waiting
+waiting for server to start.... done
+server started
 [e2e-setup]   Waiting for PostgreSQL on port 5432 (timeout: 30s)...
 [e2e-setup]   PostgreSQL is ready on port 5432
 DO
@@ -16,22 +31,13 @@ GRANT
 [e2e-setup] SuperTokens ready.
 [e2e-setup] Running database migrations...
 [e2e-setup] Starting API server...
-[e2e-setup]   Waiting for API server on port 3000 (timeout: 30s)...
+[e2e-setup]   Discarding stale api.pid=124661 (not our API or not bound to 3000)
+[e2e-setup]   Building API (tsc)...
+[e2e-setup]   Waiting for API server on port 3000 (timeout: 60s)...
 [e2e-setup]   API server is ready on port 3000
 [e2e-setup] API server ready.
 [e2e-setup] Starting Astro site...
 [e2e-setup]   Installing site dependencies...
-[e2e-setup]   Waiting for Astro site on port 4321 (timeout: 60s)...
-[e2e-setup]   Astro site is ready on port 4321
-[e2e-setup] Astro site ready.
-[e2e-setup] State written to /home/max/git/kanix/.dev/e2e-state/env
-[e2e-setup] 
-[e2e-setup] === All backend services are running ===
-[e2e-setup]   PostgreSQL:   127.0.0.1:5432
-[e2e-setup]   SuperTokens:  http://127.0.0.1:3567
-[e2e-setup]   API:          http://127.0.0.1:3000
-[e2e-setup]   Astro site:   http://127.0.0.1:4321
-[e2e-setup]   State dir:    /home/max/git/kanix/.dev/e2e-state
 
 === stderr ===
 

@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # test/e2e/setup.sh — Start backend services for E2E testing
-# Starts: postgres → supertokens → api → astro site
+# Starts: postgres → supertokens → api → astro site → android emulator
 # Idempotent: safe to run multiple times; kills orphan processes on known ports.
-# The Android emulator is managed by the spec-kit runner's PlatformManager, not this script.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,13 +20,48 @@ log() { echo "[e2e-setup] $*"; }
 die() { echo "[e2e-setup] ERROR: $*" >&2; exit 1; }
 
 # -------------------------------------------------------------------
+# Required tools
+#
+# Historically setup.sh used `lsof` to find stale processes on known
+# ports and silenced errors with `2>/dev/null || true`. When `lsof` was
+# missing from the shell's PATH (e.g. run outside `nix develop`), the
+# orphan-kill logic became a no-op and stale API processes survived
+# across runs — producing a boot that looked like a timeout but was
+# really a ghost process holding the port. Fail loudly instead so the
+# failure mode is unmissable.
+# -------------------------------------------------------------------
+require_tool() {
+  local tool=$1
+  command -v "$tool" >/dev/null 2>&1 || die \
+"'$tool' not found in PATH. Run setup inside 'nix develop' so all dev tools are available."
+}
+require_tool lsof
+require_tool ss
+
+# -------------------------------------------------------------------
+# Find PIDs bound to a TCP port. Primary path uses lsof; if lsof
+# returns nothing we also try `ss` in case lsof can't see processes
+# owned by other UIDs / in different PID namespaces.
+# -------------------------------------------------------------------
+pids_on_port() {
+  local port=$1
+  local pids
+  pids=$(lsof -ti "tcp:${port}" 2>/dev/null || true)
+  if [ -z "$pids" ]; then
+    pids=$(ss -tlnpH "sport = :${port}" 2>/dev/null \
+      | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -u)
+  fi
+  echo "$pids"
+}
+
+# -------------------------------------------------------------------
 # Kill orphan processes on known ports
 # -------------------------------------------------------------------
 kill_orphans() {
   log "Checking for orphan processes on known ports..."
   for port in "${KNOWN_PORTS[@]}"; do
     local pids
-    pids=$(lsof -ti "tcp:${port}" 2>/dev/null || true)
+    pids=$(pids_on_port "$port")
     if [ -n "$pids" ]; then
       log "  Killing orphan process(es) on port ${port}: ${pids}"
       echo "$pids" | xargs kill -9 2>/dev/null || true
@@ -85,6 +119,20 @@ wait_for_http() {
 # Prepare state directory
 # -------------------------------------------------------------------
 mkdir -p "$STATE_DIR"
+
+# -------------------------------------------------------------------
+# Step 0a: Ensure $HOME/.android/avd symlink for emulator AVD discovery
+# -------------------------------------------------------------------
+# Inside bwrap sandboxes $HOME is tmpfs, so ~/.android/avd/ is empty.
+# The runner may call `emulator -list-avds` (raw SDK binary) which looks
+# in $HOME/.android/avd/ by default. Create a symlink to the project-local
+# AVD directory so it can find AVDs regardless of which emulator binary
+# is used or whether ANDROID_USER_HOME is set.
+_avd_dir="${ANDROID_AVD_HOME:-$PROJECT_ROOT/.dev/android-user-home/avd}"
+if [ -d "$_avd_dir" ] && [ -w "${HOME:-/tmp}" ]; then
+  mkdir -p "$HOME/.android" 2>/dev/null || true
+  ln -sfn "$_avd_dir" "$HOME/.android/avd" 2>/dev/null || true
+fi
 
 # -------------------------------------------------------------------
 # Step 0: Kill orphans and clean up
@@ -172,26 +220,104 @@ if [ ! -f "$PROJECT_ROOT/.env" ] && [ -f "$PROJECT_ROOT/.env.example" ]; then
   log "  Created .env from .env.example (using defaults)"
 fi
 
-if ! nc -z 127.0.0.1 "$PORT_API" 2>/dev/null; then
+# Validate api.pid: the recorded pid must exist AND actually be our API
+# process AND be bound to PORT_API. A bare `kill -0 $pid` check passes for
+# any live pid on the host (pid reuse after reboots or long gaps), which
+# previously made the script think the API was "already running" when the
+# recorded pid had been reassigned to an unrelated process — skipping the
+# port-cleanup block below and causing EADDRINUSE when the real listener
+# was a stale node from an earlier run.
+api_already_running=false
+
+# Fast path: if the API health endpoint is already responding, skip the
+# PID-file and port-ownership checks entirely.  This handles the common
+# case where the API was started by a prior setup.sh run whose process
+# lives in a different PID namespace (containers, Claude Code sandbox)
+# and is invisible to lsof / kill / ps — but the service itself is fine.
+if curl -sf "http://127.0.0.1:${PORT_API}/health" >/dev/null 2>&1; then
+  api_already_running=true
+  log "  API already healthy on port ${PORT_API}, skipping start"
+fi
+
+if [ "$api_already_running" = false ] && [ -f "$STATE_DIR/api.pid" ]; then
+  old_api_pid=$(cat "$STATE_DIR/api.pid" 2>/dev/null || echo "")
+  pid_cmd=""
+  if [ -n "$old_api_pid" ] && kill -0 "$old_api_pid" 2>/dev/null; then
+    pid_cmd=$(ps -p "$old_api_pid" -o args= 2>/dev/null || true)
+  fi
+  port_pids=$(pids_on_port "$PORT_API")
+  if [ -n "$old_api_pid" ] \
+     && echo "$pid_cmd" | grep -qE "(dist/index\.js|tsx .*src/index\.ts)" \
+     && echo "$port_pids" | tr ' ' '\n' | grep -qx "$old_api_pid"; then
+    api_already_running=true
+    log "  API already running (pid ${old_api_pid}), skipping start"
+  else
+    if [ -n "$old_api_pid" ]; then
+      log "  Discarding stale api.pid=${old_api_pid} (not our API or not bound to ${PORT_API})"
+    fi
+    rm -f "$STATE_DIR/api.pid"
+  fi
+fi
+
+# Kill anything holding the port so the new server can bind. Loop because
+# a killed process can respawn from a watcher parent, and we also want to
+# verify the port is free after the kill — not just that we sent signals.
+if [ "$api_already_running" = false ]; then
+  for attempt in 1 2 3; do
+    api_pids=$(pids_on_port "$PORT_API")
+    if [ -z "$api_pids" ] && ! nc -z 127.0.0.1 "$PORT_API" 2>/dev/null; then
+      break
+    fi
+    if [ -n "$api_pids" ]; then
+      log "  Killing stale process(es) on port ${PORT_API} (attempt ${attempt}): ${api_pids}"
+      echo "$api_pids" | xargs kill -9 2>/dev/null || true
+    fi
+    # Close orphaned sockets invisible to lsof (e.g. PID-namespace ghosts)
+    if nc -z 127.0.0.1 "$PORT_API" 2>/dev/null; then
+      log "  Port ${PORT_API} still held after kill; closing via ss --kill"
+      ss --kill state listening src "0.0.0.0:${PORT_API}" 2>/dev/null || true
+    fi
+    sleep 1
+  done
+  if nc -z 127.0.0.1 "$PORT_API" 2>/dev/null; then
+    die "Port ${PORT_API} still occupied after 3 cleanup attempts; refusing to start API"
+  fi
+fi
+
+if [ "$api_already_running" = false ]; then
+  # Export env vars for the API (used by both build and start).
+  # Secret keys must be real env vars (config.ts ignores them from .env).
+  # DATABASE_URL and SUPERTOKENS_API_KEY point at local services started above.
+  # Third-party keys use test-mode dummies — E2E tests don't call real APIs.
+  export DATABASE_URL="postgresql://kanix:kanix@127.0.0.1:${PORT_POSTGRES}/kanix"
+  export SUPERTOKENS_API_KEY="e2e-test-key"
+  export STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-sk_test_e2e_placeholder_key}"
+  export STRIPE_WEBHOOK_SECRET="${STRIPE_WEBHOOK_SECRET:-whsec_e2e_placeholder_secret}"
+  export EASYPOST_API_KEY="${EASYPOST_API_KEY:-EZAK_REPLACE_ME}"
+  export EASYPOST_WEBHOOK_SECRET="${EASYPOST_WEBHOOK_SECRET:-whsec_e2e_easypost}"
+  export GITHUB_OAUTH_CLIENT_ID="${GITHUB_OAUTH_CLIENT_ID:-e2e-github-client-id}"
+  export GITHUB_OAUTH_CLIENT_SECRET="${GITHUB_OAUTH_CLIENT_SECRET:-e2e-github-client-secret}"
+  export PUBLIC_STRIPE_PUBLISHABLE_KEY="${PUBLIC_STRIPE_PUBLISHABLE_KEY:-pk_test_e2e_placeholder_key}"
+
+  # Pre-build TypeScript so the server starts from compiled JS (~1s)
+  # instead of tsx watch (~30s cold-compile for the large server.ts).
+  log "  Building API (tsc)..."
+  (cd "$PROJECT_ROOT/api" && pnpm build) > "$STATE_DIR/api-build.log" 2>&1 || {
+    log "  WARNING: tsc build failed, falling back to tsx (no watch)"
+  }
+
   (
     cd "$PROJECT_ROOT/api"
-    # Secret keys must be real env vars (config.ts ignores them from .env).
-    # DATABASE_URL and SUPERTOKENS_API_KEY point at local services started above.
-    # Third-party keys use test-mode dummies — E2E tests don't call real APIs.
-    export DATABASE_URL="postgresql://kanix:kanix@127.0.0.1:${PORT_POSTGRES}/kanix"
-    export SUPERTOKENS_API_KEY="e2e-test-key"
-    export STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-sk_test_e2e_placeholder_key}"
-    export STRIPE_WEBHOOK_SECRET="${STRIPE_WEBHOOK_SECRET:-whsec_e2e_placeholder_secret}"
-    export EASYPOST_API_KEY="${EASYPOST_API_KEY:-EZAK_REPLACE_ME}"
-    export EASYPOST_WEBHOOK_SECRET="${EASYPOST_WEBHOOK_SECRET:-whsec_e2e_easypost}"
-    export GITHUB_OAUTH_CLIENT_ID="${GITHUB_OAUTH_CLIENT_ID:-e2e-github-client-id}"
-    export GITHUB_OAUTH_CLIENT_SECRET="${GITHUB_OAUTH_CLIENT_SECRET:-e2e-github-client-secret}"
-    export PUBLIC_STRIPE_PUBLISHABLE_KEY="${PUBLIC_STRIPE_PUBLISHABLE_KEY:-pk_test_e2e_placeholder_key}"
-    PORT="$PORT_API" pnpm dev
+    if [ -f dist/index.js ]; then
+      PORT="$PORT_API" node dist/index.js
+    else
+      # tsx without --watch starts faster (no fs-watcher overhead)
+      PORT="$PORT_API" npx tsx src/index.ts
+    fi
   ) > "$STATE_DIR/api.log" 2>&1 &
   echo $! > "$STATE_DIR/api.pid"
 fi
-wait_for_port "$PORT_API" "API server" 30
+wait_for_port "$PORT_API" "API server" 60
 log "API server ready."
 
 # -------------------------------------------------------------------
@@ -199,7 +325,11 @@ log "API server ready."
 # -------------------------------------------------------------------
 log "Starting Astro site..."
 
-if ! nc -z 127.0.0.1 "$PORT_ASTRO" 2>/dev/null; then
+# Fast path: if the Astro dev server is already serving pages, skip restart.
+# Same rationale as the API health check above (cross-namespace visibility).
+if curl -so /dev/null -w '' "http://127.0.0.1:${PORT_ASTRO}/" 2>/dev/null; then
+  log "  Astro site already healthy on port ${PORT_ASTRO}, skipping start"
+elif ! nc -z 127.0.0.1 "$PORT_ASTRO" 2>/dev/null; then
   # Ensure site dependencies are installed before starting
   log "  Installing site dependencies..."
   (cd "$PROJECT_ROOT/site" && npm install --prefer-offline) >> "$STATE_DIR/astro.log" 2>&1 || {
@@ -215,7 +345,89 @@ wait_for_port "$PORT_ASTRO" "Astro site" 60
 log "Astro site ready."
 
 # -------------------------------------------------------------------
-# Step 6: Write state/env file
+# Step 6: Android emulator
+# -------------------------------------------------------------------
+# The runner's PlatformManager checks whether an emulator is reachable
+# (`mcp-android --check` / `adb devices`) AFTER MCP readiness but does
+# not start the emulator itself.  Without this step, every boot ends in
+# `platform_init_fail` because `adb devices` shows no connected device.
+if command -v start-emulator >/dev/null 2>&1; then
+  log "Starting Android emulator..."
+  if start-emulator 2>"$STATE_DIR/emulator.log"; then
+    log "Android emulator ready."
+  else
+    log "  WARNING: start-emulator exited $? — see $STATE_DIR/emulator.log"
+  fi
+fi
+
+# -------------------------------------------------------------------
+# Step 6b: Pre-build Flutter APK to trigger SDK overlay + auto-install
+# -------------------------------------------------------------------
+# On NixOS, the Flutter and Android SDKs live in /nix/store (read-only).
+# settings.gradle.kts creates writable overlays and Gradle auto-installs
+# missing components (NDK, platforms, build-tools).  The auto-installed
+# binaries are pre-built for FHS Linux and have /lib64/ld-linux-x86-64.so.2
+# as their ELF interpreter, which doesn't exist on NixOS.  We trigger one
+# build to create the overlays + download components, then patchelf all
+# binaries so subsequent builds succeed.
+if command -v flutter >/dev/null 2>&1 && command -v patchelf >/dev/null 2>&1; then
+  for _app_dir in "$PROJECT_ROOT/customer" "$PROJECT_ROOT/admin"; do
+    _sdk_overlay="$_app_dir/.dev/android-sdk"
+    _patched_marker="$_sdk_overlay/.nixos-patched"
+    if [ -d "$_app_dir/android" ] && [ ! -f "$_patched_marker" ]; then
+      # Resolve pub dependencies first — flutter build does NOT auto-run
+      # pub get when the .pub-cache is empty, causing compilation failures.
+      log "Resolving Flutter deps in $_app_dir..."
+      (cd "$_app_dir" && flutter pub get) >/dev/null 2>&1 || true
+
+      # Trigger settings.gradle.kts overlay creation with a minimal Gradle
+      # invocation instead of a full assembleDebug (~5s vs ~250s).  The
+      # overlay is created during Gradle's configuration phase (settings
+      # script evaluation), so any task works.
+      log "Triggering Gradle SDK overlay in $_app_dir/android..."
+      (cd "$_app_dir/android" && ./gradlew projects --no-daemon -q) >/dev/null 2>&1 || true
+
+      # Patch all ELF binaries with wrong interpreter
+      if [ -d "$_sdk_overlay" ]; then
+        _nix_interp=$(find /nix/store -maxdepth 3 -name 'ld-linux-x86-64.so.2' -path '*/glibc*/lib/*' 2>/dev/null | head -1)
+        _nix_zlib=$(find /nix/store -maxdepth 3 -name 'libz.so.1' -path '*/zlib*/lib/*' 2>/dev/null | head -1)
+        _nix_zlib_dir=$(dirname "$_nix_zlib" 2>/dev/null || true)
+
+        if [ -n "$_nix_interp" ]; then
+          log "  Patching ELF binaries in $_sdk_overlay..."
+          find "$_sdk_overlay" -type f -executable 2>/dev/null | while read _f; do
+            _interp=$(readelf -l "$_f" 2>/dev/null | grep -oP '(?<=Requesting program interpreter: )/[^\]]+' || true)
+            if [ "$_interp" = "/lib64/ld-linux-x86-64.so.2" ]; then
+              patchelf --set-interpreter "$_nix_interp" "$_f" 2>/dev/null || true
+              if [ -n "$_nix_zlib_dir" ]; then
+                _rpath=$(patchelf --print-rpath "$_f" 2>/dev/null || true)
+                if [ -n "$_rpath" ]; then
+                  patchelf --set-rpath "$_rpath:$_nix_zlib_dir" "$_f" 2>/dev/null || true
+                else
+                  patchelf --set-rpath "$_nix_zlib_dir" "$_f" 2>/dev/null || true
+                fi
+              fi
+            fi
+          done
+          # Also patch Gradle-cached AAPT2
+          find "$HOME/.gradle/caches" -name 'aapt2' -type f 2>/dev/null | while read _f; do
+            _interp=$(readelf -l "$_f" 2>/dev/null | grep -oP '(?<=Requesting program interpreter: )/[^\]]+' || true)
+            if [ "$_interp" = "/lib64/ld-linux-x86-64.so.2" ]; then
+              patchelf --set-interpreter "$_nix_interp" "$_f" 2>/dev/null || true
+            fi
+          done
+        fi
+        # Write marker whether or not patching was needed — the overlay
+        # symlinks to Nix store binaries which are already patched.
+        echo "patched" > "$_patched_marker"
+        log "  SDK overlay ready."
+      fi
+    fi
+  done
+fi
+
+# -------------------------------------------------------------------
+# Step 7: Write state/env file
 # -------------------------------------------------------------------
 STRIPE_KEY_PRESENT="false"
 if [ -f "$PROJECT_ROOT/.env" ] && grep -q 'STRIPE_SECRET_KEY=sk_test_' "$PROJECT_ROOT/.env" && \
@@ -233,6 +445,25 @@ ADMIN_EMAIL=admin@kanix.test
 ADMIN_PASSWORD=TestAdmin123!
 STRIPE_TEST_KEY_PRESENT=${STRIPE_KEY_PRESENT}
 ENVEOF
+
+# Also emit a sourceable shell snippet for consumers (spec-kit pre-E2E
+# gate, ad-hoc developer shells) that need the exact env the API was
+# started with. Keep in sync with the `export` block in Step 5.
+cat > "$STATE_DIR/env.sh" <<ENVSHEOF
+# Source this file to get the env the API is running with.
+# Generated by test/e2e/setup.sh — do not edit by hand.
+export DATABASE_URL="postgresql://kanix:kanix@127.0.0.1:${PORT_POSTGRES}/kanix"
+export SUPERTOKENS_CONNECTION_URI="http://127.0.0.1:${PORT_SUPERTOKENS}"
+export SUPERTOKENS_API_KEY="e2e-test-key"
+export STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-sk_test_e2e_placeholder_key}"
+export STRIPE_WEBHOOK_SECRET="${STRIPE_WEBHOOK_SECRET:-whsec_e2e_placeholder_secret}"
+export EASYPOST_API_KEY="${EASYPOST_API_KEY:-EZAK_REPLACE_ME}"
+export EASYPOST_WEBHOOK_SECRET="${EASYPOST_WEBHOOK_SECRET:-whsec_e2e_easypost}"
+export GITHUB_OAUTH_CLIENT_ID="${GITHUB_OAUTH_CLIENT_ID:-e2e-github-client-id}"
+export GITHUB_OAUTH_CLIENT_SECRET="${GITHUB_OAUTH_CLIENT_SECRET:-e2e-github-client-secret}"
+export PUBLIC_STRIPE_PUBLISHABLE_KEY="${PUBLIC_STRIPE_PUBLISHABLE_KEY:-pk_test_e2e_placeholder_key}"
+export PORT="${PORT_API}"
+ENVSHEOF
 
 log "State written to ${STATE_DIR}/env"
 log ""

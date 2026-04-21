@@ -79,6 +79,58 @@ Tests that depend on Stripe should check for a live listener (PID file exists
 and process is alive) and skip cleanly with a clear message when it isn't
 running, so the rest of the suite remains runnable without Stripe credentials.
 
+## Controlling test state (stock, reservations, etc.)
+
+The seed script sets every variant to `onHand: 50, available: 50` ([api/src/db/scripts/seed.ts:223-237](../../api/src/db/scripts/seed.ts#L223-L237)). **Do not edit the seed** to test edge cases — drive state through the same admin API a real operator would use. This is the single source of truth and already covered by auth, auditing, and movement history.
+
+### Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/admin/inventory/adjustments` | Change `onHand` by a delta (positive or negative). `adjustment_type`: `restock`, `shrinkage`, `correction`, etc. |
+| `GET  /api/admin/inventory/balances?variant_id=<id>` | Read current `onHand` / `available` / `reserved` / `safetyStock` |
+| `POST /api/admin/inventory/reservations` | Reserve N units (reduces `available`, not `onHand`) |
+| `POST /api/admin/inventory/reservations/<id>/release` | Release a reservation |
+| `POST /api/admin/inventory/reservations/<id>/consume` | Consume a reservation (commits the `onHand` decrement) |
+
+Worked examples live in [api/src/critical-path.integration.test.ts:309](../../api/src/critical-path.integration.test.ts#L309), [api/src/low-stock-alert.integration.test.ts:249](../../api/src/low-stock-alert.integration.test.ts#L249), and [api/src/admin-reservation.integration.test.ts](../../api/src/admin-reservation.integration.test.ts).
+
+### Driving a variant to zero (out-of-stock test)
+
+```bash
+# 1. Sign in as the seeded test admin to get session headers
+#    (admin@kanix.test / TestAdmin123! — see test/e2e/.state/env)
+
+# 2. Read current balance
+curl -s "$API_URL/api/admin/inventory/balances?variant_id=$VARIANT_ID" \
+  -H "cookie: $ADMIN_COOKIE" -H "authorization: Bearer $ADMIN_TOKEN"
+
+# 3. Apply a negative adjustment equal to current onHand
+curl -s -X POST "$API_URL/api/admin/inventory/adjustments" \
+  -H "content-type: application/json" \
+  -H "cookie: $ADMIN_COOKIE" -H "authorization: Bearer $ADMIN_TOKEN" \
+  -H "anti-csrf: $ANTI_CSRF" \
+  -d '{
+    "variant_id": "'$VARIANT_ID'",
+    "location_id": "'$LOCATION_ID'",
+    "adjustment_type": "shrinkage",
+    "quantity_delta": -50,
+    "reason": "e2e: force out-of-stock"
+  }'
+
+# 4. Run your out-of-stock assertions
+# 5. Restock with a +50 adjustment to leave the DB clean for the next test
+```
+
+### Test isolation
+
+Tests share seed data, so mutating stock on a shared variant will leak into other tests. Two options, in order of preference:
+
+1. **Create your own variant** inside the test (the admin product/variant APIs accept `POST`), drive it to whatever state you need, and let teardown/cleanup drop it. No restock dance required.
+2. **Restock at the end** of the test — if you forced `-50`, apply `+50` before returning. Only safe when tests run serially.
+
+Never edit `seed.ts` to change starting stock. That breaks every other test that assumes the default.
+
 ## Scripts reference
 
 | Script | Purpose |

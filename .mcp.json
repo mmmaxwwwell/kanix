@@ -1,12 +1,16 @@
 {
   "mcpServers": {
     "mcp-android": {
-      "command": "nix",
-      "args": ["run", ".#mcp-android"]
+      "command": "mcp-android",
+      "args": ["--emulator"],
+      "env": {
+        "ANDROID_USER_HOME": ".dev/android-user-home",
+        "ANDROID_AVD_HOME": ".dev/android-user-home/avd",
+        "ANDROID_BUILD_ROOT": "customer"
+      }
     },
     "mcp-browser": {
-      "command": "nix",
-      "args": ["run", ".#mcp-browser"]
+      "command": "mcp-browser"
     }
   }
 }
