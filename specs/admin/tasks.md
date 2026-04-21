@@ -490,7 +490,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T222 Harden `reservation-cleanup.integration.test.ts` — expired reservation cleanup job
   Done when: reservations past TTL get released by the cleanup job; released inventory is available for new reservations; cleanup is idempotent; cleanup job writes metrics (count released, count kept).
 
-- [ ] T223 Harden `reservation-expiry-race.integration.test.ts` — expiry ↔ late payment race [FR-E008]
+- [x] T223 Harden `reservation-expiry-race.integration.test.ts` — expiry ↔ late payment race [FR-E008]
   Done when: reservation expires then payment_intent.succeeded arrives: either re-reserves successfully OR flags the order for manual review with admin alert (both branches exercised); stock-available and stock-exhausted setups both tested; order final state is deterministic.
 
 ### Admin (admin tooling over the product + order domain)

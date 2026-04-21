@@ -162,3 +162,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `releaseExpiredReservations` was changed from returning `number` to `{ released, kept }` (`CleanupMetrics`). The `kept` count query uses drizzle's `gte()` + `count()` — do NOT use `sql` template literals with `Date` objects for postgres.js (causes `ERR_INVALID_ARG_TYPE`); use drizzle column operators instead.
 - Balance API response uses camelCase (`onHand`) — the original test had `on_hand` which was silently passing due to `undefined === undefined` coincidence. Removed the fragile assertion.
 - Sequential tests sharing the same variant/location must clean up reservations at the end of each test (force-expire via direct DB update + re-run cleanup) to avoid balance state leaking into the next test.
+
+## T223 — Harden reservation-expiry-race.integration.test.ts
+- The old test had its own inline `testConfig`/`createFakeProcess` boilerplate but properly set `STRIPE_WEBHOOK_SECRET` to match the test's HMAC secret. When migrating to `createTestServer`, pass the custom secret via `configOverrides: { STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET }` — otherwise signature verification fails because the default is `"whsec_xxx"`.
+- `consumeReservation` decrements both `on_hand` and `reserved` — after re-reserve + consume the balance math is: onHand-=qty, reserved-=qty, available stays at onHand-reserved. Verify all three fields, not just `available`.

@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "node:events";
-import { createServer, markReady, markNotReady } from "./server.js";
-import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
-import type { Config } from "./config.js";
+import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
+import type { DatabaseConnection } from "./db/connection.js";
 import type { FastifyInstance } from "fastify";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { product, productVariant } from "./db/schema/catalog.js";
 import {
   inventoryBalance,
@@ -18,38 +16,8 @@ import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 import type { PaymentAdapter } from "./services/payment-adapter.js";
 import { createAdminAlertService, type AdminAlertService } from "./services/admin-alert.js";
 import { createHmac } from "node:crypto";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = requireDatabaseUrl();
-const SUPERTOKENS_URI = getSuperTokensUri();
 const WEBHOOK_SECRET = "whsec_test_race_handler_secret";
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
 
 function createStubTaxAdapter(): TaxAdapter {
   return {
@@ -102,7 +70,9 @@ function generateWebhookPayload(
 // ---------------------------------------------------------------------------
 // Test 1: Expired reservations + out of stock → order flagged for review
 // ---------------------------------------------------------------------------
-describe("Reservation expiry race — flagged for review (T054b)", () => {
+describe("Reservation expiry race — flagged for review (FR-E008)", () => {
+  let ts_: TestServer;
+
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let adminAlertService: AdminAlertService;
@@ -111,26 +81,24 @@ describe("Reservation expiry race — flagged for review (T054b)", () => {
 
   let orderId = "";
   let paymentIntentId = "";
+  let variantId = "";
+  let locationId = "";
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const db = dbConn.db;
     adminAlertService = createAdminAlertService();
 
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-      reservationCleanupIntervalMs: 0,
-      taxAdapter: createStubTaxAdapter(),
-      shippingAdapter: createStubShippingAdapter(),
-      paymentAdapter: createStubPaymentAdapter(),
-      adminAlertService,
+    ts_ = await createTestServer({
+      configOverrides: { STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET },
+      serverOverrides: {
+        taxAdapter: createStubTaxAdapter(),
+        shippingAdapter: createStubShippingAdapter(),
+        paymentAdapter: createStubPaymentAdapter(),
+        adminAlertService,
+      },
     });
-    app = server.app;
-    await server.start();
-    markReady();
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+    const db = dbConn.db;
 
     // Seed product + variant + location + inventory
     const [prod] = await db
@@ -153,10 +121,10 @@ describe("Reservation expiry race — flagged for review (T054b)", () => {
         weight: "16",
       })
       .returning();
+    variantId = variant.id;
 
     // Use first existing location or create one
     const existingBalances = await db.select().from(inventoryBalance).limit(1);
-    let locationId: string;
     if (existingBalances.length > 0) {
       locationId = existingBalances[0].locationId;
     } else {
@@ -259,9 +227,7 @@ describe("Reservation expiry race — flagged for review (T054b)", () => {
   });
 
   afterAll(async () => {
-    markNotReady();
-    await app?.close();
-    await dbConn?.close();
+    await stopTestServer(ts_);
   });
 
   it("should flag order for review when reservations expired and stock unavailable", async () => {
@@ -294,25 +260,63 @@ describe("Reservation expiry race — flagged for review (T054b)", () => {
 
     expect(res.statusCode).toBe(200);
 
-    // Verify order stays in pending_payment (NOT confirmed)
+    // Verify order stays in pending_payment (NOT confirmed) — deterministic final state
     const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
     expect(orderRow.status).toBe("pending_payment");
     expect(orderRow.paymentStatus).toBe("paid");
 
-    // Verify admin alert was queued
+    // Verify admin alert was queued with concrete fields
     const alerts = adminAlertService.getAlerts();
     const raceAlert = alerts.find(
       (a) => a.type === "reservation_expired_payment_received" && a.orderId === orderId,
     );
-    expect(raceAlert).toBeDefined();
-    expect(raceAlert?.message).toContain("manual review");
+    expect(raceAlert).not.toBeUndefined();
+    expect(raceAlert!.type).toBe("reservation_expired_payment_received");
+    expect(raceAlert!.orderId).toBe(orderId);
+    expect(raceAlert!.message).toBe(
+      "Payment received but inventory reservations expired and stock is no longer available. Order requires manual review.",
+    );
+    expect(raceAlert!.timestamp).toBeInstanceOf(Date);
+
+    // Verify alert details contain the expired reservation info
+    const details = raceAlert!.details as { expiredReservations: Array<{ variantId: string; locationId: string; quantity: number }> };
+    expect(Array.isArray(details.expiredReservations)).toBe(true);
+    expect(details.expiredReservations.length).toBe(1);
+    expect(details.expiredReservations[0].variantId).toBe(variantId);
+    expect(details.expiredReservations[0].locationId).toBe(locationId);
+    expect(details.expiredReservations[0].quantity).toBe(2);
+
+    // Verify inventory balance is still depleted (no re-reservation happened)
+    const [balance] = await db
+      .select()
+      .from(inventoryBalance)
+      .where(
+        and(
+          eq(inventoryBalance.variantId, variantId),
+          eq(inventoryBalance.locationId, locationId),
+        ),
+      );
+    expect(balance.available).toBe(0);
+    expect(balance.onHand).toBe(0);
+
+    // Verify all reservations for this order are still expired (no new ones created)
+    const reservations = await db
+      .select()
+      .from(inventoryReservation)
+      .where(eq(inventoryReservation.orderId, orderId));
+    const expiredCount = reservations.filter((r) => r.status === "expired").length;
+    const activeOrConsumed = reservations.filter((r) => r.status === "active" || r.status === "consumed").length;
+    expect(expiredCount).toBe(1);
+    expect(activeOrConsumed).toBe(0);
   });
 });
 
 // ---------------------------------------------------------------------------
 // Test 2: Expired reservations + stock available → re-reserved and confirmed
 // ---------------------------------------------------------------------------
-describe("Reservation expiry race — re-reserved (T054b)", () => {
+describe("Reservation expiry race — re-reserved (FR-E008)", () => {
+  let ts_: TestServer;
+
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let adminAlertService: AdminAlertService;
@@ -321,26 +325,24 @@ describe("Reservation expiry race — re-reserved (T054b)", () => {
 
   let orderId = "";
   let paymentIntentId = "";
+  let variantId = "";
+  let locationId = "";
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const db = dbConn.db;
     adminAlertService = createAdminAlertService();
 
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-      reservationCleanupIntervalMs: 0,
-      taxAdapter: createStubTaxAdapter(),
-      shippingAdapter: createStubShippingAdapter(),
-      paymentAdapter: createStubPaymentAdapter(),
-      adminAlertService,
+    ts_ = await createTestServer({
+      configOverrides: { STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET },
+      serverOverrides: {
+        taxAdapter: createStubTaxAdapter(),
+        shippingAdapter: createStubShippingAdapter(),
+        paymentAdapter: createStubPaymentAdapter(),
+        adminAlertService,
+      },
     });
-    app = server.app;
-    await server.start();
-    markReady();
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+    const db = dbConn.db;
 
     // Seed product + variant + location + inventory
     const [prod] = await db
@@ -363,9 +365,9 @@ describe("Reservation expiry race — re-reserved (T054b)", () => {
         weight: "16",
       })
       .returning();
+    variantId = variant.id;
 
     const existingBalances = await db.select().from(inventoryBalance).limit(1);
-    let locationId: string;
     if (existingBalances.length > 0) {
       locationId = existingBalances[0].locationId;
     } else {
@@ -454,13 +456,11 @@ describe("Reservation expiry race — re-reserved (T054b)", () => {
         .set({ status: "expired", releasedAt: new Date() })
         .where(eq(inventoryReservation.id, res.id));
     }
-    // Stock is still available (10 units restored to available)
+    // Stock is still available (10 units restored to available → 10)
   });
 
   afterAll(async () => {
-    markNotReady();
-    await app?.close();
-    await dbConn?.close();
+    await stopTestServer(ts_);
   });
 
   it("should re-reserve and confirm order when stock is available", async () => {
@@ -493,22 +493,45 @@ describe("Reservation expiry race — re-reserved (T054b)", () => {
 
     expect(res.statusCode).toBe(200);
 
-    // Verify order IS confirmed (re-reservation succeeded)
+    // Verify order IS confirmed — deterministic final state
     const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
     expect(orderRow.status).toBe("confirmed");
     expect(orderRow.paymentStatus).toBe("paid");
 
-    // Verify new reservations were created and consumed
+    // Verify reservations: expired originals + consumed new ones
     const reservations = await db
       .select()
       .from(inventoryReservation)
       .where(eq(inventoryReservation.orderId, orderId));
 
-    // Should have both expired originals and consumed new ones
     const expired = reservations.filter((r) => r.status === "expired");
     const consumed = reservations.filter((r) => r.status === "consumed");
-    expect(expired.length).toBeGreaterThan(0);
-    expect(consumed.length).toBeGreaterThan(0);
+    expect(expired.length).toBe(1); // original reservation
+    expect(consumed.length).toBe(1); // re-reserved and then consumed
+
+    // Verify the consumed reservation has the recovery reason
+    expect(consumed[0].variantId).toBe(variantId);
+    expect(consumed[0].quantity).toBe(2);
+
+    // Verify inventory balance reflects the consumed re-reservation
+    // Started with 10, checkout reserved 2 (then expired → back to 10),
+    // re-reservation took 2, consumed → onHand should drop by 2
+    const [balance] = await db
+      .select()
+      .from(inventoryBalance)
+      .where(
+        and(
+          eq(inventoryBalance.variantId, variantId),
+          eq(inventoryBalance.locationId, locationId),
+        ),
+      );
+    // After re-reserve + consume: reserved goes to 0, onHand stays 10,
+    // available = onHand - reserved = 10 - 0 = 10... but consume decrements onHand by quantity
+    // Actually: reserve does reserved+2/available-2, consume does onHand-2/reserved-2
+    // So: onHand=10-2=8, reserved=2-2=0, available=10-2=8
+    expect(balance.onHand).toBe(8);
+    expect(balance.reserved).toBe(0);
+    expect(balance.available).toBe(8);
 
     // Verify no admin alert was queued (re-reservation succeeded)
     const alerts = adminAlertService.getAlerts();
