@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "node:events";
-import { createServer, markReady, markNotReady } from "./server.js";
-import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
-import type { Config } from "./config.js";
+import type { DatabaseConnection } from "./db/connection.js";
 import type { FastifyInstance } from "fastify";
 import { eq, and } from "drizzle-orm";
 import { adminUser, adminRole, adminUserRole } from "./db/schema/admin.js";
@@ -15,37 +12,7 @@ import {
 } from "./db/schema/inventory.js";
 import { adminAuditLog } from "./db/schema/admin.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
-
-const DATABASE_URL = requireDatabaseUrl();
-const SUPERTOKENS_URI = getSuperTokensUri();
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: "whsec_xxx",
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
+import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
 
 async function signUpUser(address: string, email: string, password: string): Promise<string> {
   const res = await fetch(`${address}/auth/signup`, {
@@ -96,7 +63,9 @@ async function signInAndGetHeaders(
   return headers;
 }
 
-describe("admin inventory balance + adjustment API (T040)", () => {
+describe("admin inventory balance + adjustment API (T226)", () => {
+  let ts_: TestServer;
+
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
@@ -110,21 +79,15 @@ describe("admin inventory balance + adjustment API (T040)", () => {
   // Track IDs for cleanup
   let testProductId: string;
   let testVariantId: string;
+  let testVariant2Id: string;
   let testLocationId: string;
   let testRoleId: string;
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-    });
-    address = await server.start();
-    markReady();
-    app = server.app;
+    ts_ = await createTestServer();
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+    address = ts_.address;
 
     // Create admin user with super_admin role
     const authSubject = await signUpUser(address, adminEmail, adminPassword);
@@ -154,7 +117,7 @@ describe("admin inventory balance + adjustment API (T040)", () => {
 
     adminHeaders = await signInAndGetHeaders(address, adminEmail, adminPassword);
 
-    // Create test product + variant
+    // Create test product + variants
     const [testProduct] = await dbConn.db
       .insert(product)
       .values({
@@ -178,6 +141,20 @@ describe("admin inventory balance + adjustment API (T040)", () => {
       .returning();
     testVariantId = testVariant.id;
 
+    // Second variant for bulk tests
+    const [testVariant2] = await dbConn.db
+      .insert(productVariant)
+      .values({
+        productId: testProductId,
+        sku: `INV-TEST2-${ts}`,
+        title: "Test Variant 2",
+        status: "active",
+        priceMinor: 1999,
+        currency: "USD",
+      })
+      .returning();
+    testVariant2Id = testVariant2.id;
+
     // Create test location
     const [location] = await dbConn.db
       .insert(inventoryLocation)
@@ -191,51 +168,49 @@ describe("admin inventory balance + adjustment API (T040)", () => {
   }, 30000);
 
   afterAll(async () => {
-    markNotReady();
-    if (dbConn) {
-      try {
-        // Cleanup in reverse dependency order
-        await dbConn.db
-          .delete(inventoryMovement)
-          .where(eq(inventoryMovement.variantId, testVariantId));
-        await dbConn.db
-          .delete(inventoryAdjustment)
-          .where(eq(inventoryAdjustment.variantId, testVariantId));
-        await dbConn.db
-          .delete(inventoryBalance)
-          .where(eq(inventoryBalance.variantId, testVariantId));
-        await dbConn.db.delete(inventoryLocation).where(eq(inventoryLocation.id, testLocationId));
-        await dbConn.db.delete(productVariant).where(eq(productVariant.id, testVariantId));
-        await dbConn.db.delete(product).where(eq(product.id, testProductId));
-        // Cleanup admin records
-        await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, adminUserId));
-        await dbConn.db.delete(adminUser).where(eq(adminUser.id, adminUserId));
-        await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));
-        // Cleanup audit logs
-        await dbConn.db
-          .delete(adminAuditLog)
-          .where(eq(adminAuditLog.actorAdminUserId, adminUserId));
-      } catch {
-        // Best-effort cleanup
-      }
-      await dbConn.close();
+    try {
+      // Cleanup in reverse dependency order
+      await dbConn.db
+        .delete(inventoryMovement)
+        .where(eq(inventoryMovement.variantId, testVariantId));
+      await dbConn.db
+        .delete(inventoryMovement)
+        .where(eq(inventoryMovement.variantId, testVariant2Id));
+      await dbConn.db
+        .delete(inventoryAdjustment)
+        .where(eq(inventoryAdjustment.variantId, testVariantId));
+      await dbConn.db
+        .delete(inventoryAdjustment)
+        .where(eq(inventoryAdjustment.variantId, testVariant2Id));
+      await dbConn.db
+        .delete(inventoryBalance)
+        .where(eq(inventoryBalance.variantId, testVariantId));
+      await dbConn.db
+        .delete(inventoryBalance)
+        .where(eq(inventoryBalance.variantId, testVariant2Id));
+      await dbConn.db.delete(inventoryLocation).where(eq(inventoryLocation.id, testLocationId));
+      await dbConn.db.delete(productVariant).where(eq(productVariant.id, testVariantId));
+      await dbConn.db.delete(productVariant).where(eq(productVariant.id, testVariant2Id));
+      await dbConn.db.delete(product).where(eq(product.id, testProductId));
+      // Cleanup admin records
+      await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, adminUserId));
+      await dbConn.db.delete(adminUser).where(eq(adminUser.id, adminUserId));
+      await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));
+      // Cleanup audit logs
+      await dbConn.db
+        .delete(adminAuditLog)
+        .where(eq(adminAuditLog.actorAdminUserId, adminUserId));
+    } catch {
+      // Best-effort cleanup
     }
-    if (app) {
-      await app.close();
-    }
+    await stopTestServer(ts_);
   }, 15000);
 
-  it("should list balances (initially empty)", async () => {
-    const res = await fetch(`${address}/api/admin/inventory/balances`, {
-      headers: adminHeaders,
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { balances: unknown[] };
-    expect(body.balances).toBeDefined();
-    expect(Array.isArray(body.balances)).toBe(true);
-  });
+  // ---------------------------------------------------------------------------
+  // Positive adjustment (restock)
+  // ---------------------------------------------------------------------------
 
-  it("should restock +100 and verify balance", async () => {
+  it("restock +100 increases on_hand and available with correct response shape", async () => {
     const res = await fetch(`${address}/api/admin/inventory/adjustments`, {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
@@ -249,19 +224,36 @@ describe("admin inventory balance + adjustment API (T040)", () => {
     });
     expect(res.status).toBe(201);
     const body = (await res.json()) as {
-      adjustment: { adjustment_type: string; quantity_delta: number };
-      movement: { movement_type: string };
-      balance: { on_hand: number; available: number };
+      adjustment: { id: string; adjustmentType: string; quantityDelta: number; reason: string; variantId: string; locationId: string };
+      movement: { id: string; movementType: string; quantityDelta: number; referenceType: string };
+      balance: { onHand: number; reserved: number; available: number; safetyStock: number };
       low_stock: boolean;
     };
-    expect(body.adjustment.adjustment_type).toBe("restock");
-    expect(body.adjustment.quantity_delta).toBe(100);
-    expect(body.movement.movement_type).toBe("adjustment");
-    expect(body.balance.on_hand).toBe(100);
+    // Adjustment fields
+    expect(body.adjustment.adjustmentType).toBe("restock");
+    expect(body.adjustment.quantityDelta).toBe(100);
+    expect(body.adjustment.reason).toBe("Initial stock");
+    expect(body.adjustment.variantId).toBe(testVariantId);
+    expect(body.adjustment.locationId).toBe(testLocationId);
+    expect(typeof body.adjustment.id).toBe("string");
+    // Movement fields
+    expect(body.movement.movementType).toBe("adjustment");
+    expect(body.movement.quantityDelta).toBe(100);
+    expect(body.movement.referenceType).toBe("adjustment");
+    expect(typeof body.movement.id).toBe("string");
+    // Balance fields
+    expect(body.balance.onHand).toBe(100);
     expect(body.balance.available).toBe(100);
+    expect(body.balance.reserved).toBe(0);
+    // Low stock
+    expect(body.low_stock).toBe(false);
   });
 
-  it("should shrinkage -5 and verify balance", async () => {
+  // ---------------------------------------------------------------------------
+  // Negative adjustment (shrinkage) with required reason
+  // ---------------------------------------------------------------------------
+
+  it("shrinkage -5 decreases balance with audit reason", async () => {
     const res = await fetch(`${address}/api/admin/inventory/adjustments`, {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
@@ -276,34 +268,76 @@ describe("admin inventory balance + adjustment API (T040)", () => {
     });
     expect(res.status).toBe(201);
     const body = (await res.json()) as {
-      balance: { on_hand: number; available: number };
+      adjustment: { adjustmentType: string; quantityDelta: number; reason: string; notes: string | null };
+      balance: { onHand: number; available: number };
     };
-    expect(body.balance.on_hand).toBe(95);
+    expect(body.adjustment.adjustmentType).toBe("shrinkage");
+    expect(body.adjustment.quantityDelta).toBe(-5);
+    expect(body.adjustment.reason).toBe("Missing units during audit");
+    expect(body.adjustment.notes).toBe("Found during weekly count");
+    expect(body.balance.onHand).toBe(95);
     expect(body.balance.available).toBe(95);
   });
 
-  it("should filter balances by variant_id", async () => {
+  it("rejects negative adjustment without reason", async () => {
+    const res = await fetch(`${address}/api/admin/inventory/adjustments`, {
+      method: "POST",
+      headers: { ...adminHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        variant_id: testVariantId,
+        location_id: testLocationId,
+        adjustment_type: "shrinkage",
+        quantity_delta: -1,
+        // reason intentionally omitted
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe("ERR_VALIDATION");
+    expect(body.message).toContain("reason");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Balance filtering
+  // ---------------------------------------------------------------------------
+
+  it("lists balances filtered by variant_id with concrete field checks", async () => {
     const res = await fetch(`${address}/api/admin/inventory/balances?variant_id=${testVariantId}`, {
       headers: adminHeaders,
     });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { balances: Array<{ variant_id: string }> };
+    const body = (await res.json()) as {
+      balances: Array<{ variantId: string; locationId: string; onHand: number; available: number; reserved: number; safetyStock: number }>;
+    };
     expect(body.balances.length).toBeGreaterThanOrEqual(1);
-    expect(body.balances[0].variant_id).toBe(testVariantId);
+    const match = body.balances.find((b) => b.variantId === testVariantId);
+    expect(match).toBeDefined();
+    expect(match!.locationId).toBe(testLocationId);
+    expect(match!.onHand).toBe(95);
+    expect(match!.available).toBe(95);
+    expect(match!.reserved).toBe(0);
   });
 
-  it("should filter balances by location_id", async () => {
+  it("lists balances filtered by location_id", async () => {
     const res = await fetch(
       `${address}/api/admin/inventory/balances?location_id=${testLocationId}`,
       { headers: adminHeaders },
     );
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { balances: Array<{ location_id: string }> };
+    const body = (await res.json()) as {
+      balances: Array<{ variantId: string; locationId: string }>;
+    };
     expect(body.balances.length).toBeGreaterThanOrEqual(1);
-    expect(body.balances[0].location_id).toBe(testLocationId);
+    const match = body.balances.find((b) => b.locationId === testLocationId);
+    expect(match).toBeDefined();
+    expect(match!.locationId).toBe(testLocationId);
   });
 
-  it("should detect low stock when available < safety_stock", async () => {
+  // ---------------------------------------------------------------------------
+  // Low stock detection
+  // ---------------------------------------------------------------------------
+
+  it("detects low stock when available < safety_stock after adjustment", async () => {
     // Set safety_stock to 100 — current available is 95, so it's already low
     await dbConn.db
       .update(inventoryBalance)
@@ -328,28 +362,37 @@ describe("admin inventory balance + adjustment API (T040)", () => {
       }),
     });
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { low_stock: boolean; balance: { available: number } };
+    const body = (await res.json()) as {
+      low_stock: boolean;
+      balance: { available: number; safetyStock: number };
+    };
     expect(body.low_stock).toBe(true);
     expect(body.balance.available).toBe(94);
+    expect(body.balance.safetyStock).toBe(100);
   });
 
-  it("should return low_stock_only balances via filter", async () => {
+  it("returns low_stock_only balances via filter with correct fields", async () => {
     const res = await fetch(`${address}/api/admin/inventory/balances?low_stock_only=true`, {
       headers: adminHeaders,
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      balances: Array<{ variant_id: string; available: number; safety_stock: number }>;
+      balances: Array<{ variantId: string; available: number; safetyStock: number }>;
     };
     // Our test variant has available=94, safety_stock=100, so it qualifies
-    const match = body.balances.find((b) => b.variant_id === testVariantId);
+    const match = body.balances.find((b) => b.variantId === testVariantId);
     expect(match).toBeDefined();
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    expect(match!.available).toBeLessThanOrEqual(match!.safety_stock);
+    expect(match!.available).toBeLessThanOrEqual(match!.safetyStock);
+    expect(match!.available).toBe(94);
+    expect(match!.safetyStock).toBe(100);
   });
 
-  it("should prevent negative available (CHECK constraint)", async () => {
-    // Try to remove more than available (94 units)
+  // ---------------------------------------------------------------------------
+  // Negative balance prevention
+  // ---------------------------------------------------------------------------
+
+  it("prevents adjustment that would drive balance negative (returns 422)", async () => {
+    // Current available is 94 — try to remove 200
     const res = await fetch(`${address}/api/admin/inventory/adjustments`, {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
@@ -362,12 +405,16 @@ describe("admin inventory balance + adjustment API (T040)", () => {
       }),
     });
     expect(res.status).toBe(422);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; message: string };
     expect(body.error).toBe("ERR_INVENTORY_INSUFFICIENT");
+    expect(body.message).toContain("negative");
   });
 
-  it("should create audit log entry for adjustment", async () => {
-    // The previous successful adjustments should have audit log entries
+  // ---------------------------------------------------------------------------
+  // Audit log
+  // ---------------------------------------------------------------------------
+
+  it("creates audit log entries for adjustments with correct entity type", async () => {
     const logs = await dbConn.db
       .select()
       .from(adminAuditLog)
@@ -377,10 +424,22 @@ describe("admin inventory balance + adjustment API (T040)", () => {
           eq(adminAuditLog.entityType, "inventory_adjustment"),
         ),
       );
-    expect(logs.length).toBeGreaterThanOrEqual(1);
+    // We've had 3 successful adjustments: restock +100, shrinkage -5, damage -1
+    expect(logs.length).toBeGreaterThanOrEqual(3);
+    for (const log of logs) {
+      expect(log.action).toBe("CREATE");
+      expect(log.actorAdminUserId).toBe(adminUserId);
+      expect(log.entityType).toBe("inventory_adjustment");
+      expect(typeof log.entityId).toBe("string");
+      expect(log.entityId.length).toBeGreaterThan(0);
+    }
   });
 
-  it("should create inventory_movement ledger entries", async () => {
+  // ---------------------------------------------------------------------------
+  // Movement ledger
+  // ---------------------------------------------------------------------------
+
+  it("creates inventory_movement ledger entries for each adjustment", async () => {
     const movements = await dbConn.db
       .select()
       .from(inventoryMovement)
@@ -390,10 +449,17 @@ describe("admin inventory balance + adjustment API (T040)", () => {
     for (const m of movements) {
       expect(m.movementType).toBe("adjustment");
       expect(m.referenceType).toBe("adjustment");
+      expect(typeof m.referenceId).toBe("string");
+      expect(m.variantId).toBe(testVariantId);
+      expect(m.locationId).toBe(testLocationId);
     }
   });
 
-  it("should reject invalid adjustment_type", async () => {
+  // ---------------------------------------------------------------------------
+  // Validation error paths
+  // ---------------------------------------------------------------------------
+
+  it("rejects invalid adjustment_type with 400", async () => {
     const res = await fetch(`${address}/api/admin/inventory/adjustments`, {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
@@ -406,9 +472,12 @@ describe("admin inventory balance + adjustment API (T040)", () => {
       }),
     });
     expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe("ERR_VALIDATION");
+    expect(body.message).toContain("adjustment_type");
   });
 
-  it("should reject zero quantity_delta", async () => {
+  it("rejects zero quantity_delta with 400", async () => {
     const res = await fetch(`${address}/api/admin/inventory/adjustments`, {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
@@ -421,18 +490,27 @@ describe("admin inventory balance + adjustment API (T040)", () => {
       }),
     });
     expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe("ERR_VALIDATION");
+    expect(body.message).toContain("quantity_delta");
   });
 
-  it("should reject missing required fields", async () => {
+  it("rejects missing required fields with 400", async () => {
     const res = await fetch(`${address}/api/admin/inventory/adjustments`, {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
       body: JSON.stringify({ variant_id: testVariantId }),
     });
     expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe("ERR_VALIDATION");
   });
 
-  it("should return original result for duplicate idempotency_key header (T054c)", async () => {
+  // ---------------------------------------------------------------------------
+  // Idempotency
+  // ---------------------------------------------------------------------------
+
+  it("returns original result for duplicate idempotency_key header (T054c)", async () => {
     const idempotencyKey = `idem-test-${Date.now()}`;
     const adjustmentBody = {
       variant_id: testVariantId,
@@ -454,10 +532,10 @@ describe("admin inventory balance + adjustment API (T040)", () => {
     });
     expect(res1.status).toBe(201);
     const body1 = (await res1.json()) as {
-      adjustment: { id: string; idempotency_key: string };
-      balance: { on_hand: number };
+      adjustment: { id: string; idempotencyKey: string | null };
+      balance: { onHand: number };
     };
-    expect(body1.adjustment.idempotency_key).toBe(idempotencyKey);
+    expect(body1.adjustment.idempotencyKey).toBe(idempotencyKey);
 
     // Second request with same key — should return original without creating another
     const res2 = await fetch(`${address}/api/admin/inventory/adjustments`, {
@@ -471,13 +549,13 @@ describe("admin inventory balance + adjustment API (T040)", () => {
     });
     expect(res2.status).toBe(200);
     const body2 = (await res2.json()) as {
-      adjustment: { id: string; idempotency_key: string };
-      balance: { on_hand: number };
+      adjustment: { id: string; idempotencyKey: string | null };
+      balance: { onHand: number };
     };
 
     // Same adjustment returned
     expect(body2.adjustment.id).toBe(body1.adjustment.id);
-    expect(body2.adjustment.idempotency_key).toBe(idempotencyKey);
+    expect(body2.adjustment.idempotencyKey).toBe(idempotencyKey);
 
     // Verify only one adjustment record exists with this key
     const adjustments = await dbConn.db
@@ -487,7 +565,7 @@ describe("admin inventory balance + adjustment API (T040)", () => {
     expect(adjustments.length).toBe(1);
   });
 
-  it("should allow different idempotency keys to create separate adjustments", async () => {
+  it("allows different idempotency keys to create separate adjustments", async () => {
     const key1 = `idem-diff-a-${Date.now()}`;
     const key2 = `idem-diff-b-${Date.now()}`;
     const adjustmentBody = {
@@ -515,5 +593,159 @@ describe("admin inventory balance + adjustment API (T040)", () => {
     const body1 = (await res1.json()) as { adjustment: { id: string } };
     const body2 = (await res2.json()) as { adjustment: { id: string } };
     expect(body1.adjustment.id).not.toBe(body2.adjustment.id);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Adjustment history queryable per variant
+  // ---------------------------------------------------------------------------
+
+  it("returns adjustment history for a variant ordered by creation time", async () => {
+    const res = await fetch(
+      `${address}/api/admin/inventory/adjustments?variant_id=${testVariantId}`,
+      { headers: adminHeaders },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      adjustments: Array<{
+        id: string;
+        variantId: string;
+        adjustmentType: string;
+        quantityDelta: number;
+        reason: string;
+        actorAdminUserId: string;
+        createdAt: string;
+      }>;
+    };
+    // We've done: restock +100, shrinkage -5, damage -1, restock +10 (idem), restock +5, restock +5
+    expect(body.adjustments.length).toBeGreaterThanOrEqual(3);
+    for (const adj of body.adjustments) {
+      expect(adj.variantId).toBe(testVariantId);
+      expect(typeof adj.id).toBe("string");
+      expect(typeof adj.adjustmentType).toBe("string");
+      expect(typeof adj.quantityDelta).toBe("number");
+      expect(typeof adj.reason).toBe("string");
+      expect(adj.reason.length).toBeGreaterThan(0);
+      expect(typeof adj.createdAt).toBe("string");
+    }
+    // Most recent first (descending order)
+    const dates = body.adjustments.map((a) => new Date(a.createdAt).getTime());
+    for (let i = 1; i < dates.length; i++) {
+      expect(dates[i - 1]).toBeGreaterThanOrEqual(dates[i]);
+    }
+  });
+
+  it("returns empty adjustments array when variant has no history", async () => {
+    const fakeId = "00000000-0000-0000-0000-000000000000";
+    const res = await fetch(
+      `${address}/api/admin/inventory/adjustments?variant_id=${fakeId}`,
+      { headers: adminHeaders },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { adjustments: unknown[] };
+    expect(body.adjustments).toEqual([]);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Bulk adjustment endpoint
+  // ---------------------------------------------------------------------------
+
+  it("processes bulk adjustments for multiple variants", async () => {
+    const res = await fetch(`${address}/api/admin/inventory/adjustments/bulk`, {
+      method: "POST",
+      headers: { ...adminHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        adjustments: [
+          {
+            variant_id: testVariant2Id,
+            location_id: testLocationId,
+            adjustment_type: "restock",
+            quantity_delta: 50,
+            reason: "Bulk restock variant 2",
+          },
+          {
+            variant_id: testVariantId,
+            location_id: testLocationId,
+            adjustment_type: "restock",
+            quantity_delta: 10,
+            reason: "Bulk restock variant 1",
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      results: Array<{
+        index: number;
+        adjustment: { id: string; variantId: string; quantityDelta: number };
+        balance: { onHand: number; available: number };
+      }>;
+      errors: Array<{ index: number; error: string }>;
+    };
+    expect(body.results.length).toBe(2);
+    expect(body.errors.length).toBe(0);
+    // First result is variant2 with 50
+    expect(body.results[0].index).toBe(0);
+    expect(body.results[0].adjustment.variantId).toBe(testVariant2Id);
+    expect(body.results[0].balance.onHand).toBe(50);
+    // Second result is variant1 with +10 on top of existing
+    expect(body.results[1].index).toBe(1);
+    expect(body.results[1].adjustment.variantId).toBe(testVariantId);
+  });
+
+  it("bulk endpoint returns errors for invalid items alongside successes", async () => {
+    const res = await fetch(`${address}/api/admin/inventory/adjustments/bulk`, {
+      method: "POST",
+      headers: { ...adminHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        adjustments: [
+          {
+            variant_id: testVariantId,
+            location_id: testLocationId,
+            adjustment_type: "restock",
+            quantity_delta: 5,
+            reason: "Valid item",
+          },
+          {
+            variant_id: testVariantId,
+            location_id: testLocationId,
+            adjustment_type: "invalid_type",
+            quantity_delta: 5,
+            reason: "Bad type",
+          },
+          {
+            variant_id: testVariantId,
+            location_id: testLocationId,
+            adjustment_type: "shrinkage",
+            quantity_delta: -99999,
+            reason: "Would go negative",
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      results: Array<{ index: number }>;
+      errors: Array<{ index: number; error: string; message: string }>;
+    };
+    // First item succeeds
+    expect(body.results.length).toBe(1);
+    expect(body.results[0].index).toBe(0);
+    // Second item fails validation, third fails insufficient balance
+    expect(body.errors.length).toBe(2);
+    expect(body.errors[0].index).toBe(1);
+    expect(body.errors[0].error).toBe("ERR_VALIDATION");
+    expect(body.errors[1].index).toBe(2);
+    expect(body.errors[1].error).toBe("ERR_INVENTORY_INSUFFICIENT");
+  });
+
+  it("bulk endpoint rejects empty array", async () => {
+    const res = await fetch(`${address}/api/admin/inventory/adjustments/bulk`, {
+      method: "POST",
+      headers: { ...adminHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ adjustments: [] }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("ERR_VALIDATION");
   });
 });

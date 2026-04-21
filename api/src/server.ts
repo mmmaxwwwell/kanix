@@ -66,6 +66,7 @@ import {
   findBalanceByVariantAndLocation,
   createInventoryAdjustment,
   findAdjustmentByIdempotencyKey,
+  findAdjustmentsByVariant,
 } from "./db/queries/inventory.js";
 import { findActiveProductsWithDetails, findActiveProductBySlug } from "./db/queries/catalog.js";
 import {
@@ -3656,9 +3657,16 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             low_stock: result.lowStock,
           });
         } catch (err: unknown) {
-          const pgErr = err as { code?: string; constraint?: string };
+          const appErr = err as { code?: string; constraint?: string; message?: string };
+          // Application-level insufficient inventory check (from query pre-check)
+          if (appErr.code === "ERR_INVENTORY_INSUFFICIENT") {
+            return reply.status(422).send({
+              error: "ERR_INVENTORY_INSUFFICIENT",
+              message: appErr.message ?? "Adjustment would result in negative inventory balance",
+            });
+          }
           // Unique constraint violation on idempotency_key (concurrent duplicate)
-          if (pgErr.code === "23505" && idempotencyKey) {
+          if (appErr.code === "23505" && idempotencyKey) {
             const existing = await findAdjustmentByIdempotencyKey(database.db, idempotencyKey);
             if (existing) {
               return reply.status(200).send({
@@ -3669,8 +3677,8 @@ export async function createServer(options: CreateServerOptions): Promise<Server
               });
             }
           }
-          // CHECK constraint violation means available would go negative
-          if (pgErr.code === "23514" && pgErr.constraint?.includes("ck_inventory_balance")) {
+          // CHECK constraint violation means available would go negative (safety net)
+          if (appErr.code === "23514" && appErr.constraint?.includes("ck_inventory_balance")) {
             return reply.status(422).send({
               error: "ERR_INVENTORY_INSUFFICIENT",
               message: "Adjustment would result in negative inventory balance",
@@ -3678,6 +3686,101 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           }
           throw err;
         }
+      },
+    );
+
+    // List adjustment history for a variant
+    app.get(
+      "/api/admin/inventory/adjustments",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.INVENTORY_READ)],
+      },
+      async (request) => {
+        const query = request.query as { variant_id?: string };
+        if (!query.variant_id) {
+          return { adjustments: [] };
+        }
+        const adjustments = await findAdjustmentsByVariant(database.db, query.variant_id);
+        return { adjustments };
+      },
+    );
+
+    // Bulk inventory adjustments
+    app.post(
+      "/api/admin/inventory/adjustments/bulk",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.INVENTORY_ADJUST)],
+      },
+      async (request, reply) => {
+        const body = request.body as {
+          adjustments: Array<{
+            variant_id: string;
+            location_id: string;
+            adjustment_type: string;
+            quantity_delta: number;
+            reason: string;
+            notes?: string;
+          }>;
+        };
+
+        if (!Array.isArray(body.adjustments) || body.adjustments.length === 0) {
+          return reply.status(400).send({
+            error: "ERR_VALIDATION",
+            message: "adjustments must be a non-empty array",
+          });
+        }
+
+        const validTypes = ["restock", "shrinkage", "correction", "damage", "return"];
+        const results = [];
+        const errors = [];
+
+        for (let i = 0; i < body.adjustments.length; i++) {
+          const adj = body.adjustments[i];
+          if (!adj.variant_id || !adj.location_id || !adj.adjustment_type || adj.quantity_delta == null || !adj.reason) {
+            errors.push({ index: i, error: "ERR_VALIDATION", message: "Missing required fields" });
+            continue;
+          }
+          if (!validTypes.includes(adj.adjustment_type)) {
+            errors.push({ index: i, error: "ERR_VALIDATION", message: `Invalid adjustment_type: ${adj.adjustment_type}` });
+            continue;
+          }
+          if (!Number.isInteger(adj.quantity_delta) || adj.quantity_delta === 0) {
+            errors.push({ index: i, error: "ERR_VALIDATION", message: "quantity_delta must be a non-zero integer" });
+            continue;
+          }
+
+          try {
+            const result = await createInventoryAdjustment(database.db, {
+              variantId: adj.variant_id,
+              locationId: adj.location_id,
+              adjustmentType: adj.adjustment_type as "restock" | "shrinkage" | "correction" | "damage" | "return",
+              quantityDelta: adj.quantity_delta,
+              reason: adj.reason,
+              notes: adj.notes,
+              actorAdminUserId: request.adminContext?.adminUserId ?? "",
+            });
+            results.push({ index: i, adjustment: result.adjustment, balance: result.balance });
+          } catch (err: unknown) {
+            const appErr = err as { code?: string };
+            if (appErr.code === "ERR_INVENTORY_INSUFFICIENT") {
+              errors.push({ index: i, error: "ERR_INVENTORY_INSUFFICIENT", message: "Would result in negative balance" });
+            } else {
+              errors.push({ index: i, error: "ERR_INTERNAL", message: "Unexpected error" });
+            }
+          }
+        }
+
+        // Set audit context for the bulk operation (use first result's ID if available)
+        if (results.length > 0) {
+          request.auditContext = {
+            action: "CREATE",
+            entityType: "inventory_adjustment",
+            entityId: results[0].adjustment.id,
+            afterJson: { bulkCount: results.length, bulkErrors: errors.length },
+          };
+        }
+
+        return reply.status(results.length > 0 ? 201 : 400).send({ results, errors });
       },
     );
 

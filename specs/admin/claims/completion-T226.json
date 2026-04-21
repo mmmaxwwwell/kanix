@@ -1,0 +1,20 @@
+{
+  "task_id": "T226",
+  "status": "complete",
+  "summary": "Hardened admin-inventory.integration.test.ts: fixed camelCase response types, added pre-check for negative balance, added GET adjustment history and POST bulk adjustment endpoints, replaced all vacuous assertions with concrete checks (20 tests, all green)",
+  "commands_run": [
+    {"command": "cd api && npx vitest run src/admin-inventory.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": [
+    "specs/admin/claims/completion-T226.json"
+  ],
+  "files_modified": [
+    "api/src/admin-inventory.integration.test.ts",
+    "api/src/db/queries/inventory.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 3
+}

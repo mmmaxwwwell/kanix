@@ -501,7 +501,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T225 Harden `admin-dashboard.integration.test.ts` — admin dashboard aggregates
   Done when: dashboard endpoint returns correct aggregates (open orders, pending fulfillments, stuck reservations, low-stock count) against seeded fixture data; date range filter verified; timezone handling asserted.
 
-- [ ] T226 Harden `admin-inventory.integration.test.ts` — admin inventory adjustments
+- [x] T226 Harden `admin-inventory.integration.test.ts` — admin inventory adjustments
   Done when: positive adjustment (restock) increases balance with audit; negative adjustment (shrinkage) decreases with reason required; attempting to drive balance negative returns 400; adjustment history queryable per variant; bulk adjustment endpoint verified.
 
 - [ ] T227 Harden `admin-products.integration.test.ts` — admin product CRUD

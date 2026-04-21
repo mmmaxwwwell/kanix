@@ -126,8 +126,15 @@ export async function createInventoryAdjustment(
           )
       )[0];
 
+    // Pre-check: reject if negative delta would drive balance below zero
+    if (input.quantityDelta < 0) {
+      if (existingBalance.available + input.quantityDelta < 0 || existingBalance.onHand + input.quantityDelta < 0) {
+        throw { code: "ERR_INVENTORY_INSUFFICIENT", message: "Adjustment would result in negative inventory balance" };
+      }
+    }
+
     // Atomically update on_hand and available
-    // The CHECK constraint will throw if available goes negative
+    // The CHECK constraint is a safety net; the pre-check above catches it first
     const [updatedBalance] = await tx
       .update(inventoryBalance)
       .set({
@@ -216,6 +223,20 @@ export async function findAdjustmentByIdempotencyKey(
   const lowStock = balance.available <= balance.safetyStock;
 
   return { adjustment, movement, balance, lowStock };
+}
+
+/**
+ * Find adjustment records for a variant, ordered by creation time descending.
+ */
+export async function findAdjustmentsByVariant(
+  db: PostgresJsDatabase,
+  variantId: string,
+): Promise<InventoryAdjustment[]> {
+  return db
+    .select()
+    .from(inventoryAdjustment)
+    .where(eq(inventoryAdjustment.variantId, variantId))
+    .orderBy(sql`${inventoryAdjustment.createdAt} DESC`);
 }
 
 /**

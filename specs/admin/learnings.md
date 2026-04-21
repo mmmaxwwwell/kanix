@@ -176,3 +176,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The `dispute` table has NO `createdAt` column — it uses `openedAt` instead. When adding date filters to dashboard queries, use `dispute.openedAt` for the time dimension.
 - `inventoryBalance` has no `createdAt` either (only `updatedAt`) — low stock counts are point-in-time by nature, so date range filtering is intentionally skipped for that aggregate.
 - For delta-based assertions on shared DB: capture a "baseline" summary before seeding test-specific data, then assert `(after - baseline) == expectedDelta` for each count field.
+
+## T226 — Harden admin-inventory.integration.test.ts
+- The DB CHECK constraint (`ck_inventory_balance_available`) throws a postgres.js error whose properties don't always match the expected `{ code: "23514", constraint: "ck_inventory_balance..." }` shape via Drizzle transactions. Solved by adding a pre-check in `createInventoryAdjustment` that throws `{ code: "ERR_INVENTORY_INSUFFICIENT" }` before the UPDATE.
+- API response fields from Drizzle `returning()` use camelCase (`onHand`, `adjustmentType`, `idempotencyKey`), not snake_case. Test type casts using `as` don't fail at runtime — accessing `body.adjustment.adjustment_type` silently returns `undefined`, making assertions pass vacuously when comparing `undefined` to something else.
+- The `admin_audit_log.entity_id` column is `uuid` type — using a non-UUID string like `"bulk"` causes an insert failure. For bulk operations, use the first result's adjustment ID as the entity_id.
