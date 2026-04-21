@@ -52,8 +52,8 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1776738191,
-        "narHash": "sha256-z0ZEj4SjWnJmg9F4FIVlH3rFM5apFZN/+yWi5w8PKqs=",
+        "lastModified": 1776739272,
+        "narHash": "sha256-cX5WxP9f/D2+0nYpko8QiRSPoeYXOAX7ie0XYi8wmGU=",
         "path": "/home/max/git/agent-framework/.claude/skills/spec-kit/code-review-graph",
         "type": "path"
       },

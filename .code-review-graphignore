@@ -1,0 +1,11 @@
+# BEGIN code-review-graph managed (from flake.nix excludeDirs)
+stl/**
+test-logs/**
+logs/**
+validate/**
+attempts/**
+ci-debug/**
+# END code-review-graph managed
+
+# my custom extras
+fixtures/**/*.json

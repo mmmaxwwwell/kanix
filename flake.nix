@@ -44,10 +44,18 @@
           buildOnEnter = true;
           watch = true;
           serveMcp = false;  # .mcp.json drives MCP config; don't double-spawn
+          # Written to a managed block in .code-review-graphignore. Only
+          # includes things NOT already in the upstream DEFAULT_IGNORE_PATTERNS
+          # list (which already covers node_modules, .venv, dist, build,
+          # .dart_tool, .pub-cache, .next, .gradle, vendor, __pycache__, etc).
+          # See reference/code-review-graph.md § Per-project excludes.
           excludeDirs = [
-            "node_modules" ".direnv" "result" "dist" ".venv" "__pycache__"
-            "build" ".dart_tool" ".next" ".gradle" ".pub-cache"
-            "stl" "test-logs" "logs" "validate" "attempts" "ci-debug"
+            "stl"          # 3D model renders (STL files, not source)
+            "test-logs"    # vitest/pytest output
+            "logs"         # runtime log dumps
+            "validate"     # spec-kit runner validation artifacts
+            "attempts"     # spec-kit runner fix-attempt artifacts
+            "ci-debug"     # CI diagnostic dumps
           ];
         };
 
