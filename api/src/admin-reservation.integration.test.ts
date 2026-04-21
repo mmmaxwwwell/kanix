@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "node:events";
-import { createServer, markReady, markNotReady } from "./server.js";
-import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
-import type { Config } from "./config.js";
+import type { DatabaseConnection } from "./db/connection.js";
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { adminUser, adminRole, adminUserRole } from "./db/schema/admin.js";
@@ -16,37 +13,7 @@ import {
 import { adminAuditLog } from "./db/schema/admin.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
 import { releaseExpiredReservations } from "./db/queries/reservation.js";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
-
-const DATABASE_URL = requireDatabaseUrl();
-const SUPERTOKENS_URI = getSuperTokensUri();
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: "whsec_xxx",
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
+import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
 
 async function signUpUser(address: string, email: string, password: string): Promise<string> {
   const res = await fetch(`${address}/auth/signup`, {
@@ -98,6 +65,8 @@ async function signInAndGetHeaders(
 }
 
 describe("inventory reservation system (T041)", () => {
+  let ts_: TestServer;
+
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
@@ -114,17 +83,10 @@ describe("inventory reservation system (T041)", () => {
   let testRoleId: string;
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-    });
-    address = await server.start();
-    markReady();
-    app = server.app;
+    ts_ = await createTestServer();
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+    address = ts_.address;
 
     // Create admin user with super_admin role
     const authSubject = await signUpUser(address, adminEmail, adminPassword);
@@ -205,9 +167,7 @@ describe("inventory reservation system (T041)", () => {
   }, 30000);
 
   afterAll(async () => {
-    markNotReady();
-    if (dbConn) {
-      try {
+          try {
         // Cleanup in reverse dependency order
         await dbConn.db
           .delete(inventoryMovement)
@@ -230,11 +190,7 @@ describe("inventory reservation system (T041)", () => {
       } catch {
         // Best-effort cleanup
       }
-      await dbConn.close();
-    }
-    if (app) {
-      await app.close();
-    }
+    await stopTestServer(ts_);
   }, 15000);
 
   it("should reserve → consume", async () => {
@@ -385,8 +341,8 @@ describe("inventory reservation system (T041)", () => {
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     // Run the expiry sweep
-    const released = await releaseExpiredReservations(dbConn.db);
-    expect(released).toBeGreaterThanOrEqual(1);
+    const metrics = await releaseExpiredReservations(dbConn.db);
+    expect(metrics.released).toBeGreaterThanOrEqual(1);
 
     // Verify the reservation is now expired
     const getRes = await fetch(

@@ -37,10 +37,8 @@ export function startReservationCleanup(
 
   async function tick(): Promise<void> {
     try {
-      const count = await releaseExpiredReservations(db);
-      if (count > 0) {
-        logger.info(`Released ${count} expired reservations`);
-      }
+      const { released, kept } = await releaseExpiredReservations(db);
+      logger.info({ released, kept }, "Reservation cleanup completed");
     } catch (err) {
       logger.error({ err }, "Reservation cleanup failed");
     }

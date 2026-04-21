@@ -157,3 +157,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `notificationDispatch.dispatchAlert` publishes one WebSocket message per admin target (via `inAppAdapter.send → wsManager.publish`), so with N active admins in the shared DB, the wsManager buffer gets N messages per alert. Use `>= 1` assertion, not `== 1`, and filter by variantId + buffer offset.
 - `LowStockAlertService` had no deduplication — added a per-variant cooldown map with configurable `cooldownMs` (default 5 min). The `clear()` method must also clear the cooldown map to avoid stale timestamps.
 - Email assertions against the default `logs/emails.jsonl` must filter by admin email + variant ID since other test files and prior test runs also write to the same log file.
+
+## T222 — Harden reservation-cleanup.integration.test.ts
+- `releaseExpiredReservations` was changed from returning `number` to `{ released, kept }` (`CleanupMetrics`). The `kept` count query uses drizzle's `gte()` + `count()` — do NOT use `sql` template literals with `Date` objects for postgres.js (causes `ERR_INVALID_ARG_TYPE`); use drizzle column operators instead.
+- Balance API response uses camelCase (`onHand`) — the original test had `on_hand` which was silently passing due to `undefined === undefined` coincidence. Removed the fragile assertion.
+- Sequential tests sharing the same variant/location must clean up reservations at the end of each test (force-expire via direct DB update + re-run cleanup) to avoid balance state leaking into the next test.

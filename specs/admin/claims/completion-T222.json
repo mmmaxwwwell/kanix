@@ -1,0 +1,20 @@
+{
+  "task_id": "T222",
+  "status": "complete",
+  "summary": "Hardened reservation-cleanup.integration.test.ts with 4 tests: TTL expiry + balance restore, re-reservation after cleanup, idempotency (second run releases 0), and metrics (released + kept counts). Modified releaseExpiredReservations to return CleanupMetrics { released, kept } and updated cron to log both.",
+  "commands_run": [
+    {"command": "npx vitest run src/reservation-cleanup.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T222.json"],
+  "files_modified": [
+    "api/src/db/queries/reservation.ts",
+    "api/src/db/queries/index.ts",
+    "api/src/cron/reservation-cleanup.ts",
+    "api/src/reservation-cleanup.integration.test.ts",
+    "api/src/admin-reservation.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

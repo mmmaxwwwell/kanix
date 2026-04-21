@@ -487,7 +487,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T221 Harden `low-stock-alert.integration.test.ts` — low-stock threshold + admin notification [FR-038, FR-085]
   Done when: variant dropping below safety_stock fires an alert via admin WebSocket + email within expected latency; threshold changes update alert behavior; alert includes variant SKU + product title + available count + threshold; alerts deduplicated within cooldown window.
 
-- [ ] T222 Harden `reservation-cleanup.integration.test.ts` — expired reservation cleanup job
+- [x] T222 Harden `reservation-cleanup.integration.test.ts` — expired reservation cleanup job
   Done when: reservations past TTL get released by the cleanup job; released inventory is available for new reservations; cleanup is idempotent; cleanup job writes metrics (count released, count kept).
 
 - [ ] T223 Harden `reservation-expiry-race.integration.test.ts` — expiry ↔ late payment race [FR-E008]

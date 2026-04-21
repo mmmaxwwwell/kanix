@@ -82,6 +82,7 @@ export type {
   ReserveResult,
   ConsumeResult,
   ReleaseResult,
+  CleanupMetrics,
 } from "./reservation.js";
 export { findActiveProductsWithDetails, findActiveProductBySlug } from "./catalog.js";
 export type { CatalogProduct, CatalogVariant, CatalogMedia } from "./catalog.js";

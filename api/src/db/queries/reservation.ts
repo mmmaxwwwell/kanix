@@ -1,4 +1,4 @@
-import { eq, and, sql, lt } from "drizzle-orm";
+import { eq, and, sql, lt, gte, count } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { inventoryReservation, inventoryBalance, inventoryMovement } from "../schema/inventory.js";
 
@@ -7,6 +7,11 @@ import { inventoryReservation, inventoryBalance, inventoryMovement } from "../sc
 // ---------------------------------------------------------------------------
 
 export type InventoryReservation = typeof inventoryReservation.$inferSelect;
+
+export interface CleanupMetrics {
+  released: number;
+  kept: number;
+}
 
 export interface ReserveInput {
   variantId: string;
@@ -281,9 +286,10 @@ export async function releaseReservation(
 // ---------------------------------------------------------------------------
 
 /**
- * Release expired reservations. Returns count released.
+ * Release expired reservations. Returns cleanup metrics: count released and
+ * count of active reservations kept (not yet expired).
  */
-export async function releaseExpiredReservations(db: PostgresJsDatabase): Promise<number> {
+export async function releaseExpiredReservations(db: PostgresJsDatabase): Promise<CleanupMetrics> {
   const now = new Date();
   let released = 0;
 
@@ -333,7 +339,15 @@ export async function releaseExpiredReservations(db: PostgresJsDatabase): Promis
     });
   }
 
-  return released;
+  // Count active reservations that are still valid (not yet expired)
+  const [keptResult] = await db
+    .select({ count: count() })
+    .from(inventoryReservation)
+    .where(and(eq(inventoryReservation.status, "active"), gte(inventoryReservation.expiresAt, now)));
+
+  const kept = keptResult?.count ?? 0;
+
+  return { released, kept };
 }
 
 /**
