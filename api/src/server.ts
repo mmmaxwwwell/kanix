@@ -4059,14 +4059,27 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           });
         }
 
-        const created = await insertProduct(database.db, {
-          slug: body.slug,
-          title: body.title,
-          subtitle: body.subtitle,
-          description: body.description,
-          brand: body.brand,
-          status,
-        });
+        let created;
+        try {
+          created = await insertProduct(database.db, {
+            slug: body.slug,
+            title: body.title,
+            subtitle: body.subtitle,
+            description: body.description,
+            brand: body.brand,
+            status,
+          });
+        } catch (err: unknown) {
+          const drizzleErr = err as { cause?: { code?: string } ; code?: string };
+          const pgCode = drizzleErr.cause?.code ?? drizzleErr.code;
+          if (pgCode === "23505") {
+            return reply.status(400).send({
+              error: "ERR_SLUG_COLLISION",
+              message: `A product with slug '${body.slug}' already exists`,
+            });
+          }
+          throw err;
+        }
 
         request.auditContext = {
           action: "CREATE",
@@ -4133,6 +4146,16 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         if (body.status !== undefined) updateData.status = body.status;
 
         const updated = await updateProduct(database.db, id, updateData);
+
+        // Propagate archive to all non-archived variants
+        if (body.status === "archived" && existing.status !== "archived") {
+          const variants = await findVariantsByProductId(database.db, id);
+          for (const v of variants) {
+            if (v.status !== "archived") {
+              await updateVariant(database.db, v.id, { status: "archived" });
+            }
+          }
+        }
 
         request.auditContext = {
           action: "UPDATE",

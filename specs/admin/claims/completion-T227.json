@@ -1,0 +1,12 @@
+{
+  "task_id": "T227",
+  "status": "complete",
+  "summary": "Hardened admin-products.integration.test.ts with 14 tests: variant CRUD + pricing, slug collision (400), archive propagation to variants, media URL verification, concrete assertions replacing vacuous ones. Added slug collision handling and archive propagation to server.ts.",
+  "commands_run": [
+    {"command": "pnpm vitest run src/admin-products.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T227.json"],
+  "files_modified": ["api/src/admin-products.integration.test.ts", "api/src/server.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 2
+}

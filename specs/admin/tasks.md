@@ -504,7 +504,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T226 Harden `admin-inventory.integration.test.ts` — admin inventory adjustments
   Done when: positive adjustment (restock) increases balance with audit; negative adjustment (shrinkage) decreases with reason required; attempting to drive balance negative returns 400; adjustment history queryable per variant; bulk adjustment endpoint verified.
 
-- [ ] T227 Harden `admin-products.integration.test.ts` — admin product CRUD
+- [x] T227 Harden `admin-products.integration.test.ts` — admin product CRUD
   Done when: create product with variants + media + pricing succeeds; updating price updates the active snapshot; archive propagates to variants (cannot add to cart); slug collision returns 400; media upload URL signing verified.
 
 - [ ] T228 Harden `admin-reservation.integration.test.ts` — admin reservation view + override

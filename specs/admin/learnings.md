@@ -181,3 +181,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The DB CHECK constraint (`ck_inventory_balance_available`) throws a postgres.js error whose properties don't always match the expected `{ code: "23514", constraint: "ck_inventory_balance..." }` shape via Drizzle transactions. Solved by adding a pre-check in `createInventoryAdjustment` that throws `{ code: "ERR_INVENTORY_INSUFFICIENT" }` before the UPDATE.
 - API response fields from Drizzle `returning()` use camelCase (`onHand`, `adjustmentType`, `idempotencyKey`), not snake_case. Test type casts using `as` don't fail at runtime — accessing `body.adjustment.adjustment_type` silently returns `undefined`, making assertions pass vacuously when comparing `undefined` to something else.
 - The `admin_audit_log.entity_id` column is `uuid` type — using a non-UUID string like `"bulk"` causes an insert failure. For bulk operations, use the first result's adjustment ID as the entity_id.
+
+## T227 — Harden admin-products.integration.test.ts
+- Drizzle wraps postgres.js errors: the top-level error has `{ query, params, cause }` — the original postgres.js error (with `code: "23505"` for unique violations) is in `err.cause`. Use `err.cause?.code ?? err.code` to handle both raw and wrapped errors.
+- Product archive does NOT automatically propagate to variants — had to add explicit propagation in the PATCH `/api/admin/products/:id` handler that loops over `findVariantsByProductId` and archives each non-archived variant.
+- No media upload URL signing endpoint exists in the codebase — the media POST endpoint just stores a provided URL string directly. Tests verify URL round-trip through create and GET.
