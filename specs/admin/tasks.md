@@ -473,7 +473,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T217 Harden `order-state-machine.integration.test.ts` — order state transitions [T050]
   Done when: every legal transition from the state machine diagram produces correct side effects (events, notifications, inventory); every illegal transition returns 409 with ERR_INVALID_TRANSITION; terminal states (shipped, cancelled, refunded) reject all further transitions; state transition audit log entries written.
 
-- [ ] T218 Harden `order-cancel.integration.test.ts` — order cancellation
+- [x] T218 Harden `order-cancel.integration.test.ts` — order cancellation
   Done when: customer-initiated cancel before ship succeeds + releases reservation + refunds via Stripe; cancel after ship returns 409; admin force-cancel path with audit log entry; partial cancel (single line item) produces correct recalculated totals.
 
 - [ ] T219 Harden `resend-confirmation.integration.test.ts` — resend order confirmation email [T059d]

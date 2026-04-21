@@ -137,3 +137,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The state machine is DB-only (no HTTP server needed) — test directly against `transitionOrderStatus` / `findOrderById` / `findOrderStatusHistory` from `order-state-machine.js`. Each test creates its own order via direct DB insert at the desired starting state, avoiding sequential test dependencies.
 - Terminal states are defined by having `[]` (empty array) in the transition maps — use the exported `*_TRANSITIONS` records to dynamically generate exhaustive rejection tests for every terminal state × every possible target.
 - `transitionOrderStatus` throws plain objects (not Error instances) with `{ code, message, statusType, from, to }` — cast `catch (err: unknown)` as the specific shape rather than using `instanceof Error`.
+
+## T218 — Harden order-cancel.integration.test.ts
+- The cancel endpoint (`/api/admin/orders/:id/cancel`) returns 400 (not 409) for both `ERR_ORDER_ALREADY_SHIPPED` and `ERR_INVALID_TRANSITION` — the handler maps all domain errors to 400.
+- Audit log entries are written automatically via the `onResponse` hook in `auth/audit-log.ts` — no manual `insertAuditLog` call needed; just set `request.auditContext` in the route handler. Query `admin_audit_log` by `entityId` + `action="order.cancel"` to verify.
+- The old test used inline `testConfig`/`createFakeProcess` boilerplate — migrated to shared `createTestServer`/`stopTestServer` harness; the `env.sh` file lives at `.dev/e2e-state/env.sh` (not `test/e2e/.state/env.sh`).

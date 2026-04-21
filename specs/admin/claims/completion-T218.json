@@ -1,0 +1,17 @@
+{
+  "task_id": "T218",
+  "status": "complete",
+  "summary": "Hardened order-cancel.integration.test.ts with concrete assertions on refund amounts, inventory balance restoration, audit log entries, order status history, and error paths (shipped, already-canceled, missing auth, missing reason)",
+  "commands_run": [
+    {"command": "bash test/e2e/setup.sh", "exit_code": 0},
+    {"command": "source .dev/e2e-state/env.sh && cd api && npx vitest run src/order-cancel.integration.test.ts --no-file-parallelism", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T218.json"],
+  "files_modified": [
+    "api/src/order-cancel.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 2
+}

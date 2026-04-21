@@ -1,56 +1,24 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "node:events";
-import { createServer, markReady, markNotReady } from "./server.js";
 import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
-import type { Config } from "./config.js";
 import type { FastifyInstance } from "fastify";
-import { eq } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { product, productVariant } from "./db/schema/catalog.js";
 import {
   inventoryBalance,
   inventoryLocation,
   inventoryReservation,
 } from "./db/schema/inventory.js";
-import { order } from "./db/schema/order.js";
+import { order, orderStatusHistory } from "./db/schema/order.js";
 import { payment, refund } from "./db/schema/payment.js";
-import { adminUser, adminRole, adminUserRole } from "./db/schema/admin.js";
+import { adminUser, adminRole, adminUserRole, adminAuditLog } from "./db/schema/admin.js";
 import type { TaxAdapter } from "./services/tax-adapter.js";
 import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 import type { PaymentAdapter } from "./services/payment-adapter.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
 import { createHmac } from "node:crypto";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
+import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
 
-const DATABASE_URL = requireDatabaseUrl();
-const SUPERTOKENS_URI = getSuperTokensUri();
 const WEBHOOK_SECRET = "whsec_test_cancel_secret";
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
 
 function createStubTaxAdapter(): TaxAdapter {
   return {
@@ -156,10 +124,13 @@ function generateWebhookPayload(
 }
 
 describe("order cancellation API (T053)", () => {
+  let ts_: TestServer;
+
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
   let adminHeaders: Record<string, string>;
+  let adminUserId: string;
 
   const ts = Date.now();
   const adminEmail = `test-cancel-admin-${ts}@kanix.dev`;
@@ -172,24 +143,21 @@ describe("order cancellation API (T053)", () => {
   let unpaidOrderId = "";
   let paidOrderId = "";
   let shippedOrderId = "";
+  let alreadyCanceledOrderId = "";
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const db = dbConn.db;
-
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-      reservationCleanupIntervalMs: 0,
-      taxAdapter: createStubTaxAdapter(),
-      shippingAdapter: createStubShippingAdapter(),
-      paymentAdapter: createStubPaymentAdapter(),
+    ts_ = await createTestServer({
+      configOverrides: { STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET },
+      serverOverrides: {
+        taxAdapter: createStubTaxAdapter(),
+        shippingAdapter: createStubShippingAdapter(),
+        paymentAdapter: createStubPaymentAdapter(),
+      },
     });
-    app = server.app;
-    address = await server.start();
-    markReady();
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+    address = ts_.address;
+    const db = dbConn.db;
 
     // Create admin user with finance role (has orders.cancel)
     const authSubject = await signUpUser(address, adminEmail, adminPassword);
@@ -212,6 +180,7 @@ describe("order cancellation API (T053)", () => {
         status: "active",
       })
       .returning();
+    adminUserId = user.id;
 
     await db.insert(adminUserRole).values({ adminUserId: user.id, adminRoleId: role.id });
     adminHeaders = await signInAndGetHeaders(address, adminEmail, adminPassword);
@@ -275,6 +244,13 @@ describe("order cancellation API (T053)", () => {
     await simulatePaymentSuccess(app, db, shippedOrderId, `evt_cancel_shipped_${ts}`);
     // Manually set shipping_status to "shipped"
     await db.update(order).set({ shippingStatus: "shipped" }).where(eq(order.id, shippedOrderId));
+
+    // --- Create order 4: already canceled (for duplicate-cancel rejection) ---
+    alreadyCanceledOrderId = await createCheckoutOrder(app, db, variantId, `cxl-already-${ts}`);
+    await db
+      .update(order)
+      .set({ status: "canceled" })
+      .where(eq(order.id, alreadyCanceledOrderId));
   });
 
   async function createCheckoutOrder(
@@ -358,23 +334,28 @@ describe("order cancellation API (T053)", () => {
   }
 
   afterAll(async () => {
-    markNotReady();
-    await app?.close();
-    await dbConn?.close();
+    await stopTestServer(ts_);
   });
 
-  it("should cancel an unpaid order and release reservations", async () => {
+  it("should cancel an unpaid order, release reservations, and restore inventory balance", async () => {
     const db = dbConn.db;
+
+    // Capture inventory balance before cancel
+    const [balanceBefore] = await db
+      .select()
+      .from(inventoryBalance)
+      .where(
+        and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
+      );
 
     // Verify reservations exist before cancel
     const resBefore = await db
       .select()
       .from(inventoryReservation)
       .where(eq(inventoryReservation.orderId, unpaidOrderId));
-    // Reservations may be active or consumed depending on flow;
-    // for unpaid orders they should be active
     const activeResBefore = resBefore.filter((r) => r.status === "active");
     expect(activeResBefore.length).toBeGreaterThan(0);
+    const reservationCount = activeResBefore.length;
 
     const res = await app.inject({
       method: "POST",
@@ -390,27 +371,54 @@ describe("order cancellation API (T053)", () => {
     const body = JSON.parse(res.body);
     expect(body.success).toBe(true);
     expect(body.orderId).toBe(unpaidOrderId);
-    expect(body.reservationsReleased).toBeGreaterThan(0);
+    expect(body.reservationsReleased).toBe(reservationCount);
     expect(body.refundInitiated).toBe(false);
+    expect(body.refundId).toBeUndefined();
 
     // Verify order status is canceled
     const [orderRow] = await db.select().from(order).where(eq(order.id, unpaidOrderId));
     expect(orderRow.status).toBe("canceled");
 
-    // Verify reservations are released
+    // Verify reservations are all released (none active)
     const resAfter = await db
       .select()
       .from(inventoryReservation)
       .where(eq(inventoryReservation.orderId, unpaidOrderId));
     const activeResAfter = resAfter.filter((r) => r.status === "active");
     expect(activeResAfter.length).toBe(0);
+
+    // Verify inventory balance was restored
+    const [balanceAfter] = await db
+      .select()
+      .from(inventoryBalance)
+      .where(
+        and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
+      );
+    expect(balanceAfter.available).toBeGreaterThan(balanceBefore.available);
+
+    // Verify order status history entry for the cancellation
+    const history = await db
+      .select()
+      .from(orderStatusHistory)
+      .where(eq(orderStatusHistory.orderId, unpaidOrderId))
+      .orderBy(desc(orderStatusHistory.createdAt));
+    const cancelEntry = history.find(
+      (h) => h.statusType === "status" && h.newValue === "canceled",
+    );
+    expect(cancelEntry).toBeDefined();
+    expect(cancelEntry!.reason).toBe("Customer changed their mind");
+    expect(cancelEntry!.actorAdminUserId).toBe(adminUserId);
   });
 
-  it("should cancel a paid order with refund and release reservations", async () => {
+  it("should cancel a paid order with full refund via Stripe", async () => {
     const db = dbConn.db;
 
     // Clear refund adapter call log
     refundAdapterCalls = [];
+
+    // Capture the payment record to verify refund amount
+    const [paymentRow] = await db.select().from(payment).where(eq(payment.orderId, paidOrderId));
+    expect(paymentRow.amountMinor).toBeGreaterThan(0);
 
     const res = await app.inject({
       method: "POST",
@@ -427,24 +435,74 @@ describe("order cancellation API (T053)", () => {
     expect(body.success).toBe(true);
     expect(body.orderId).toBe(paidOrderId);
     expect(body.refundInitiated).toBe(true);
-    expect(body.refundId).toBeTruthy();
+    expect(typeof body.refundId).toBe("string");
+    expect(body.refundId.length).toBeGreaterThan(0);
 
     // Verify order status is canceled
     const [orderRow] = await db.select().from(order).where(eq(order.id, paidOrderId));
     expect(orderRow.status).toBe("canceled");
     expect(orderRow.paymentStatus).toBe("refunded");
 
-    // Verify refund record created in DB
+    // Verify refund record created in DB with correct details
     const refunds = await db.select().from(refund).where(eq(refund.orderId, paidOrderId));
     expect(refunds.length).toBe(1);
     expect(refunds[0].reason).toBe("Order canceled by admin");
     expect(refunds[0].status).toBe("succeeded");
+    expect(refunds[0].amountMinor).toBe(paymentRow.amountMinor);
+    expect(refunds[0].paymentId).toBe(paymentRow.id);
+    expect(refunds[0].actorAdminUserId).toBe(adminUserId);
 
-    // Verify payment adapter was called for refund
-    expect(refundAdapterCalls.length).toBeGreaterThan(0);
+    // Verify payment adapter was called with correct refund amount
+    expect(refundAdapterCalls.length).toBe(1);
+    expect(refundAdapterCalls[0].paymentIntentId).toBe(paymentRow.providerPaymentIntentId);
+    expect(refundAdapterCalls[0].amountMinor).toBe(paymentRow.amountMinor);
+
+    // Verify order status history includes both payment + status transitions
+    const history = await db
+      .select()
+      .from(orderStatusHistory)
+      .where(eq(orderStatusHistory.orderId, paidOrderId))
+      .orderBy(desc(orderStatusHistory.createdAt));
+    const cancelEntry = history.find(
+      (h) => h.statusType === "status" && h.newValue === "canceled",
+    );
+    expect(cancelEntry).toBeDefined();
+    expect(cancelEntry!.reason).toBe("Order canceled by admin");
+
+    const refundEntry = history.find(
+      (h) => h.statusType === "payment_status" && h.newValue === "refunded",
+    );
+    expect(refundEntry).toBeDefined();
   });
 
-  it("should reject cancellation of shipped order with ERR_ORDER_ALREADY_SHIPPED", async () => {
+  it("should write an audit log entry on successful cancellation", async () => {
+    const db = dbConn.db;
+
+    // The audit log entries for paidOrderId were written by the cancel in the
+    // previous test. Query them by entity_id.
+    const auditEntries = await db
+      .select()
+      .from(adminAuditLog)
+      .where(
+        and(
+          eq(adminAuditLog.entityId, paidOrderId),
+          eq(adminAuditLog.action, "order.cancel"),
+        ),
+      );
+
+    expect(auditEntries.length).toBeGreaterThanOrEqual(1);
+    const entry = auditEntries[0];
+    expect(entry.actorAdminUserId).toBe(adminUserId);
+    expect(entry.entityType).toBe("order");
+    expect(entry.entityId).toBe(paidOrderId);
+
+    const afterJson = entry.afterJson as Record<string, unknown>;
+    expect(afterJson.reason).toBe("Order canceled by admin");
+    expect(afterJson.refundInitiated).toBe(true);
+    expect(typeof afterJson.refundId).toBe("string");
+  });
+
+  it("should reject cancellation of shipped order with 400 ERR_ORDER_ALREADY_SHIPPED", async () => {
     const res = await app.inject({
       method: "POST",
       url: `/api/admin/orders/${shippedOrderId}/cancel`,
@@ -458,6 +516,31 @@ describe("order cancellation API (T053)", () => {
     expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body);
     expect(body.error).toBe("ERR_ORDER_ALREADY_SHIPPED");
+    expect(typeof body.message).toBe("string");
+    expect(body.message.length).toBeGreaterThan(0);
+
+    // Verify the shipped order status was NOT changed
+    const db = dbConn.db;
+    const [orderRow] = await db.select().from(order).where(eq(order.id, shippedOrderId));
+    expect(orderRow.status).not.toBe("canceled");
+    expect(orderRow.shippingStatus).toBe("shipped");
+  });
+
+  it("should reject cancellation of already-canceled order with ERR_INVALID_TRANSITION", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/admin/orders/${alreadyCanceledOrderId}/cancel`,
+      headers: {
+        "content-type": "application/json",
+        ...adminHeaders,
+      },
+      body: JSON.stringify({ reason: "Already canceled" }),
+    });
+
+    // The handler catches ERR_INVALID_TRANSITION and returns an error
+    expect(res.statusCode).toBeGreaterThanOrEqual(400);
+    const body = JSON.parse(res.body);
+    expect(body.error).toBe("ERR_INVALID_TRANSITION");
   });
 
   it("should return 404 for non-existent order", async () => {
@@ -475,5 +558,36 @@ describe("order cancellation API (T053)", () => {
     expect(res.statusCode).toBe(404);
     const body = JSON.parse(res.body);
     expect(body.error).toBe("ERR_ORDER_NOT_FOUND");
+    expect(typeof body.message).toBe("string");
+  });
+
+  it("should require reason field in request body", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/admin/orders/${shippedOrderId}/cancel`,
+      headers: {
+        "content-type": "application/json",
+        ...adminHeaders,
+      },
+      body: JSON.stringify({}),
+    });
+
+    // Fastify schema validation returns 400 when required field is missing
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("should require admin authentication to cancel", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/admin/orders/${shippedOrderId}/cancel`,
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
+      },
+      body: JSON.stringify({ reason: "No auth" }),
+    });
+
+    // Unauthenticated request should be rejected
+    expect(res.statusCode).toBe(401);
   });
 });
