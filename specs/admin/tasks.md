@@ -422,7 +422,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 
 ### Auth (everything downstream needs sessions working)
 
-- [ ] T203 Harden `auth/auth.integration.test.ts` — customer email/password + email verification [T032, FR-064]
+- [x] T203 Harden `auth/auth.integration.test.ts` — customer email/password + email verification [T032, FR-064]
   Done when: signup creates user + customer row (assert both); unverified user gets 401 on protected routes; verified user can access protected routes; login returns valid session tokens (assert token shape); bad credentials return 401 with correct error code; integration covers rate-limit rejection on repeated bad attempts.
 
 - [ ] T204 Harden `auth/admin-auth.integration.test.ts` — admin auth + role-based access

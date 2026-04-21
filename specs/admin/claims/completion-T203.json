@@ -1,0 +1,12 @@
+{
+  "task_id": "T203",
+  "status": "complete",
+  "summary": "Hardened auth/auth.integration.test.ts: replaced vacuous assertions with concrete checks, added signIn/verifyEmail helpers, added tests for signup+customer-row, unauth 401, unverified 403, verified access, bad credentials, non-existent email, and rate limiting",
+  "commands_run": [
+    {"command": "pnpm exec vitest run --reporter=verbose src/auth/auth.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T203.json"],
+  "files_modified": ["api/src/auth/auth.integration.test.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

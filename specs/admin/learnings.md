@@ -69,3 +69,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - **SuperTokens claim validators**: When using SuperTokens `Session.getSession` with proper wrappers, EmailVerification in REQUIRED mode causes 403 for unverified users. Must pass `overrideGlobalClaimValidators: () => []` since `requireVerifiedEmail` is a separate preHandler.
 - **Public products API requires class membership**: `findActiveProductsWithDetails` filters products by `productClassMembership`. Test products without class membership won't appear in listings — use the detail endpoint (`/api/products/:slug`) instead, which has no class membership requirement.
 - **Admin API responses use Drizzle camelCase**: Balance responses use `onHand`/`reserved`/`available` (not snake_case), and movement responses use `movementType`/`quantityDelta`.
+
+## T203 — Harden auth/auth.integration.test.ts
+- SuperTokens `signIn` returns 200 with `status: "WRONG_CREDENTIALS_ERROR"` (not HTTP 401) — test both wrong-password and non-existent-email to prevent enumeration
+- Email verification uses `EmailVerification.createEmailVerificationToken` + `verifyEmailUsingToken` server-side; must re-sign-in after verification to get a session with the verified claim
+- Rate limit test needs a separate server instance with `RATE_LIMIT_MAX: 3` to avoid polluting the main test server's request counter
