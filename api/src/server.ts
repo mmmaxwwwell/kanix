@@ -7265,7 +7265,25 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           });
         }
 
-        const dashboard = await getContributorDashboard(db, contrib.id);
+        // Parse optional date range query params
+        const query = request.query as { from?: string; to?: string };
+        const filter: { from?: Date; to?: Date } = {};
+        if (query.from) {
+          const d = new Date(query.from);
+          if (isNaN(d.getTime())) {
+            return reply.status(400).send({ error: "ERR_INVALID_DATE", message: "Invalid 'from' date" });
+          }
+          filter.from = d;
+        }
+        if (query.to) {
+          const d = new Date(query.to);
+          if (isNaN(d.getTime())) {
+            return reply.status(400).send({ error: "ERR_INVALID_DATE", message: "Invalid 'to' date" });
+          }
+          filter.to = d;
+        }
+
+        const dashboard = await getContributorDashboard(db, contrib.id, filter);
         if (!dashboard) {
           return reply.status(404).send({
             error: "ERR_NOT_FOUND",

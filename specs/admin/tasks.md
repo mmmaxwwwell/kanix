@@ -577,7 +577,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T247 Harden `contributor.integration.test.ts` — contributor onboarding + profile [T067]
   Done when: contributor signup via GitHub; profile with STL upload flow; CLA acceptance persists with version + timestamp; profile visibility setting (public/private) respected in public endpoints.
 
-- [ ] T248 Harden `contributor-dashboard.integration.test.ts` — contributor dashboard data [T071]
+- [x] T248 Harden `contributor-dashboard.integration.test.ts` — contributor dashboard data [T071]
   Done when: dashboard shows units-sold, earned royalties, milestone progress with exact number assertions; date range filter works; timezone handling verified; non-owner can't see another contributor's dashboard.
 
 - [ ] T249 Harden `contributor-milestones.integration.test.ts` — milestone transitions [T070, FR-071..075]

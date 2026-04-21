@@ -1,4 +1,4 @@
-import { eq, inArray, and, sql } from "drizzle-orm";
+import { eq, inArray, and, sql, gte, lte } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import {
   contributor,
@@ -962,13 +962,22 @@ export interface DashboardResult {
   payouts: PayoutRow[];
 }
 
+export interface DashboardFilterOptions {
+  /** Include only royalties created on or after this date */
+  from?: Date;
+  /** Include only royalties created on or before this date */
+  to?: Date;
+}
+
 /**
  * Get a full dashboard view for a contributor.
  * Aggregates designs with sales counts, royalty totals, milestones, and payouts.
+ * Optional date range filter scopes royalty aggregation to a time window.
  */
 export async function getContributorDashboard(
   db: PostgresJsDatabase,
   contributorId: string,
+  filter?: DashboardFilterOptions,
 ): Promise<DashboardResult | null> {
   const contrib = await findContributorById(db, contributorId);
   if (!contrib) return null;
@@ -986,6 +995,15 @@ export async function getContributorDashboard(
     .leftJoin(product, eq(contributorDesign.productId, product.id))
     .where(eq(contributorDesign.contributorId, contributorId));
 
+  // Build royalty filter conditions
+  const royaltyConditions = [eq(contributorRoyalty.contributorId, contributorId)];
+  if (filter?.from) {
+    royaltyConditions.push(gte(contributorRoyalty.createdAt, filter.from));
+  }
+  if (filter?.to) {
+    royaltyConditions.push(lte(contributorRoyalty.createdAt, filter.to));
+  }
+
   // Royalty aggregation by status
   const royaltyRows = await db
     .select({
@@ -993,7 +1011,7 @@ export async function getContributorDashboard(
       total: sql<number>`coalesce(sum(${contributorRoyalty.amountMinor}), 0)`.as("total"),
     })
     .from(contributorRoyalty)
-    .where(eq(contributorRoyalty.contributorId, contributorId))
+    .where(and(...royaltyConditions))
     .groupBy(contributorRoyalty.status);
 
   let accruedMinor = 0;

@@ -266,3 +266,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The `contributor` table had no `cla_version` or `profile_visibility` columns — added via Liquibase migration `014-contributor-profile-fields.xml` with a CHECK constraint on `profile_visibility IN ('public', 'private')` and default `'public'`.
 - Public contributor endpoints (`/api/contributors/public` and `/api/contributors/public/:username`) filter by `profile_visibility = 'public'` — the per-username endpoint also returns the contributor's designs for profile rendering.
 - The old test used DB-level queries only; hardened version uses HTTP-level tests through `createTestServer` with admin auth (signUp + signIn + admin_user + admin_role setup) following the same pattern as T227.
+
+## T248 — Harden contributor-dashboard.integration.test.ts
+- The dashboard endpoint (`GET /api/contributors/dashboard`) uses session → customer → contributor lookup, so each authenticated user only ever sees their own dashboard — no contributor ID in the URL means no cross-user access path exists.
+- `getContributorDashboard` had no date range filtering — added optional `from`/`to` parameters that scope the royalty aggregation query via `gte`/`lte` on `contributorRoyalty.createdAt`. Designs, milestones, and payouts are unaffected by the date filter (lifetime values).
+- The old test used direct DB connections only; migrated to `createTestServer` with full auth (signUp + verifyEmail + signIn) since the endpoint requires `verifySession + requireVerifiedEmail`.
