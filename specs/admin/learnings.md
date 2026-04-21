@@ -152,3 +152,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Fastify rejects `POST` with `Content-Type: application/json` and no body (`FST_ERR_CTP_EMPTY_JSON_BODY` → 500). For admin action endpoints that take no body, omit the Content-Type header entirely.
 - The `resend-confirmation` endpoint is at `/api/admin/orders/:id/resend-confirmation` with `verifySession + requireAdmin + requireCapability(ORDERS_MANAGE)` — only `super_admin` role has `ORDERS_MANAGE`; `support`/`finance`/`fulfillment` do not.
 - Updated `createNotificationService` to accept an optional `{ emailLogPath }` and write email entries to a JSONL file alongside the in-memory queue, enabling `logs/emails.jsonl` assertions in integration tests.
+
+## T221 — Harden low-stock-alert.integration.test.ts
+- `notificationDispatch.dispatchAlert` publishes one WebSocket message per admin target (via `inAppAdapter.send → wsManager.publish`), so with N active admins in the shared DB, the wsManager buffer gets N messages per alert. Use `>= 1` assertion, not `== 1`, and filter by variantId + buffer offset.
+- `LowStockAlertService` had no deduplication — added a per-variant cooldown map with configurable `cooldownMs` (default 5 min). The `clear()` method must also clear the cooldown map to avoid stale timestamps.
+- Email assertions against the default `logs/emails.jsonl` must filter by admin email + variant ID since other test files and prior test runs also write to the same log file.

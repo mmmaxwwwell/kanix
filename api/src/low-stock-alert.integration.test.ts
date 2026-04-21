@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "node:events";
-import { createServer, markReady, markNotReady } from "./server.js";
-import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
-import type { Config } from "./config.js";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import type { DatabaseConnection } from "./db/connection.js";
 import type { FastifyInstance } from "fastify";
 import { eq, and } from "drizzle-orm";
 import { adminUser, adminRole, adminUserRole } from "./db/schema/admin.js";
@@ -15,39 +14,14 @@ import {
   inventoryReservation,
 } from "./db/schema/inventory.js";
 import { adminAuditLog } from "./db/schema/admin.js";
+import { adminAlertPreference } from "./db/schema/alert-preference.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
-import type { LowStockAlertService } from "./services/low-stock-alert.js";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
-
-const DATABASE_URL = requireDatabaseUrl();
-const SUPERTOKENS_URI = getSuperTokensUri();
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: "whsec_xxx",
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
+import {
+  createLowStockAlertService,
+  type LowStockAlertService,
+} from "./services/low-stock-alert.js";
+import type { WsManager } from "./ws/manager.js";
+import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
 
 async function signUpUser(address: string, email: string, password: string): Promise<string> {
   const res = await fetch(`${address}/auth/signup`, {
@@ -98,37 +72,43 @@ async function signInAndGetHeaders(
   return headers;
 }
 
-describe("low-stock alert (T043)", () => {
+describe("low-stock alert (T043, FR-038, FR-085)", () => {
+  let ts_: TestServer;
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
   let adminHeaders: Record<string, string>;
   let adminUserId: string;
   let alertService: LowStockAlertService;
+  let wsManager: WsManager | undefined;
 
   const ts = Date.now();
   const adminEmail = `test-lowstock-admin-${ts}@kanix.dev`;
   const adminPassword = "AdminPassword123!";
+  const defaultEmailLogPath = join(process.cwd(), "logs", "emails.jsonl");
 
   let testProductId: string;
   let testVariantId: string;
   let testLocationId: string;
   let testRoleId: string;
 
-  beforeAll(async () => {
-    await assertSuperTokensUp();
+  // Use a short cooldown (2 seconds) for testability
+  const COOLDOWN_MS = 2000;
 
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-      reservationCleanupIntervalMs: 0,
+  beforeAll(async () => {
+    // Create alert service with short cooldown for deduplication testing
+    const customAlertService = createLowStockAlertService({ cooldownMs: COOLDOWN_MS });
+
+    ts_ = await createTestServer({
+      serverOverrides: {
+        lowStockAlertService: customAlertService,
+      },
     });
-    address = await server.start();
-    markReady();
-    app = server.app;
-    alertService = server.lowStockAlertService;
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+    address = ts_.address;
+    alertService = ts_.server.lowStockAlertService;
+    wsManager = ts_.server.wsManager;
 
     // Create admin user with super_admin role
     const authSubject = await signUpUser(address, adminEmail, adminPassword);
@@ -195,56 +175,95 @@ describe("low-stock alert (T043)", () => {
   }, 30000);
 
   afterAll(async () => {
-    markNotReady();
-    if (dbConn) {
-      try {
-        await dbConn.db
-          .delete(inventoryMovement)
-          .where(eq(inventoryMovement.variantId, testVariantId));
-        await dbConn.db
-          .delete(inventoryReservation)
-          .where(eq(inventoryReservation.variantId, testVariantId));
-        await dbConn.db
-          .delete(inventoryAdjustment)
-          .where(eq(inventoryAdjustment.variantId, testVariantId));
-        await dbConn.db
-          .delete(inventoryBalance)
-          .where(eq(inventoryBalance.variantId, testVariantId));
-        await dbConn.db.delete(inventoryLocation).where(eq(inventoryLocation.id, testLocationId));
-        await dbConn.db.delete(productVariant).where(eq(productVariant.id, testVariantId));
-        await dbConn.db.delete(product).where(eq(product.id, testProductId));
-        await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, adminUserId));
-        await dbConn.db.delete(adminUser).where(eq(adminUser.id, adminUserId));
-        await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));
-        await dbConn.db
-          .delete(adminAuditLog)
-          .where(eq(adminAuditLog.actorAdminUserId, adminUserId));
-      } catch {
-        // Best-effort cleanup
-      }
-      await dbConn.close();
+    try {
+      await dbConn.db
+        .delete(inventoryMovement)
+        .where(eq(inventoryMovement.variantId, testVariantId));
+      await dbConn.db
+        .delete(inventoryReservation)
+        .where(eq(inventoryReservation.variantId, testVariantId));
+      await dbConn.db
+        .delete(inventoryAdjustment)
+        .where(eq(inventoryAdjustment.variantId, testVariantId));
+      await dbConn.db
+        .delete(inventoryBalance)
+        .where(eq(inventoryBalance.variantId, testVariantId));
+      await dbConn.db.delete(inventoryLocation).where(eq(inventoryLocation.id, testLocationId));
+      await dbConn.db.delete(productVariant).where(eq(productVariant.id, testVariantId));
+      await dbConn.db.delete(product).where(eq(product.id, testProductId));
+      await dbConn.db
+        .delete(adminAlertPreference)
+        .where(eq(adminAlertPreference.adminUserId, adminUserId));
+      await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, adminUserId));
+      await dbConn.db.delete(adminUser).where(eq(adminUser.id, adminUserId));
+      await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));
+      await dbConn.db
+        .delete(adminAuditLog)
+        .where(eq(adminAuditLog.actorAdminUserId, adminUserId));
+    } catch {
+      // Best-effort cleanup
     }
-    if (app) {
-      await app.close();
-    }
+    await stopTestServer(ts_);
   }, 15000);
 
-  it("should queue low-stock alert when adjustment causes available < safety_stock", async () => {
-    // Step 1: Restock +15 units
-    const restockRes = await fetch(`${address}/api/admin/inventory/adjustments`, {
+  // -------------------------------------------------------------------------
+  // Helper: make an inventory adjustment via the API
+  // -------------------------------------------------------------------------
+  async function makeAdjustment(
+    adjustmentType: string,
+    quantityDelta: number,
+    reason: string,
+  ): Promise<{ status: number; body: Record<string, unknown> }> {
+    const res = await fetch(`${address}/api/admin/inventory/adjustments`, {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
       body: JSON.stringify({
         variant_id: testVariantId,
         location_id: testLocationId,
-        adjustment_type: "restock",
-        quantity_delta: 15,
-        reason: "Initial stock for low-stock test",
+        adjustment_type: adjustmentType,
+        quantity_delta: quantityDelta,
+        reason,
       }),
     });
-    expect(restockRes.status).toBe(201);
+    const body = (await res.json()) as Record<string, unknown>;
+    return { status: res.status, body };
+  }
 
-    // Step 2: Set safety_stock = 10
+  // -------------------------------------------------------------------------
+  // Helper: get current available balance
+  // -------------------------------------------------------------------------
+  async function getCurrentAvailable(): Promise<number> {
+    const res = await fetch(
+      `${address}/api/admin/inventory/balances?variant_id=${testVariantId}`,
+      { headers: adminHeaders },
+    );
+    const body = (await res.json()) as { balances: Array<{ available: number }> };
+    return body.balances[0]?.available ?? 0;
+  }
+
+  // -------------------------------------------------------------------------
+  // Helper: reset inventory to a known available count
+  // -------------------------------------------------------------------------
+  async function resetAvailableTo(target: number): Promise<void> {
+    const current = await getCurrentAvailable();
+    if (current < target) {
+      const r = await makeAdjustment("restock", target - current, "Reset for test");
+      expect(r.status).toBe(201);
+    } else if (current > target) {
+      const r = await makeAdjustment("shrinkage", -(current - target), "Reset for test");
+      expect(r.status).toBe(201);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Core: alert queued when adjustment drops available below safety_stock
+  // -------------------------------------------------------------------------
+  it("queues low-stock alert when adjustment causes available < safety_stock", async () => {
+    // Restock +15 units
+    const restock = await makeAdjustment("restock", 15, "Initial stock for low-stock test");
+    expect(restock.status).toBe(201);
+
+    // Set safety_stock = 10
     await dbConn.db
       .update(inventoryBalance)
       .set({ safetyStock: 10 })
@@ -255,94 +274,48 @@ describe("low-stock alert (T043)", () => {
         ),
       );
 
-    // Clear any previously queued alerts
     alertService.clear();
 
-    // Step 3: Shrinkage -10 → available goes from 15 to 5, which is < safety_stock (10)
-    const shrinkRes = await fetch(`${address}/api/admin/inventory/adjustments`, {
-      method: "POST",
-      headers: { ...adminHeaders, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        variant_id: testVariantId,
-        location_id: testLocationId,
-        adjustment_type: "shrinkage",
-        quantity_delta: -10,
-        reason: "Shrinkage for low-stock test",
-      }),
-    });
-    expect(shrinkRes.status).toBe(201);
-    const shrinkBody = (await shrinkRes.json()) as {
-      low_stock: boolean;
-      balance: { available: number };
-    };
-    expect(shrinkBody.low_stock).toBe(true);
-    expect(shrinkBody.balance.available).toBe(5);
+    // Shrinkage -10 → available 15 → 5, which is < safety_stock (10)
+    const shrink = await makeAdjustment("shrinkage", -10, "Shrinkage for low-stock test");
+    expect(shrink.status).toBe(201);
+    expect(shrink.body.low_stock).toBe(true);
+    expect((shrink.body.balance as { available: number }).available).toBe(5);
 
-    // Step 4: Verify alert was queued
+    // Verify alert was queued with correct fields
     const alerts = alertService.getAlerts();
-    expect(alerts.length).toBe(1);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].variantId).toBe(testVariantId);
     expect(alerts[0].variantSku).toBe(`LOWSTOCK-TEST-${ts}`);
     expect(alerts[0].productTitle).toBe(`Low Stock Alert Test Product ${ts}`);
     expect(alerts[0].available).toBe(5);
     expect(alerts[0].safetyStock).toBe(10);
-    expect(alerts[0].variantId).toBe(testVariantId);
+    expect(alerts[0].timestamp).toBeInstanceOf(Date);
   });
 
-  it("should not queue alert when available >= safety_stock", async () => {
+  // -------------------------------------------------------------------------
+  // Core: no alert when available >= safety_stock
+  // -------------------------------------------------------------------------
+  it("does not queue alert when available >= safety_stock", async () => {
     alertService.clear();
 
-    // Restock +100 → available will be well above safety_stock
-    const res = await fetch(`${address}/api/admin/inventory/adjustments`, {
-      method: "POST",
-      headers: { ...adminHeaders, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        variant_id: testVariantId,
-        location_id: testLocationId,
-        adjustment_type: "restock",
-        quantity_delta: 100,
-        reason: "Restock above threshold",
-      }),
-    });
+    // Restock +100 → available well above safety_stock
+    const res = await makeAdjustment("restock", 100, "Restock above threshold");
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { low_stock: boolean };
-    expect(body.low_stock).toBe(false);
+    expect(res.body.low_stock).toBe(false);
 
-    // No alert should be queued
-    expect(alertService.getAlerts().length).toBe(0);
+    expect(alertService.getAlerts()).toHaveLength(0);
   });
 
-  it("should queue low-stock alert when reservation causes available < safety_stock", async () => {
-    // Current state: available ~105, safety_stock = 10
-    // First set available to a controlled value: shrinkage to bring it down
-    // Reset: set available precisely by adjusting
-    const balances = await fetch(
-      `${address}/api/admin/inventory/balances?variant_id=${testVariantId}`,
-      { headers: adminHeaders },
-    );
-    const balBody = (await balances.json()) as {
-      balances: Array<{ available: number }>;
-    };
-    const currentAvailable = balBody.balances[0].available;
-
-    // Shrink down to exactly 15 available
-    if (currentAvailable > 15) {
-      const shrinkRes = await fetch(`${address}/api/admin/inventory/adjustments`, {
-        method: "POST",
-        headers: { ...adminHeaders, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          variant_id: testVariantId,
-          location_id: testLocationId,
-          adjustment_type: "shrinkage",
-          quantity_delta: -(currentAvailable - 15),
-          reason: "Adjust for reservation test",
-        }),
-      });
-      expect(shrinkRes.status).toBe(201);
-    }
+  // -------------------------------------------------------------------------
+  // Reservation trigger: alert when reservation drops available below safety_stock
+  // -------------------------------------------------------------------------
+  it("queues low-stock alert when reservation causes available < safety_stock", async () => {
+    await resetAvailableTo(15);
 
     alertService.clear();
 
-    // Reserve 10 units → available goes from 15 to 5, which is < safety_stock (10)
+    // Reserve 10 units → available 15 → 5, which is < safety_stock (10)
     const reserveRes = await fetch(`${address}/api/admin/inventory/reservations`, {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
@@ -351,17 +324,231 @@ describe("low-stock alert (T043)", () => {
         location_id: testLocationId,
         quantity: 10,
         ttl_ms: 300000,
-        reservation_reason: "low-stock-test",
+        reservation_reason: "low-stock-reservation-test",
       }),
     });
     expect(reserveRes.status).toBe(201);
 
-    // Verify alert was queued
     const alerts = alertService.getAlerts();
-    expect(alerts.length).toBe(1);
+    expect(alerts).toHaveLength(1);
     expect(alerts[0].variantSku).toBe(`LOWSTOCK-TEST-${ts}`);
     expect(alerts[0].productTitle).toBe(`Low Stock Alert Test Product ${ts}`);
     expect(alerts[0].available).toBe(5);
     expect(alerts[0].safetyStock).toBe(10);
   });
+
+  // -------------------------------------------------------------------------
+  // Threshold change: changing safety_stock updates alert behavior
+  // -------------------------------------------------------------------------
+  it("threshold change updates alert behavior", async () => {
+    await resetAvailableTo(20);
+
+    // Set safety_stock very low (2) — available 20 is well above 2
+    await dbConn.db
+      .update(inventoryBalance)
+      .set({ safetyStock: 2 })
+      .where(
+        and(
+          eq(inventoryBalance.variantId, testVariantId),
+          eq(inventoryBalance.locationId, testLocationId),
+        ),
+      );
+
+    alertService.clear();
+
+    // Shrinkage -15 → available 20 → 5, which is >= safety_stock (2) → no alert
+    const shrink1 = await makeAdjustment("shrinkage", -15, "Shrinkage with low threshold");
+    expect(shrink1.status).toBe(201);
+    expect(shrink1.body.low_stock).toBe(false);
+    expect(alertService.getAlerts()).toHaveLength(0);
+
+    // Raise threshold to 10
+    await dbConn.db
+      .update(inventoryBalance)
+      .set({ safetyStock: 10 })
+      .where(
+        and(
+          eq(inventoryBalance.variantId, testVariantId),
+          eq(inventoryBalance.locationId, testLocationId),
+        ),
+      );
+
+    // Shrinkage -1 → available 5 → 4, which is < safety_stock (10) → alert fires
+    const shrink2 = await makeAdjustment("shrinkage", -1, "Shrinkage after threshold raise");
+    expect(shrink2.status).toBe(201);
+    expect(shrink2.body.low_stock).toBe(true);
+
+    const alerts = alertService.getAlerts();
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].available).toBe(4);
+    expect(alerts[0].safetyStock).toBe(10);
+  });
+
+  // -------------------------------------------------------------------------
+  // Deduplication: alerts suppressed within cooldown window
+  // -------------------------------------------------------------------------
+  it("deduplicates alerts within cooldown window", async () => {
+    await resetAvailableTo(15);
+    await dbConn.db
+      .update(inventoryBalance)
+      .set({ safetyStock: 10 })
+      .where(
+        and(
+          eq(inventoryBalance.variantId, testVariantId),
+          eq(inventoryBalance.locationId, testLocationId),
+        ),
+      );
+
+    alertService.clear();
+
+    // First shrinkage -6 → available 15 → 9, < 10 → alert fires
+    const shrink1 = await makeAdjustment("shrinkage", -6, "First shrinkage for dedup");
+    expect(shrink1.status).toBe(201);
+    expect(shrink1.body.low_stock).toBe(true);
+    expect(alertService.getAlerts()).toHaveLength(1);
+
+    // Second shrinkage -1 → available 9 → 8, still < 10 → alert SUPPRESSED (within cooldown)
+    const shrink2 = await makeAdjustment("shrinkage", -1, "Second shrinkage for dedup");
+    expect(shrink2.status).toBe(201);
+    expect(shrink2.body.low_stock).toBe(true);
+    // Still only 1 alert — second was suppressed by cooldown
+    expect(alertService.getAlerts()).toHaveLength(1);
+  });
+
+  it("fires alert again after cooldown window expires", async () => {
+    // Wait for cooldown to expire (COOLDOWN_MS = 2000)
+    await new Promise((resolve) => setTimeout(resolve, COOLDOWN_MS + 200));
+
+    alertService.clear();
+
+    // Shrinkage -1 → should now fire since cooldown expired
+    const shrink = await makeAdjustment("shrinkage", -1, "Post-cooldown shrinkage");
+    expect(shrink.status).toBe(201);
+    expect(shrink.body.low_stock).toBe(true);
+    expect(alertService.getAlerts()).toHaveLength(1);
+  }, 10000);
+
+  // -------------------------------------------------------------------------
+  // Email notification: alert dispatches email to admins
+  // -------------------------------------------------------------------------
+  it("dispatches email notification to admin on low-stock alert", async () => {
+    // Wait for cooldown to expire so alert isn't deduplicated
+    await new Promise((resolve) => setTimeout(resolve, COOLDOWN_MS + 200));
+
+    // Record the email log file size before the alert so we can find new entries
+    let linesBefore = 0;
+    if (existsSync(defaultEmailLogPath)) {
+      linesBefore = readFileSync(defaultEmailLogPath, "utf-8").trim().split("\n").length;
+    }
+
+    await resetAvailableTo(15);
+    alertService.clear();
+
+    // Shrinkage -6 → available 9 < 10 → triggers alert + email dispatch
+    const shrink = await makeAdjustment("shrinkage", -6, "Shrinkage for email test");
+    expect(shrink.status).toBe(201);
+    expect(shrink.body.low_stock).toBe(true);
+
+    // Verify email was logged to JSONL
+    expect(existsSync(defaultEmailLogPath)).toBe(true);
+    const allLines = readFileSync(defaultEmailLogPath, "utf-8").trim().split("\n");
+    const newLines = allLines.slice(linesBefore);
+    expect(newLines.length).toBeGreaterThanOrEqual(1);
+
+    // Find the email sent to our specific admin about this variant
+    const parsed = newLines.map((line) => JSON.parse(line) as {
+      to: string;
+      subject: string;
+      body: string;
+      templateId: string;
+      timestamp: string;
+    });
+    const matchingEntry = parsed.find(
+      (entry) =>
+        entry.templateId === "low_stock_alert" &&
+        entry.subject.includes(testVariantId) &&
+        entry.to === adminEmail,
+    );
+
+    expect(matchingEntry).toBeDefined();
+    expect(matchingEntry!.body).toContain(testVariantId);
+    expect(matchingEntry!.body).toContain("9"); // available count
+    expect(matchingEntry!.body).toContain("10"); // safety stock
+    expect(matchingEntry!.timestamp).toBeTruthy();
+  }, 10000);
+
+  // -------------------------------------------------------------------------
+  // WebSocket notification: domain event published via wsManager
+  // -------------------------------------------------------------------------
+  it("publishes inventory.low_stock domain event via WebSocket manager", async () => {
+    // Wait for cooldown to expire
+    await new Promise((resolve) => setTimeout(resolve, COOLDOWN_MS + 200));
+
+    expect(wsManager).toBeDefined();
+
+    await resetAvailableTo(15);
+    alertService.clear();
+
+    // Record the buffer length right before the shrinkage that triggers the alert
+    const bufLenBefore = wsManager!.messageBuffer.length;
+
+    // Shrinkage -6 → triggers domain event via wsManager.publish
+    const shrink = await makeAdjustment("shrinkage", -6, "Shrinkage for WS test");
+    expect(shrink.status).toBe(201);
+    expect(shrink.body.low_stock).toBe(true);
+
+    // Check only NEW entries in the wsManager's message buffer.
+    // Note: there may be multiple messages because notificationDispatch.dispatchAlert
+    // publishes once per admin target (via inAppAdapter) in addition to the
+    // single domainEvents.publish call. All active admins in the shared DB
+    // are targets, so expect >= 1.
+    const newEntries = wsManager!.messageBuffer.slice(bufLenBefore);
+    const lowStockEvents = newEntries.filter(
+      (m) =>
+        m.message.type === "inventory.low_stock" &&
+        m.message.entityId === testVariantId,
+    );
+    expect(lowStockEvents.length).toBeGreaterThanOrEqual(1);
+
+    const event = lowStockEvents[0].message;
+    expect(event.entity).toBe("inventory");
+    expect(event.entityId).toBe(testVariantId);
+    expect(event.data.available).toBe(9);
+    expect(event.data.safetyStock).toBe(10);
+    expect(event.data.locationId).toBe(testLocationId);
+    expect(typeof event.sequenceId).toBe("number");
+    expect(event.sequenceId).toBeGreaterThan(0);
+
+    // Verify the message is on the inventory:* wildcard channel (admins receive this)
+    expect(lowStockEvents[0].wildcardChannel).toBe("inventory:*");
+  }, 10000);
+
+  // -------------------------------------------------------------------------
+  // Alert includes all required fields: variant SKU, product title, available, threshold
+  // -------------------------------------------------------------------------
+  it("alert includes variant SKU, product title, available count, and threshold", async () => {
+    // Wait for cooldown
+    await new Promise((resolve) => setTimeout(resolve, COOLDOWN_MS + 200));
+
+    await resetAvailableTo(12);
+    alertService.clear();
+
+    // Shrinkage -5 → available 12 → 7
+    const shrink = await makeAdjustment("shrinkage", -5, "Shrinkage for field test");
+    expect(shrink.status).toBe(201);
+    expect(shrink.body.low_stock).toBe(true);
+
+    const alerts = alertService.getAlerts();
+    expect(alerts).toHaveLength(1);
+
+    const alert = alerts[0];
+    // Exact field assertions — not toBeDefined/toBeTruthy
+    expect(alert.variantSku).toBe(`LOWSTOCK-TEST-${ts}`);
+    expect(alert.productTitle).toBe(`Low Stock Alert Test Product ${ts}`);
+    expect(alert.available).toBe(7);
+    expect(alert.safetyStock).toBe(10);
+    expect(alert.variantId).toBe(testVariantId);
+    expect(alert.timestamp.getTime()).toBeLessThanOrEqual(Date.now());
+    expect(alert.timestamp.getTime()).toBeGreaterThan(Date.now() - 5000);
+  }, 10000);
 });

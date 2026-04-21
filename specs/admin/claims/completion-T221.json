@@ -1,0 +1,17 @@
+{
+  "task_id": "T221",
+  "status": "complete",
+  "summary": "Hardened low-stock-alert.integration.test.ts: added cooldown deduplication to LowStockAlertService, migrated test to shared test harness, added tests for threshold changes, email dispatch, WebSocket domain event, and cooldown dedup window",
+  "commands_run": [
+    {"command": "pnpm --dir api test -- --reporter=verbose --testPathPattern=low-stock-alert.integration", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T221.json"],
+  "files_modified": [
+    "api/src/low-stock-alert.integration.test.ts",
+    "api/src/services/low-stock-alert.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

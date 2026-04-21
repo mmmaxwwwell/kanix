@@ -35,8 +35,21 @@ export interface LowStockAlertService {
 // Implementation
 // ---------------------------------------------------------------------------
 
-export function createLowStockAlertService(): LowStockAlertService {
+/** Default cooldown window: 5 minutes (ms). */
+const DEFAULT_COOLDOWN_MS = 5 * 60 * 1000;
+
+export interface LowStockAlertServiceOptions {
+  /** Cooldown window in ms. Duplicate alerts for the same variant within this window are suppressed. */
+  cooldownMs?: number;
+}
+
+export function createLowStockAlertService(
+  opts?: LowStockAlertServiceOptions,
+): LowStockAlertService {
   const alerts: LowStockAlert[] = [];
+  const cooldownMs = opts?.cooldownMs ?? DEFAULT_COOLDOWN_MS;
+  /** Tracks last alert timestamp per variant for deduplication. */
+  const lastAlertTime = new Map<string, number>();
 
   return {
     async checkAndQueue(
@@ -46,6 +59,13 @@ export function createLowStockAlertService(): LowStockAlertService {
       safetyStock: number,
     ): Promise<void> {
       if (safetyStock <= 0 || available >= safetyStock) {
+        return;
+      }
+
+      // Deduplicate within cooldown window
+      const now = Date.now();
+      const lastTime = lastAlertTime.get(variantId);
+      if (lastTime !== undefined && now - lastTime < cooldownMs) {
         return;
       }
 
@@ -67,6 +87,7 @@ export function createLowStockAlertService(): LowStockAlertService {
 
       const productTitle = prod?.title ?? "Unknown Product";
 
+      lastAlertTime.set(variantId, now);
       alerts.push({
         variantId,
         variantSku: variant.sku,
@@ -83,6 +104,7 @@ export function createLowStockAlertService(): LowStockAlertService {
 
     clear(): void {
       alerts.length = 0;
+      lastAlertTime.clear();
     },
   };
 }
