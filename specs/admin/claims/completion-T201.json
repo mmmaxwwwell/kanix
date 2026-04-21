@@ -1,0 +1,12 @@
+{
+  "task_id": "T201",
+  "status": "complete",
+  "summary": "Hardened ready.integration.test.ts: removed skip guards, added 6 tests covering not-ready-at-startup, happy-path, DB down, SuperTokens down, both down, and ready-to-not-ready transition with concrete assertions on every response field",
+  "commands_run": [
+    {"command": "npx vitest run --reporter=verbose src/ready.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T201.json"],
+  "files_modified": ["api/src/ready.integration.test.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

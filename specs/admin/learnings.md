@@ -57,3 +57,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The old test used `describe.skip` via `describeWithDb` when `DATABASE_URL` was unset — replaced with `requireDatabaseUrl()` from `test-helpers.ts` which throws loudly in `beforeAll`
 - `postgres.js` `sql.end()` makes subsequent template-tag queries throw — use `conn.sql\`SELECT 1\`` (not `conn.db.execute()`) to test post-close failure since drizzle's `execute()` needs a proper SQL object
 - `createDatabaseConnection` with an unreachable URL doesn't throw until the first query — `checkDatabaseConnectivity` returns `false` (catches internally), but raw `sql\`SELECT 1\`` throws
+
+## T201 — Harden ready.integration.test.ts
+- The `/ready` endpoint returns only `{ status, dependencies? }` — `uptime` and `version` are on `/health` (HealthResponse), not `/ready` (ReadyResponse)
+- When `isReady()` is false (before `markReady()` or during shutdown), `/ready` short-circuits to 503 without checking dependencies — the response body has no `dependencies` field in this case
+- The old test used `describeWithDb = DATABASE_URL ? describe : describe.skip` — replaced with `requireDatabaseUrl()` + `assertSuperTokensUp()` for loud failures
