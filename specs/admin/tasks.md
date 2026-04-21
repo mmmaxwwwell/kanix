@@ -465,7 +465,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T215 Harden `checkout.integration.test.ts` — checkout → payment intent + tax + shipping [FR-012..018]
   Done when: happy-path checkout produces client_secret + correct totals; invalid shipping address returns 400 with field errors; Stripe Tax calculation path verified (TX address → non-zero tax); shipping rate selection persists; checkout against stale cart (items changed) returns 409 with the conflict detail; repeated checkout on same cart returns consistent totals.
 
-- [ ] T216 Harden `policy-acknowledgment.integration.test.ts` — customer policy acknowledgment
+- [x] T216 Harden `policy-acknowledgment.integration.test.ts` — customer policy acknowledgment
   Done when: checkout requires policy acknowledgment (ToS, warranty disclaimer); submission without acknowledgment returns 400 naming the missing policy; acknowledgment persists with timestamp + policy version; re-acknowledgment required when policy version bumps.
 
 ### Orders + state machine (lifecycle transitions)

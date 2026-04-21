@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "node:events";
-import { createServer, markReady, markNotReady } from "./server.js";
-import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
-import type { Config } from "./config.js";
+import type { DatabaseConnection } from "./db/connection.js";
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { product, productVariant } from "./db/schema/catalog.js";
@@ -11,37 +8,8 @@ import { policySnapshot, orderPolicyAcknowledgment } from "./db/schema/evidence.
 import type { TaxAdapter } from "./services/tax-adapter.js";
 import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 import type { PaymentAdapter } from "./services/payment-adapter.js";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
-
-const DATABASE_URL = requireDatabaseUrl();
-const SUPERTOKENS_URI = getSuperTokensUri();
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: "whsec_xxx",
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
+import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
+import { findInventoryBalances } from "./db/queries/index.js";
 
 function createStubTaxAdapter(): TaxAdapter {
   return {
@@ -67,42 +35,79 @@ function createStubPaymentAdapter(): PaymentAdapter {
   };
 }
 
-describe("policy acknowledgment (T054)", () => {
+describe("policy acknowledgment (T216)", () => {
+  let ts_: TestServer;
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
 
   const ts = Date.now();
 
   let activeVariantId = "";
-  let locationId = "";
-  let cartToken = "";
+
+  function checkoutBody(cartToken: string) {
+    return {
+      cart_token: cartToken,
+      email: `policy-t216-${Date.now()}@example.com`,
+      shipping_address: {
+        full_name: "Policy Test User",
+        line1: "456 Oak Ave",
+        city: "Austin",
+        state: "TX",
+        postal_code: "78702",
+        country: "US",
+      },
+    };
+  }
+
+  async function createCartWithItem(): Promise<string> {
+    const cartRes = await app.inject({
+      method: "POST",
+      url: "/api/cart",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const cartData = JSON.parse(cartRes.body);
+    const token = cartData.cart.token;
+
+    await app.inject({
+      method: "POST",
+      url: "/api/cart/items",
+      headers: {
+        "content-type": "application/json",
+        "x-cart-token": token,
+      },
+      body: JSON.stringify({ variant_id: activeVariantId, quantity: 1 }),
+    });
+
+    return token;
+  }
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-    dbConn = createDatabaseConnection(DATABASE_URL);
+    ts_ = await createTestServer({
+      skipListen: true,
+      serverOverrides: {
+        taxAdapter: createStubTaxAdapter(),
+        shippingAdapter: createStubShippingAdapter(),
+        paymentAdapter: createStubPaymentAdapter(),
+      },
+    });
+    app = ts_.app;
+    dbConn = ts_.dbConn;
     const db = dbConn.db;
 
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-      reservationCleanupIntervalMs: 0,
-      taxAdapter: createStubTaxAdapter(),
-      shippingAdapter: createStubShippingAdapter(),
-      paymentAdapter: createStubPaymentAdapter(),
-    });
-    app = server.app;
+    // Find the default location (same one checkout uses via findInventoryBalances)
+    const balances = await findInventoryBalances(db, {});
+    const defaultLocationId = balances[0]?.locationId;
+    if (!defaultLocationId) {
+      throw new Error("No inventory location found — seed data missing");
+    }
 
-    await server.start();
-    markReady();
-
-    // Seed test data
-    // 1. Product + variant
+    // Seed product + variant
     const [prod] = await db
       .insert(product)
       .values({
-        slug: `policy-test-prod-${ts}`,
-        title: `Policy Test Product ${ts}`,
+        slug: `pol-t216-prod-${ts}`,
+        title: `Policy T216 Product ${ts}`,
         status: "active",
       })
       .returning();
@@ -111,8 +116,8 @@ describe("policy acknowledgment (T054)", () => {
       .insert(productVariant)
       .values({
         productId: prod.id,
-        sku: `POL-VAR1-${ts}`,
-        title: `Policy Variant ${ts}`,
+        sku: `POL216-${ts}`,
+        title: `Policy T216 Variant ${ts}`,
         priceMinor: 1500,
         status: "active",
         weight: "16",
@@ -120,139 +125,255 @@ describe("policy acknowledgment (T054)", () => {
       .returning();
     activeVariantId = variant.id;
 
-    // 2. Inventory location + balance
-    const [loc] = await db
-      .insert(inventoryLocation)
-      .values({
-        name: `Policy Warehouse ${ts}`,
-        code: `POL-WH-${ts}`,
-        type: "warehouse",
-      })
-      .returning();
-    locationId = loc.id;
-
+    // Insert inventory at the DEFAULT location (matches checkout behavior)
     await db.insert(inventoryBalance).values({
       variantId: activeVariantId,
-      locationId,
-      onHand: 50,
+      locationId: defaultLocationId,
+      onHand: 200,
       reserved: 0,
-      available: 50,
+      available: 200,
     });
 
-    // 3. Seed policy snapshots for testing
-    const now = new Date();
-    const policyTypes = ["terms_of_service", "refund_policy", "shipping_policy", "privacy_policy"];
-    for (const pType of policyTypes) {
+    // Ensure all 4 policy types have an effective snapshot (use onConflictDoNothing
+    // since the shared DB may already have them from prior runs)
+    const policyTypes = [
+      "terms_of_service",
+      "refund_policy",
+      "shipping_policy",
+      "privacy_policy",
+    ];
+    for (const pt of policyTypes) {
       await db
         .insert(policySnapshot)
         .values({
-          policyType: pType,
+          policyType: pt,
           version: 1,
-          contentHtml: `<p>${pType} v1 content</p>`,
-          contentText: `${pType} v1 content`,
-          effectiveAt: new Date(now.getTime() - 86400000), // yesterday
+          contentHtml: `<p>${pt} v1 content</p>`,
+          contentText: `${pt} v1 content`,
+          effectiveAt: new Date(Date.now() - 86400000),
         })
         .onConflictDoNothing();
     }
-
-    // 4. Create a cart with an item
-    const cartRes = await app.inject({
-      method: "POST",
-      url: "/api/cart",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    const cartData = JSON.parse(cartRes.body);
-    cartToken = cartData.cart.token;
-
-    await app.inject({
-      method: "POST",
-      url: "/api/cart/items",
-      headers: {
-        "content-type": "application/json",
-        "x-cart-token": cartToken,
-      },
-      body: JSON.stringify({ variant_id: activeVariantId, quantity: 1 }),
-    });
   }, 30000);
 
   afterAll(async () => {
-    markNotReady();
-    try {
-      await app?.close();
-    } catch {
-      // ignore
-    }
-    try {
-      await dbConn?.close();
-    } catch {
-      // ignore
-    }
+    await stopTestServer(ts_);
   });
 
-  it("should create policy acknowledgment records during checkout", async () => {
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/checkout",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        cart_token: cartToken,
-        email: "policy-test@example.com",
-        shipping_address: {
-          full_name: "Policy Test User",
-          line1: "456 Oak Ave",
-          city: "Austin",
-          state: "TX",
-          postal_code: "78702",
-          country: "US",
-        },
-      }),
-    });
+  describe("happy path: checkout creates acknowledgments", () => {
+    it("creates acknowledgment records for all 4 policy types with concrete timestamps and versions", async () => {
+      const beforeCheckout = Date.now();
 
-    expect(res.statusCode).toBe(201);
-    const body = JSON.parse(res.body);
-    const orderId = body.order.id;
+      const cartToken = await createCartWithItem();
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/checkout",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(checkoutBody(cartToken)),
+      });
 
-    // Verify acknowledgment records exist with correct policy versions
-    const db = dbConn.db;
-    const acknowledgments = await db
-      .select()
-      .from(orderPolicyAcknowledgment)
-      .where(eq(orderPolicyAcknowledgment.orderId, orderId));
+      expect(res.statusCode).toBe(201);
+      const body = JSON.parse(res.body);
+      const orderId = body.order.id;
+      expect(typeof orderId).toBe("string");
+      expect(body.client_secret).toMatch(/^pi_policy_test_/);
 
-    // Should have acknowledgments for all 4 policy types
-    expect(acknowledgments.length).toBe(4);
-
-    // Verify each acknowledgment links to a valid policy snapshot
-    for (const ack of acknowledgments) {
-      expect(ack.policySnapshotId).toBeDefined();
-      expect(ack.acknowledgedAt).toBeDefined();
-
-      // Look up the linked snapshot
-      const [snapshot] = await db
+      // Verify acknowledgment records in DB
+      const db = dbConn.db;
+      const acknowledgments = await db
         .select()
-        .from(policySnapshot)
-        .where(eq(policySnapshot.id, ack.policySnapshotId));
-      expect(snapshot).toBeDefined();
-      expect(snapshot.version).toBe(1);
-    }
+        .from(orderPolicyAcknowledgment)
+        .where(eq(orderPolicyAcknowledgment.orderId, orderId));
 
-    // Verify the policy types are all represented
-    const snapshotIds = acknowledgments.map((a) => a.policySnapshotId);
+      expect(acknowledgments).toHaveLength(4);
 
-    // Get all snapshots for all acknowledgments
-    const allSnapshots = [];
-    for (const sid of snapshotIds) {
-      const [s] = await db.select().from(policySnapshot).where(eq(policySnapshot.id, sid));
-      allSnapshots.push(s);
-    }
+      // Collect policy types via their linked snapshots
+      const coveredTypes: string[] = [];
+      for (const ack of acknowledgments) {
+        // orderId linkage
+        expect(ack.orderId).toBe(orderId);
 
-    const policyTypes = allSnapshots.map((s) => s.policyType).sort();
-    expect(policyTypes).toEqual([
-      "privacy_policy",
-      "refund_policy",
-      "shipping_policy",
-      "terms_of_service",
-    ]);
-  }, 30000);
+        // policySnapshotId is a valid UUID
+        expect(ack.policySnapshotId).toMatch(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+        );
+
+        // acknowledgedAt is a recent timestamp (within checkout window)
+        const ackTime = new Date(ack.acknowledgedAt).getTime();
+        expect(ackTime).toBeGreaterThanOrEqual(beforeCheckout);
+        expect(ackTime).toBeLessThanOrEqual(Date.now());
+
+        // Linked snapshot exists with a concrete version number
+        const [snapshot] = await db
+          .select()
+          .from(policySnapshot)
+          .where(eq(policySnapshot.id, ack.policySnapshotId));
+        expect(typeof snapshot.version).toBe("number");
+        expect(snapshot.version).toBeGreaterThanOrEqual(1);
+        expect(snapshot.contentHtml.length).toBeGreaterThan(0);
+        expect(snapshot.contentText.length).toBeGreaterThan(0);
+        coveredTypes.push(snapshot.policyType);
+      }
+
+      // All 4 required policy types are represented
+      expect(coveredTypes.sort()).toEqual([
+        "privacy_policy",
+        "refund_policy",
+        "shipping_policy",
+        "terms_of_service",
+      ]);
+    }, 30000);
+  });
+
+  describe("missing policies: checkout returns 400", () => {
+    it("returns 400 ERR_MISSING_POLICY naming every missing policy type", async () => {
+      const db = dbConn.db;
+
+      // Make all policy snapshots "not yet effective" by shifting effective_at to far future.
+      // This avoids FK constraint issues from deleting referenced rows.
+      const farFuture = new Date("3000-01-01T00:00:00Z");
+      await db
+        .update(policySnapshot)
+        .set({ effectiveAt: farFuture });
+
+      try {
+        const cartToken = await createCartWithItem();
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/checkout",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(checkoutBody(cartToken)),
+        });
+
+        expect(res.statusCode).toBe(400);
+        const body = JSON.parse(res.body);
+        expect(body.error).toBe("ERR_MISSING_POLICY");
+        expect(body.missing_policies).toEqual(
+          expect.arrayContaining([
+            "terms_of_service",
+            "refund_policy",
+            "shipping_policy",
+            "privacy_policy",
+          ]),
+        );
+        expect(body.missing_policies).toHaveLength(4);
+        expect(body.message).toContain("terms_of_service");
+        expect(body.message).toContain("privacy_policy");
+      } finally {
+        // Restore effective_at to the past so subsequent tests work
+        const past = new Date(Date.now() - 86400000);
+        await db
+          .update(policySnapshot)
+          .set({ effectiveAt: past });
+      }
+    }, 30000);
+
+    it("returns 400 naming only the specific missing policy when one is absent", async () => {
+      const db = dbConn.db;
+
+      // Make only privacy_policy ineffective
+      const farFuture = new Date("3000-01-01T00:00:00Z");
+      await db
+        .update(policySnapshot)
+        .set({ effectiveAt: farFuture })
+        .where(eq(policySnapshot.policyType, "privacy_policy"));
+
+      try {
+        const cartToken = await createCartWithItem();
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/checkout",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(checkoutBody(cartToken)),
+        });
+
+        expect(res.statusCode).toBe(400);
+        const body = JSON.parse(res.body);
+        expect(body.error).toBe("ERR_MISSING_POLICY");
+        expect(body.missing_policies).toEqual(["privacy_policy"]);
+        expect(body.message).toContain("privacy_policy");
+      } finally {
+        // Restore
+        const past = new Date(Date.now() - 86400000);
+        await db
+          .update(policySnapshot)
+          .set({ effectiveAt: past })
+          .where(eq(policySnapshot.policyType, "privacy_policy"));
+      }
+    }, 30000);
+  });
+
+  describe("re-acknowledgment on policy version bump", () => {
+    it("new checkout links to updated policy version after version bump", async () => {
+      const db = dbConn.db;
+
+      // Insert a new version of terms_of_service with a unique high version number
+      // and a more recent effective_at so it becomes the "current" policy
+      const uniqueVersion = 900000 + Math.floor(Math.random() * 99999);
+      const [v2Snapshot] = await db
+        .insert(policySnapshot)
+        .values({
+          policyType: "terms_of_service",
+          version: uniqueVersion,
+          contentHtml: `<p>terms_of_service v${uniqueVersion} updated content</p>`,
+          contentText: `terms_of_service v${uniqueVersion} updated content`,
+          effectiveAt: new Date(Date.now() - 500), // just now
+        })
+        .returning();
+
+      // Checkout should pick up the new version
+      const cartToken = await createCartWithItem();
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/checkout",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(checkoutBody(cartToken)),
+      });
+
+      expect(res.statusCode).toBe(201);
+      const orderId = JSON.parse(res.body).order.id;
+
+      // Find acknowledgments for this order
+      const acks = await db
+        .select()
+        .from(orderPolicyAcknowledgment)
+        .where(eq(orderPolicyAcknowledgment.orderId, orderId));
+
+      expect(acks).toHaveLength(4);
+
+      // Find the terms_of_service acknowledgment
+      let tosAck: { policySnapshotId: string; acknowledgedAt: Date } | null = null;
+      let tosSnap: { id: string; version: number; policyType: string; contentText: string } | null = null;
+
+      for (const ack of acks) {
+        const [snap] = await db
+          .select()
+          .from(policySnapshot)
+          .where(eq(policySnapshot.id, ack.policySnapshotId));
+        if (snap.policyType === "terms_of_service") {
+          tosAck = ack;
+          tosSnap = snap;
+          break;
+        }
+      }
+
+      // Must link to the new version, not any older one
+      expect(tosSnap).not.toBeNull();
+      expect(tosSnap!.id).toBe(v2Snapshot.id);
+      expect(tosSnap!.version).toBe(uniqueVersion);
+      expect(tosSnap!.contentText).toContain(`v${uniqueVersion} updated content`);
+
+      // Other policy types still have their own latest versions (not changed)
+      for (const ack of acks) {
+        const [snap] = await db
+          .select()
+          .from(policySnapshot)
+          .where(eq(policySnapshot.id, ack.policySnapshotId));
+        if (snap.policyType !== "terms_of_service") {
+          // Each non-ToS policy links to a valid snapshot with a version >= 1
+          expect(snap.version).toBeGreaterThanOrEqual(1);
+        }
+      }
+    }, 30000);
+  });
 });

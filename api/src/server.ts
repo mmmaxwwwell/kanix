@@ -153,6 +153,7 @@ import {
   findPoliciesByType,
   findCurrentPolicyByType,
   createCheckoutAcknowledgments,
+  validateCheckoutPolicies,
 } from "./db/queries/policy.js";
 import {
   hasEventBeenProcessed,
@@ -5507,6 +5508,16 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           .send({ error: "ERR_VALIDATION", message: "shipping_address.postal_code is required" });
       }
 
+      // Validate that all required policy snapshots exist
+      const missingPolicies = await validateCheckoutPolicies(db);
+      if (missingPolicies.length > 0) {
+        return reply.status(400).send({
+          error: "ERR_MISSING_POLICY",
+          message: `Missing required policies: ${missingPolicies.join(", ")}`,
+          missing_policies: missingPolicies,
+        });
+      }
+
       // Resolve and validate cart
       const cartRow = await findCartByToken(db, body.cart_token);
       if (!cartRow) {
@@ -5741,12 +5752,8 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         customerId,
       );
 
-      // 7. Create policy acknowledgments for current effective policies
-      try {
-        await createCheckoutAcknowledgments(db, newOrder.id);
-      } catch {
-        // Non-critical — policies may not be seeded yet
-      }
+      // 7. Create policy acknowledgments (policies validated at checkout start)
+      await createCheckoutAcknowledgments(db, newOrder.id);
 
       // 8. Update reservations with order ID
       for (const rid of reservationIds) {

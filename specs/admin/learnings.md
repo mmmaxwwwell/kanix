@@ -126,4 +126,9 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T215 — Harden checkout.integration.test.ts
 - The checkout handler picks `findInventoryBalances(db,{})[0].locationId` as the default location for ALL reservations — tests must insert inventory at the same location as existing balance rows, not at a freshly created location, or `reserveInventory` will fail with `ERR_INVENTORY_NOT_FOUND`.
 - Stale-cart detection returns 400 `ERR_CART_STALE` (not 409 as the task description says) — the handler returns `stale_items[]` with `variant_id`, `price_changed`, and `insufficient_stock` booleans for each stale item.
-- `order.shippingAddressSnapshotJson` is a Postgres `jsonb` column ��� Drizzle returns it as an object, not a string. Don't `JSON.parse()` it; use it directly or guard with `typeof` check.
+- `order.shippingAddressSnapshotJson` is a Postgres `jsonb` column — Drizzle returns it as an object, not a string. Don't `JSON.parse()` it; use it directly or guard with `typeof` check.
+
+## T216 — Harden policy-acknowledgment.integration.test.ts
+- `policy_snapshot` has FK RESTRICT from `order_policy_acknowledgment` — can't delete snapshots referenced by acknowledgments from prior test runs. To test "missing policy" scenarios, UPDATE `effective_at` to far future (3000-01-01) so `findCurrentPolicyByType` returns null, then restore in `finally`.
+- `policy_snapshot` has a unique constraint on `(policy_type, version)` — version bump tests must use a unique high version number (e.g. `900000 + random`) to avoid collisions with prior runs on the shared DB.
+- The original checkout handler wrapped `createCheckoutAcknowledgments` in try/catch as non-critical — hardening required moving policy validation before order creation and returning 400 `ERR_MISSING_POLICY` with `missing_policies[]` array.

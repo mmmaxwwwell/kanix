@@ -164,6 +164,7 @@ export {
   createPolicyAcknowledgment,
   findAcknowledgmentsByOrderId,
   createCheckoutAcknowledgments,
+  validateCheckoutPolicies,
 } from "./policy.js";
 export type { NewPolicySnapshot, PolicySnapshot, PolicyAcknowledgment } from "./policy.js";
 export {

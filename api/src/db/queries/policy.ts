@@ -155,11 +155,36 @@ const CHECKOUT_POLICY_TYPES = [
   "privacy_policy",
 ];
 
+/**
+ * Validate that all required checkout policy snapshots exist.
+ * Returns an array of missing policy type names, or empty if all present.
+ */
+export async function validateCheckoutPolicies(
+  db: PostgresJsDatabase,
+): Promise<string[]> {
+  const missing: string[] = [];
+  for (const policyType of CHECKOUT_POLICY_TYPES) {
+    const currentPolicy = await findCurrentPolicyByType(db, policyType);
+    if (!currentPolicy) {
+      missing.push(policyType);
+    }
+  }
+  return missing;
+}
+
 export async function createCheckoutAcknowledgments(
   db: PostgresJsDatabase,
   orderId: string,
   contextJson?: unknown,
 ): Promise<PolicyAcknowledgment[]> {
+  const missing = await validateCheckoutPolicies(db);
+  if (missing.length > 0) {
+    const err = new Error(`Missing required policies: ${missing.join(", ")}`);
+    (err as Error & { code: string; missingPolicies: string[] }).code = "ERR_MISSING_POLICY";
+    (err as Error & { missingPolicies: string[] }).missingPolicies = missing;
+    throw err;
+  }
+
   const acknowledgments: PolicyAcknowledgment[] = [];
 
   for (const policyType of CHECKOUT_POLICY_TYPES) {

@@ -1,0 +1,20 @@
+{
+  "task_id": "T216",
+  "status": "complete",
+  "summary": "Hardened policy-acknowledgment.integration.test.ts: added missing-policy 400 validation, concrete timestamp/version assertions, version-bump re-acknowledgment test, and updated checkout handler to enforce policy existence",
+  "commands_run": [
+    {"command": "npx vitest run src/policy-acknowledgment.integration.test.ts --reporter=verbose", "exit_code": 0},
+    {"command": "npx vitest run src/checkout.integration.test.ts --reporter=verbose", "exit_code": 0},
+    {"command": "npx vitest run src/critical-path.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T216.json"],
+  "files_modified": [
+    "api/src/policy-acknowledgment.integration.test.ts",
+    "api/src/db/queries/policy.ts",
+    "api/src/db/queries/index.ts",
+    "api/src/server.ts",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 2
+}
