@@ -1,0 +1,18 @@
+{
+  "task_id": "T235",
+  "status": "complete",
+  "summary": "Hardened void-label.integration.test.ts: 13 tests covering carrier window success/rejection, already-scanned label rejection, refund accounting with concrete cost assertions, audit event storage for every void, and idempotency; enhanced voidShipmentLabel with ERR_VOID_WINDOW_EXPIRED error handling and shipment event audit trail",
+  "commands_run": [
+    {"command": "npx vitest run src/void-label.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T235.json"],
+  "files_modified": [
+    "api/src/void-label.integration.test.ts",
+    "api/src/db/queries/shipment.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

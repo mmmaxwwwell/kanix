@@ -206,3 +206,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `evidence_record` table has immutability triggers (both UPDATE and DELETE blocked by PL/pgSQL triggers). To clean up in afterAll, use `ALTER TABLE evidence_record DISABLE TRIGGER USER` / `ENABLE TRIGGER USER` — `DISABLE TRIGGER ALL` fails with "permission denied: system trigger".
 - `hasShipmentEventBeenProcessed` checks providerEventId globally (not per-shipment). In tests with fixed `occurredAt` for idempotency testing, use a run-unique timestamp (e.g. `Date.now()`) to avoid collisions with prior test runs on the shared DB.
 - `order_line.variant_id` has FK constraint to `product_variant` — test fixtures must create real product + variant rows first. Fake UUIDs like `00000000-...` cause FK violations when the test runs in isolation.
+
+## T235 — Harden void-label.integration.test.ts
+- `voidShipmentLabel` didn't catch adapter errors — carrier window expiry (adapter throws) caused unhandled error propagation. Added `ERR_VOID_WINDOW_EXPIRED` error code with adapter error wrapping; HTTP endpoint maps it to 409.
+- `voidShipmentLabel` had no audit trail — added `shipmentEvent` insert for every void with refund/no-refund description, using `void-{shipmentId}-{timestamp}` as the providerEventId to avoid collisions.
+- The stub adapter's `voidLabel` always returns `{ refunded: true }` — to test carrier-window-expired or no-refund scenarios, override just that method via spread: `{ ...adapter, async voidLabel() { ... } }`.

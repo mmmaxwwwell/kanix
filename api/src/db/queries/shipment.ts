@@ -436,7 +436,18 @@ export async function voidShipmentLabel(
 
     if (purchases.length > 0) {
       // Call the adapter to void/refund the label
-      const voidResult = await adapter.voidLabel(shipmentId);
+      let voidResult: { refunded: boolean };
+      try {
+        voidResult = await adapter.voidLabel(shipmentId);
+      } catch (adapterErr: unknown) {
+        const msg =
+          adapterErr instanceof Error ? adapterErr.message : "Label void failed";
+        throw {
+          code: "ERR_VOID_WINDOW_EXPIRED",
+          message: msg,
+          shipmentId,
+        };
+      }
       refunded = voidResult.refunded;
       if (refunded) {
         refundedCostMinor = purchases.reduce((sum, p) => sum + p.costMinor, 0);
@@ -446,6 +457,21 @@ export async function voidShipmentLabel(
 
   // Transition to voided
   await transitionShipmentStatus(db, shipmentId, "voided");
+
+  // Store a shipment event for audit trail
+  const now = new Date();
+  await db
+    .insert(shipmentEvent)
+    .values({
+      shipmentId,
+      providerEventId: `void-${shipmentId}-${now.getTime()}`,
+      status: "voided",
+      description: refunded
+        ? `Label voided with refund of ${refundedCostMinor} minor units`
+        : "Label voided (no refund)",
+      occurredAt: now,
+      rawPayloadJson: { refunded, refundedCostMinor },
+    });
 
   // Fetch the updated shipment
   const [updated] = await db

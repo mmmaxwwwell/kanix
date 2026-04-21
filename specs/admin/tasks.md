@@ -521,16 +521,16 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T231 Harden `shipment.integration.test.ts` — shipment creation + tracking [T058]
   Done when: buy-label produces shipment row with carrier + tracking number + rate; tracking updates via EasyPost webhook move shipment state; void-label path creates correct void record; shipment linked back to order + fulfillment task.
 
-- [ ] T232 Harden `fulfillment-propagation.integration.test.ts` — fulfillment events propagate to order [T060]
+- [x] T232 Harden `fulfillment-propagation.integration.test.ts` — fulfillment events propagate to order [T060]
   Done when: shipment.created updates order.status = shipped; shipment tracking event (delivered) updates order.status = delivered; out-of-order events handled idempotently; customer + admin WebSocket notifications fire with exact payloads asserted.
 
-- [ ] T233 Harden `fulfillment-edge-cases.integration.test.ts` — fulfillment edge cases [T066c]
+- [x] T233 Harden `fulfillment-edge-cases.integration.test.ts` — fulfillment edge cases [T066c]
   Done when: returned shipment, partial ship, split ship, multi-parcel ship all handled; label voided after ship flagged for investigation; carrier API timeout falls back to retry queue; each edge case has a concrete assertion on the final DB + event state.
 
-- [ ] T234 Harden `shipping-edge-cases.integration.test.ts` — shipping address/rate edge cases [T066d]
+- [x] T234 Harden `shipping-edge-cases.integration.test.ts` — shipping address/rate edge cases [T066d]
   Done when: invalid shipping address returns 400 with specific field errors; no-rate-available path handled; PO Box rejection for ship-only carriers; international address rejected with clear reason (US-only); address normalization (street abbreviations, state codes) verified.
 
-- [ ] T235 Harden `void-label.integration.test.ts` — label voiding [T059a]
+- [x] T235 Harden `void-label.integration.test.ts` — label voiding [T059a]
   Done when: void within carrier window succeeds; void after carrier window rejects with 409; void of already-scanned label rejects; void creates correct refund accounting on the shipment cost; audit entry for each void.
 
 ### Payments + webhooks (external integrations)

@@ -2060,6 +2060,12 @@ export async function createServer(options: CreateServerOptions): Promise<Server
               message: error.message,
             });
           }
+          if (error.code === "ERR_VOID_WINDOW_EXPIRED") {
+            return reply.status(409).send({
+              error: "ERR_VOID_WINDOW_EXPIRED",
+              message: error.message,
+            });
+          }
           if (error.code === "ERR_INVALID_STATE" || error.code === "ERR_INVALID_TRANSITION") {
             return reply.status(400).send({
               error: error.code,
@@ -5722,6 +5728,31 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           .send({ error: "ERR_VALIDATION", message: "shipping_address.postal_code is required" });
       }
 
+      // Normalize state code to uppercase
+      shippingAddr.state = shippingAddr.state.toUpperCase();
+
+      // Validate US postal code format (5 digits or 5+4)
+      if (!/^\d{5}(-\d{4})?$/.test(shippingAddr.postal_code)) {
+        return reply.status(400).send({
+          error: "ERR_VALIDATION",
+          message: "Invalid US postal code format",
+        });
+      }
+
+      // PO Box rejection — ship-only carriers cannot deliver to PO Boxes
+      const poBoxPattern =
+        /\b(P\.?\s*O\.?\s*Box|Post\s+Office\s+Box)\b/i;
+      if (
+        poBoxPattern.test(shippingAddr.line1) ||
+        (shippingAddr.line2 && poBoxPattern.test(shippingAddr.line2))
+      ) {
+        return reply.status(400).send({
+          error: "ERR_PO_BOX_NOT_ALLOWED",
+          message:
+            "PO Box addresses are not supported — carrier shipping requires a physical street address",
+        });
+      }
+
       // Validate that all required policy snapshots exist
       const missingPolicies = await validateCheckoutPolicies(db);
       if (missingPolicies.length > 0) {
@@ -5849,7 +5880,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           })),
         );
         shippingAmountMinor = shippingResult.shippingAmountMinor;
-      } catch (err) {
+      } catch (err: unknown) {
         // Release reservations on failure
         for (const rid of reservationIds) {
           try {
@@ -5857,6 +5888,13 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           } catch {
             /* best-effort */
           }
+        }
+        const shippingErr = err as { code?: string; message?: string };
+        if (shippingErr.code === "ERR_NO_SHIPPING_RATES") {
+          return reply.status(400).send({
+            error: "ERR_NO_SHIPPING_RATES",
+            message: shippingErr.message ?? "No shipping rates available for this address",
+          });
         }
         throw err;
       }
