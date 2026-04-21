@@ -451,7 +451,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T211 Harden `kit-composition.integration.test.ts` — kit definition + class requirements [T047]
   Done when: kit with multiple classes validates that a selection satisfies each class; missing-class selection returns 400 with which class is missing; wrong-variant-for-class returns 400; active-only product selection enforced; kit savings calculation is concrete (assert exact price math).
 
-- [ ] T212 Harden `kit-revalidation.integration.test.ts` — kit cart re-validation on state change [T054a]
+- [x] T212 Harden `kit-revalidation.integration.test.ts` — kit cart re-validation on state change [T054a]
   Done when: kit in cart with a variant that goes out-of-stock revalidates with 409 and specific out-of-stock detail; product archived after add triggers revalidation; price change triggers revalidation; revalidation is idempotent (repeated calls return same conclusion).
 
 - [ ] T213 Harden `customer-address.integration.test.ts` — customer address CRUD [T045]

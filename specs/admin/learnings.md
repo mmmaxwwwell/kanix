@@ -107,3 +107,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `product_class.name` has a unique constraint (`uq_product_class_name`) — use `Date.now()` suffix on names (not just slugs) to avoid collisions with data from prior test runs on the shared DB.
 - The kit `ERR_KIT_CLASS_MISMATCH` error message comes from the query layer (`addKitToCart`), not the route handler — server re-throws the query error's message. Actual message: "Variant's product does not belong to the specified class" (not the handler's fallback).
 - OOS variant alternatives only include variants from *other products* in the same class (the query skips the OOS variant's own product) — so test fixtures need at least 2 products per class to produce alternatives.
+
+## T212 — Harden kit-revalidation.integration.test.ts
+- Kit cart line stores `selections[0].variant_id` as its `variantId` — `getCartWithItems` checks inventory for THAT variant only, not all kit components. To test OOS, delete/zero the primary variant's balance rows (not a component-only update).
+- Using `update(...).set({ available: 0 })` on `inventoryBalance` by variantId may not affect all rows if prior test runs left orphan balances at different locations — use `delete` + re-insert for reliable OOS simulation.
+- Checkout returns `ERR_CART_STALE` (400) for price/stock issues and `ERR_KIT_VALIDATION_FAILED` (400) for structural kit warnings (archived variant, changed requirements) — stale-items check runs first, kit warnings second.
