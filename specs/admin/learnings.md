@@ -52,3 +52,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Playwright JSON reporter configured via `PW_JSON_OUTPUT` env var — defaults to `../test-logs/e2e/playwright-results.json` relative to site dir; Patrol uses `flutter test --machine` to emit JSON
 - Patrol Android setup requires both `MainActivityTest.java` with `@RunWith(PatrolJUnitRunner.class)` in `androidTest/` AND `testInstrumentationRunner` in `build.gradle.kts` `defaultConfig`
 - Site uses pnpm (not npm) for dependency management — `pnpm add -D @playwright/test` installs correctly; CI workflow uses `npm ci` since `package-lock.json` may be expected by the workflow
+
+## T200 — Harden db/db.integration.test.ts
+- The old test used `describe.skip` via `describeWithDb` when `DATABASE_URL` was unset — replaced with `requireDatabaseUrl()` from `test-helpers.ts` which throws loudly in `beforeAll`
+- `postgres.js` `sql.end()` makes subsequent template-tag queries throw — use `conn.sql\`SELECT 1\`` (not `conn.db.execute()`) to test post-close failure since drizzle's `execute()` needs a proper SQL object
+- `createDatabaseConnection` with an unreachable URL doesn't throw until the first query — `checkDatabaseConnectivity` returns `false` (catches internally), but raw `sql\`SELECT 1\`` throws

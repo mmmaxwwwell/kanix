@@ -411,7 +411,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 
 ### Infrastructure + DB (foundation — everything else depends on these)
 
-- [ ] T200 Harden `db/db.integration.test.ts` — Postgres connection, migrations, query helpers
+- [x] T200 Harden `db/db.integration.test.ts` — Postgres connection, migrations, query helpers
   Done when: file runs green against live services (source `test/e2e/.state/env.sh` first); no skip guards; every DB helper touched by the file has a concrete-value assertion (not just `toBeDefined()`); connection failure path tested (bad URL → loud failure, not silent); no FR tags in the file — infer from `api/src/db/connection.ts` what behaviors need coverage.
 
 - [ ] T201 Harden `ready.integration.test.ts` — `/ready` readiness probe [FR-103]

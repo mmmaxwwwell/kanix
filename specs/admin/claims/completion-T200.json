@@ -1,0 +1,16 @@
+{
+  "task_id": "T200",
+  "status": "complete",
+  "summary": "Hardened db/db.integration.test.ts: removed skip guard, replaced all vacuous assertions with concrete checks, added connection failure path test (bad URL), close() lifecycle test, findProductBySlug/findAllProducts/findProductById-missing coverage",
+  "commands_run": [
+    {"command": "pnpm vitest run src/db/db.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T200.json"],
+  "files_modified": [
+    "api/src/db/db.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
