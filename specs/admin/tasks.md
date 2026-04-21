@@ -515,7 +515,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 
 ### Fulfillment + shipping (post-order physical flow)
 
-- [ ] T230 Harden `fulfillment-task.integration.test.ts` — fulfillment task lifecycle [T056]
+- [x] T230 Harden `fulfillment-task.integration.test.ts` — fulfillment task lifecycle [T056]
   Done when: task auto-created on order confirmation; task assignment persists; state transitions (pending → picking → packed → shipped) fire correct events; abandoned task (stale) flagged for admin review.
 
 - [ ] T231 Harden `shipment.integration.test.ts` — shipment creation + tracking [T058]

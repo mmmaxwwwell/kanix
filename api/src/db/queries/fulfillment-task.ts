@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, lt, inArray, sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { fulfillmentTask } from "../schema/fulfillment.js";
 import { order, orderLine } from "../schema/order.js";
@@ -661,4 +661,54 @@ export async function listFulfillmentTasks(
   }
 
   return query;
+}
+
+// ---------------------------------------------------------------------------
+// Find stale fulfillment tasks (active but not updated within threshold)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns fulfillment tasks that have been in an active (non-terminal) state
+ * for longer than `thresholdMs` without an update. These are candidates for
+ * admin review — the task may be abandoned or stuck.
+ */
+export async function findStaleFulfillmentTasks(
+  db: PostgresJsDatabase,
+  thresholdMs: number = 4 * 60 * 60 * 1000, // default 4 hours
+): Promise<
+  {
+    id: string;
+    orderId: string;
+    status: string;
+    priority: string;
+    assignedAdminUserId: string | null;
+    notes: string | null;
+    blockedReason: string | null;
+    preBlockedStatus: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }[]
+> {
+  const cutoff = new Date(Date.now() - thresholdMs);
+  return db
+    .select({
+      id: fulfillmentTask.id,
+      orderId: fulfillmentTask.orderId,
+      status: fulfillmentTask.status,
+      priority: fulfillmentTask.priority,
+      assignedAdminUserId: fulfillmentTask.assignedAdminUserId,
+      notes: fulfillmentTask.notes,
+      blockedReason: fulfillmentTask.blockedReason,
+      preBlockedStatus: fulfillmentTask.preBlockedStatus,
+      createdAt: fulfillmentTask.createdAt,
+      updatedAt: fulfillmentTask.updatedAt,
+    })
+    .from(fulfillmentTask)
+    .where(
+      and(
+        inArray(fulfillmentTask.status, [...ACTIVE_STATES, "blocked"]),
+        lt(fulfillmentTask.updatedAt, cutoff),
+      ),
+    )
+    .orderBy(fulfillmentTask.updatedAt);
 }

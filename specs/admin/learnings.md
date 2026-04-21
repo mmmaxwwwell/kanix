@@ -196,3 +196,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Ajv `removeAdditional: true` silently strips unknown JSON body properties — tests should verify stripping behavior (fields not persisted), not expect 400 rejection. Numbers coerced to strings too; only objects fail type validation for string fields.
 - Admin WS channels are hardcoded in `ws/manager.ts` — adding a new domain event entity (e.g. `setting`) requires adding `"setting:*"` to the admin channel set or events won't reach admin WS clients.
 - The `settings_updated` audit log `beforeJson` was `null` — changed to capture the before-state for proper audit diffing. The audit hook fires asynchronously (~150ms delay needed before DB query in tests).
+
+## T230 — Harden fulfillment-task.integration.test.ts
+- `fulfillment_task.assigned_admin_user_id` has FK constraint (`fk_ft_admin`) to `admin_user` — tests that call `assignFulfillmentTask` must create real `admin_user` rows first; fake UUIDs like `00000000-...` will fail with FK violation.
+- `findStaleFulfillmentTasks` (new) queries active + blocked tasks whose `updatedAt` is older than a threshold — terminal states (done, canceled) are excluded. Uses `inArray` + `lt` drizzle operators against the `updatedAt` timestamp column.
+- The `transitionFulfillmentTaskStatus` return includes `oldStatus`/`newStatus` fields that the HTTP route handler uses for audit log `afterJson` — test these fields directly to verify event tracking data is correct without needing HTTP-level tests.

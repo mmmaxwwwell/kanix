@@ -1,0 +1,19 @@
+{
+  "task_id": "T230",
+  "status": "complete",
+  "summary": "Hardened fulfillment-task.integration.test.ts from 20 to 45 tests: added blockFulfillmentTask/unblockFulfillmentTask/cancelFulfillmentTask coverage, stale task detection (new findStaleFulfillmentTasks query), reason-required validation, terminal state rejection, all query filter tests, and concrete assertions on every returned field including oldStatus/newStatus for event tracking",
+  "commands_run": [
+    {"command": "npx vitest run src/fulfillment-task.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": [
+    "specs/admin/claims/completion-T230.json"
+  ],
+  "files_modified": [
+    "api/src/fulfillment-task.integration.test.ts",
+    "api/src/db/queries/fulfillment-task.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 1
+}
