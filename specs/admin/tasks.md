@@ -454,7 +454,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T212 Harden `kit-revalidation.integration.test.ts` — kit cart re-validation on state change [T054a]
   Done when: kit in cart with a variant that goes out-of-stock revalidates with 409 and specific out-of-stock detail; product archived after add triggers revalidation; price change triggers revalidation; revalidation is idempotent (repeated calls return same conclusion).
 
-- [ ] T213 Harden `customer-address.integration.test.ts` — customer address CRUD [T045]
+- [x] T213 Harden `customer-address.integration.test.ts` — customer address CRUD [T045]
   Done when: authenticated user can create/read/update/delete own addresses; trying to access another user's address returns 404 (not 403, to avoid existence leak); address validation rejects incomplete addresses with per-field errors; default-address behavior verified (only one default per user at a time).
 
 ### Cart + checkout (orders get created)

@@ -1,49 +1,20 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "node:events";
-import { createServer, markReady, markNotReady } from "./server.js";
-import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
-import type { Config } from "./config.js";
+import type { DatabaseConnection } from "./db/connection.js";
 import type { FastifyInstance } from "fastify";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
-
-const DATABASE_URL = requireDatabaseUrl();
-const SUPERTOKENS_URI = getSuperTokensUri();
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: "whsec_xxx",
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
+import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
 
 describe("customer address CRUD API (T045)", () => {
+  let ts_: TestServer;
+
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
   let authHeaders: Record<string, string> = {};
+  let otherAuthHeaders: Record<string, string> = {};
 
   const ts = Date.now();
   const testEmail = `addr-test-${ts}@example.com`;
+  const otherEmail = `addr-other-${ts}@example.com`;
   const testPassword = "TestPassword123!";
 
   async function signupAndVerify(email: string, password: string) {
@@ -104,32 +75,25 @@ describe("customer address CRUD API (T045)", () => {
   }
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
+    ts_ = await createTestServer();
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+    address = ts_.address;
 
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-      reservationCleanupIntervalMs: 0,
-    });
-    address = await server.start();
-    markReady();
-    app = server.app;
-
-    // Create verified customer
+    // Create two verified customers for isolation testing
     authHeaders = await signupAndVerify(testEmail, testPassword);
+    otherAuthHeaders = await signupAndVerify(otherEmail, testPassword);
   });
 
   afterAll(async () => {
-    markNotReady();
-    if (app) await app.close();
-    if (dbConn) await dbConn.close();
+    await stopTestServer(ts_);
   });
+
+  // ---- CRUD happy paths ----
 
   let createdAddressId = "";
 
-  it("creates a shipping address", async () => {
+  it("creates a shipping address with all fields", async () => {
     const res = await fetch(`${address}/api/customer/addresses`, {
       method: "POST",
       headers: { ...authHeaders, "Content-Type": "application/json" },
@@ -148,24 +112,165 @@ describe("customer address CRUD API (T045)", () => {
 
     expect(res.status).toBe(201);
     const body = (await res.json()) as {
-      address: { id: string; fullName: string; state: string; country: string };
+      address: {
+        id: string;
+        fullName: string;
+        phone: string;
+        line1: string;
+        line2: string;
+        city: string;
+        state: string;
+        postalCode: string;
+        country: string;
+        type: string;
+        isDefault: boolean;
+      };
     };
+    expect(body.address.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
     expect(body.address.fullName).toBe("John Doe");
+    expect(body.address.phone).toBe("555-123-4567");
+    expect(body.address.line1).toBe("123 Main St");
+    expect(body.address.line2).toBe("Apt 4B");
+    expect(body.address.city).toBe("Portland");
     expect(body.address.state).toBe("OR");
+    expect(body.address.postalCode).toBe("97201");
     expect(body.address.country).toBe("US");
+    expect(body.address.type).toBe("shipping");
+    expect(body.address.isDefault).toBe(false);
     createdAddressId = body.address.id;
   });
 
-  it("lists addresses for the customer", async () => {
+  it("lists addresses for the customer and returns the created address", async () => {
     const res = await fetch(`${address}/api/customer/addresses`, {
       headers: authHeaders,
     });
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { addresses: Array<{ id: string }> };
-    expect(body.addresses.length).toBeGreaterThanOrEqual(1);
-    expect(body.addresses.some((a) => a.id === createdAddressId)).toBe(true);
+    const body = (await res.json()) as {
+      addresses: Array<{ id: string; fullName: string; city: string }>;
+    };
+    // We created exactly one address so far for this user
+    const ourAddr = body.addresses.find((a) => a.id === createdAddressId);
+    expect(ourAddr).toBeDefined();
+    expect(ourAddr!.fullName).toBe("John Doe");
+    expect(ourAddr!.city).toBe("Portland");
   });
+
+  it("updates an address with partial fields", async () => {
+    const res = await fetch(`${address}/api/customer/addresses/${createdAddressId}`, {
+      method: "PATCH",
+      headers: { ...authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        full_name: "John Smith",
+        city: "Eugene",
+        postal_code: "97401",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      address: {
+        fullName: string;
+        city: string;
+        postalCode: string;
+        line1: string;
+        state: string;
+      };
+    };
+    expect(body.address.fullName).toBe("John Smith");
+    expect(body.address.city).toBe("Eugene");
+    expect(body.address.postalCode).toBe("97401");
+    // Unchanged fields preserved
+    expect(body.address.line1).toBe("123 Main St");
+    expect(body.address.state).toBe("OR");
+  });
+
+  it("deletes an address and confirms removal", async () => {
+    // Create a throwaway address to delete
+    const createRes = await fetch(`${address}/api/customer/addresses`, {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "shipping",
+        full_name: "Throwaway",
+        line1: "999 Temp Rd",
+        city: "Bend",
+        state: "OR",
+        postal_code: "97701",
+      }),
+    });
+    expect(createRes.status).toBe(201);
+    const { address: created } = (await createRes.json()) as { address: { id: string } };
+
+    const delRes = await fetch(`${address}/api/customer/addresses/${created.id}`, {
+      method: "DELETE",
+      headers: authHeaders,
+    });
+    expect(delRes.status).toBe(204);
+
+    // Verify it's gone from the list
+    const listRes = await fetch(`${address}/api/customer/addresses`, {
+      headers: authHeaders,
+    });
+    const listBody = (await listRes.json()) as { addresses: Array<{ id: string }> };
+    expect(listBody.addresses.some((a) => a.id === created.id)).toBe(false);
+  });
+
+  it("returns 404 when deleting non-existent address", async () => {
+    const res = await fetch(
+      `${address}/api/customer/addresses/00000000-0000-0000-0000-000000000000`,
+      {
+        method: "DELETE",
+        headers: authHeaders,
+      },
+    );
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("ERR_NOT_FOUND");
+  });
+
+  // ---- Cross-user isolation (returns 404, not 403) ----
+
+  it("returns 404 when another user tries to read/update/delete someone else's address", async () => {
+    // Other user tries to PATCH the first user's address → 404
+    const patchRes = await fetch(`${address}/api/customer/addresses/${createdAddressId}`, {
+      method: "PATCH",
+      headers: { ...otherAuthHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ full_name: "Hacker" }),
+    });
+    expect(patchRes.status).toBe(404);
+    const patchBody = (await patchRes.json()) as { error: string };
+    expect(patchBody.error).toBe("ERR_NOT_FOUND");
+
+    // Other user tries to DELETE the first user's address → 404
+    const delRes = await fetch(`${address}/api/customer/addresses/${createdAddressId}`, {
+      method: "DELETE",
+      headers: otherAuthHeaders,
+    });
+    expect(delRes.status).toBe(404);
+
+    // Confirm the address still exists for the original owner
+    const listRes = await fetch(`${address}/api/customer/addresses`, {
+      headers: authHeaders,
+    });
+    const listBody = (await listRes.json()) as { addresses: Array<{ id: string }> };
+    expect(listBody.addresses.some((a) => a.id === createdAddressId)).toBe(true);
+  });
+
+  it("other user's list does not include first user's addresses", async () => {
+    const res = await fetch(`${address}/api/customer/addresses`, {
+      headers: otherAuthHeaders,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { addresses: Array<{ id: string }> };
+    // The other user has no addresses — shouldn't see the first user's
+    expect(body.addresses.some((a) => a.id === createdAddressId)).toBe(false);
+  });
+
+  // ---- Default-address behavior ----
 
   it("sets address as default", async () => {
     const res = await fetch(`${address}/api/customer/addresses/${createdAddressId}`, {
@@ -179,7 +284,7 @@ describe("customer address CRUD API (T045)", () => {
     expect(body.address.isDefault).toBe(true);
   });
 
-  it("only-one-default constraint: new default unsets previous", async () => {
+  it("only-one-default: setting a new default unsets the previous one", async () => {
     // Create a second shipping address and set it as default
     const createRes = await fetch(`${address}/api/customer/addresses`, {
       method: "POST",
@@ -199,7 +304,7 @@ describe("customer address CRUD API (T045)", () => {
     expect(createBody.address.isDefault).toBe(true);
     const secondAddressId = createBody.address.id;
 
-    // Verify the first address is no longer default
+    // List addresses — only the second should be default
     const listRes = await fetch(`${address}/api/customer/addresses`, {
       headers: authHeaders,
     });
@@ -208,8 +313,14 @@ describe("customer address CRUD API (T045)", () => {
     };
     const firstAddr = listBody.addresses.find((a) => a.id === createdAddressId);
     const secondAddr = listBody.addresses.find((a) => a.id === secondAddressId);
-    expect(firstAddr?.isDefault).toBe(false);
-    expect(secondAddr?.isDefault).toBe(true);
+    expect(firstAddr).toBeDefined();
+    expect(secondAddr).toBeDefined();
+    expect(firstAddr!.isDefault).toBe(false);
+    expect(secondAddr!.isDefault).toBe(true);
+
+    // Count how many defaults exist — must be exactly one
+    const defaultCount = listBody.addresses.filter((a) => a.isDefault).length;
+    expect(defaultCount).toBe(1);
 
     // Clean up second address
     await fetch(`${address}/api/customer/addresses/${secondAddressId}`, {
@@ -218,25 +329,99 @@ describe("customer address CRUD API (T045)", () => {
     });
   });
 
-  it("updates an address", async () => {
-    const res = await fetch(`${address}/api/customer/addresses/${createdAddressId}`, {
-      method: "PATCH",
+  // ---- Validation: incomplete addresses with per-field errors ----
+
+  it("rejects address missing full_name", async () => {
+    const res = await fetch(`${address}/api/customer/addresses`, {
+      method: "POST",
       headers: { ...authHeaders, "Content-Type": "application/json" },
       body: JSON.stringify({
-        full_name: "John Smith",
-        city: "Eugene",
-        postal_code: "97401",
+        type: "shipping",
+        line1: "123 Main St",
+        city: "Portland",
+        state: "OR",
+        postal_code: "97201",
       }),
     });
-
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      address: { fullName: string; city: string; postalCode: string };
-    };
-    expect(body.address.fullName).toBe("John Smith");
-    expect(body.address.city).toBe("Eugene");
-    expect(body.address.postalCode).toBe("97401");
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe("ERR_VALIDATION");
+    expect(body.message).toBe("full_name is required");
   });
+
+  it("rejects address missing line1", async () => {
+    const res = await fetch(`${address}/api/customer/addresses`, {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "shipping",
+        full_name: "Test Person",
+        city: "Portland",
+        state: "OR",
+        postal_code: "97201",
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe("ERR_VALIDATION");
+    expect(body.message).toBe("line1 is required");
+  });
+
+  it("rejects address missing city", async () => {
+    const res = await fetch(`${address}/api/customer/addresses`, {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "shipping",
+        full_name: "Test Person",
+        line1: "123 Main St",
+        state: "OR",
+        postal_code: "97201",
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe("ERR_VALIDATION");
+    expect(body.message).toBe("city is required");
+  });
+
+  it("rejects address missing state", async () => {
+    const res = await fetch(`${address}/api/customer/addresses`, {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "shipping",
+        full_name: "Test Person",
+        line1: "123 Main St",
+        city: "Portland",
+        postal_code: "97201",
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe("ERR_VALIDATION");
+    expect(body.message).toBe("state is required");
+  });
+
+  it("rejects address missing postal_code", async () => {
+    const res = await fetch(`${address}/api/customer/addresses`, {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "shipping",
+        full_name: "Test Person",
+        line1: "123 Main St",
+        city: "Portland",
+        state: "OR",
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe("ERR_VALIDATION");
+    expect(body.message).toBe("postal_code is required");
+  });
+
+  // ---- Validation: format/value errors ----
 
   it("rejects non-US address on create", async () => {
     const res = await fetch(`${address}/api/customer/addresses`, {
@@ -276,7 +461,7 @@ describe("customer address CRUD API (T045)", () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string; message: string };
     expect(body.error).toBe("ERR_VALIDATION");
-    expect(body.message).toContain("Invalid US state code");
+    expect(body.message).toBe("Invalid US state code: XX");
   });
 
   it("rejects invalid postal code format", async () => {
@@ -296,7 +481,7 @@ describe("customer address CRUD API (T045)", () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string; message: string };
     expect(body.error).toBe("ERR_VALIDATION");
-    expect(body.message).toContain("postal code");
+    expect(body.message).toBe("Invalid US postal code format");
   });
 
   it("rejects invalid type", async () => {
@@ -319,33 +504,7 @@ describe("customer address CRUD API (T045)", () => {
     expect(body.message).toContain("shipping");
   });
 
-  it("deletes an address", async () => {
-    const res = await fetch(`${address}/api/customer/addresses/${createdAddressId}`, {
-      method: "DELETE",
-      headers: authHeaders,
-    });
-
-    expect(res.status).toBe(204);
-
-    // Verify it's gone
-    const listRes = await fetch(`${address}/api/customer/addresses`, {
-      headers: authHeaders,
-    });
-    const listBody = (await listRes.json()) as { addresses: Array<{ id: string }> };
-    expect(listBody.addresses.some((a) => a.id === createdAddressId)).toBe(false);
-  });
-
-  it("returns 404 when deleting non-existent address", async () => {
-    const res = await fetch(
-      `${address}/api/customer/addresses/00000000-0000-0000-0000-000000000000`,
-      {
-        method: "DELETE",
-        headers: authHeaders,
-      },
-    );
-
-    expect(res.status).toBe(404);
-  });
+  // ---- Auth: unauthenticated access ----
 
   it("returns 401 without authentication", async () => {
     const res = await fetch(`${address}/api/customer/addresses`, {
@@ -353,5 +512,20 @@ describe("customer address CRUD API (T045)", () => {
     });
 
     expect(res.status).toBe(401);
+  });
+
+  it("returns 404 on update of non-existent address", async () => {
+    const res = await fetch(
+      `${address}/api/customer/addresses/00000000-0000-0000-0000-000000000000`,
+      {
+        method: "PATCH",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ full_name: "Nobody" }),
+      },
+    );
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("ERR_NOT_FOUND");
   });
 });

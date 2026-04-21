@@ -112,3 +112,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Kit cart line stores `selections[0].variant_id` as its `variantId` — `getCartWithItems` checks inventory for THAT variant only, not all kit components. To test OOS, delete/zero the primary variant's balance rows (not a component-only update).
 - Using `update(...).set({ available: 0 })` on `inventoryBalance` by variantId may not affect all rows if prior test runs left orphan balances at different locations — use `delete` + re-insert for reliable OOS simulation.
 - Checkout returns `ERR_CART_STALE` (400) for price/stock issues and `ERR_KIT_VALIDATION_FAILED` (400) for structural kit warnings (archived variant, changed requirements) — stale-items check runs first, kit warnings second.
+
+## T213 — Harden customer-address.integration.test.ts
+- Cross-user address isolation works via `customerId` scoping in `updateAddress`/`deleteAddress` queries — returns 404 (not 403) which avoids existence leaks. The list endpoint is scoped by `findAddressesByCustomerId`, so another user's addresses never appear.
+- `validateAddressFields` returns one error at a time (first failing field wins) — per-field validation tests need one test per missing field to cover the cascade (full_name → line1 → city → state → postal_code).
+- The old test file used inline `testConfig`/`createFakeProcess` boilerplate — migrated to shared `createTestServer`/`stopTestServer` harness from `test-server.ts`.

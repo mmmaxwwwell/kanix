@@ -1,0 +1,13 @@
+{
+  "task_id": "T213",
+  "status": "complete",
+  "summary": "Hardened customer-address.integration.test.ts with cross-user isolation (404 not 403), per-field validation for all required fields, concrete assertions on all response fields, default-address uniqueness constraint, and migrated to shared test-server harness. 20 tests, all green.",
+  "commands_run": [
+    {"command": "bash test/e2e/setup.sh", "exit_code": 0},
+    {"command": "DATABASE_URL=... npx vitest run src/customer-address.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T213.json"],
+  "files_modified": ["api/src/customer-address.integration.test.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 2
+}
