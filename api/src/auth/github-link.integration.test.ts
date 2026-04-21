@@ -1,75 +1,34 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "node:events";
-import { createServer, markReady, markNotReady } from "../server.js";
-import { createDatabaseConnection, type DatabaseConnection } from "../db/connection.js";
-import type { Config } from "../config.js";
-import type { FastifyInstance } from "fastify";
 import type { GitHubUserFetcher } from "./github.js";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "../test-helpers.js";
+import { createTestServer, stopTestServer, type TestServer } from "../test-server.js";
 
-const DATABASE_URL = requireDatabaseUrl();
-const SUPERTOKENS_URI = getSuperTokensUri();
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: "whsec_xxx",
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-github-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-github-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
-
-describe("GitHub OAuth: link GitHub account (T033)", () => {
-  let app: FastifyInstance;
-  let dbConn: DatabaseConnection;
+describe("GitHub OAuth: link GitHub account (T033, FR-068)", () => {
+  let ts_: TestServer;
   let address: string;
 
-  // Mock GitHub user fetcher that returns a predictable user
-  const mockGitHubUserId = 12345;
+  // Configurable mock GitHub user fetcher — tests can swap the returned user.
+  // Use Date.now()-based IDs to avoid collisions with data from prior runs.
+  let mockGitHubUserId = Date.now();
+  let mockGitHubLogin = "testuser";
   const mockGitHubFetcher: GitHubUserFetcher = async () => {
-    return { id: mockGitHubUserId, login: "testuser" };
+    return { id: mockGitHubUserId, login: mockGitHubLogin };
   };
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-      githubUserFetcher: mockGitHubFetcher,
+    ts_ = await createTestServer({
+      configOverrides: {
+        GITHUB_OAUTH_CLIENT_ID: "test-github-id",
+        GITHUB_OAUTH_CLIENT_SECRET: "test-github-secret",
+      },
+      serverOverrides: { githubUserFetcher: mockGitHubFetcher },
     });
-    address = await server.start();
-    markReady();
-    app = server.app;
+    address = ts_.address;
   });
 
   afterAll(async () => {
-    markNotReady();
-    if (app) await app.close();
-    if (dbConn) await dbConn.close();
+    await stopTestServer(ts_);
   });
 
-  const testEmail = `gh-test-${Date.now()}@example.com`;
   const testPassword = "TestPassword123!";
 
   async function signupAndVerify(email: string, password: string) {
@@ -129,8 +88,9 @@ describe("GitHub OAuth: link GitHub account (T033)", () => {
     return { userId, headers };
   }
 
-  it("create customer → link GitHub → verify github_user_id stored", async function () {
-    const { headers } = await signupAndVerify(testEmail, testPassword);
+  it("create customer → link GitHub → verify github_user_id stored", async () => {
+    const email = `gh-link-${Date.now()}-a@example.com`;
+    const { headers } = await signupAndVerify(email, testPassword);
 
     // Link GitHub account
     const linkRes = await fetch(`${address}/api/customer/link-github`, {
@@ -154,38 +114,166 @@ describe("GitHub OAuth: link GitHub account (T033)", () => {
     expect(meBody.customer.githubUserId).toBe(String(mockGitHubUserId));
   });
 
-  it("duplicate link prevented — same customer cannot re-link", async function () {
-    const { headers } = await signupAndVerify(testEmail, testPassword);
+  it("re-linking same GitHub ID is idempotent", async () => {
+    const email = `gh-link-${Date.now()}-idem@example.com`;
+    const ghId = Date.now() + 1;
+    mockGitHubUserId = ghId;
+    mockGitHubLogin = "idempotent-user";
+    const { headers } = await signupAndVerify(email, testPassword);
 
-    // Try to link again — should get 409 (already linked)
-    const linkRes = await fetch(`${address}/api/customer/link-github`, {
+    // First link
+    const link1 = await fetch(`${address}/api/customer/link-github`, {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({ code: "mock-auth-code" }),
     });
+    expect(link1.status).toBe(200);
+    const body1 = (await link1.json()) as {
+      customer: { id: string; github_user_id: string };
+    };
+    expect(body1.customer.github_user_id).toBe(String(ghId));
 
-    expect(linkRes.status).toBe(409);
-    const body = (await linkRes.json()) as { error: string };
-    expect(body.error).toBe("ERR_ALREADY_LINKED");
+    // Second link with same GitHub ID → idempotent 200
+    const link2 = await fetch(`${address}/api/customer/link-github`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "mock-auth-code" }),
+    });
+    expect(link2.status).toBe(200);
+    const body2 = (await link2.json()) as {
+      customer: { id: string; github_user_id: string };
+    };
+    expect(body2.customer.github_user_id).toBe(String(ghId));
+    expect(body2.customer.id).toBe(body1.customer.id);
   });
 
-  it("duplicate link prevented — different customer cannot use same GitHub ID", async function () {
-    const secondEmail = `gh-test2-${Date.now()}@example.com`;
-    const { headers } = await signupAndVerify(secondEmail, testPassword);
+  it("linking a GitHub ID already on another account returns 409 ERR_DUPLICATE_LINK", async () => {
+    const sharedGhId = Date.now() + 2;
+    mockGitHubUserId = sharedGhId;
+    mockGitHubLogin = "shared-gh-user";
 
-    // Try to link same GitHub ID to different customer — should get 409
-    const linkRes = await fetch(`${address}/api/customer/link-github`, {
+    // First customer links the GitHub ID
+    const email1 = `gh-link-${Date.now()}-dup1@example.com`;
+    const { headers: h1 } = await signupAndVerify(email1, testPassword);
+
+    const link1 = await fetch(`${address}/api/customer/link-github`, {
       method: "POST",
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: { ...h1, "Content-Type": "application/json" },
       body: JSON.stringify({ code: "mock-auth-code" }),
     });
+    expect(link1.status).toBe(200);
 
-    expect(linkRes.status).toBe(409);
-    const body = (await linkRes.json()) as { error: string };
+    // Second customer tries to link the same GitHub ID → conflict
+    const email2 = `gh-link-${Date.now()}-dup2@example.com`;
+    const { headers: h2 } = await signupAndVerify(email2, testPassword);
+
+    const link2 = await fetch(`${address}/api/customer/link-github`, {
+      method: "POST",
+      headers: { ...h2, "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "mock-auth-code" }),
+    });
+    expect(link2.status).toBe(409);
+    const body = (await link2.json()) as { error: string; message: string };
     expect(body.error).toBe("ERR_DUPLICATE_LINK");
+    expect(body.message).toContain("already linked to another customer");
   });
 
-  it("unauthenticated request gets 401", async function () {
+  it("unlink flow: link → unlink → verify githubUserId is null", async () => {
+    const ghId = Date.now() + 3;
+    mockGitHubUserId = ghId;
+    mockGitHubLogin = "unlink-user";
+    const email = `gh-link-${Date.now()}-unlink@example.com`;
+    const { headers } = await signupAndVerify(email, testPassword);
+
+    // Link
+    const linkRes = await fetch(`${address}/api/customer/link-github`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "mock-auth-code" }),
+    });
+    expect(linkRes.status).toBe(200);
+
+    // Unlink
+    const unlinkRes = await fetch(`${address}/api/customer/link-github`, {
+      method: "DELETE",
+      headers,
+    });
+    expect(unlinkRes.status).toBe(200);
+    const unlinkBody = (await unlinkRes.json()) as {
+      customer: { id: string; github_user_id: string | null };
+    };
+    expect(unlinkBody.customer.github_user_id).toBeNull();
+
+    // Verify via /api/customer/me
+    const meRes = await fetch(`${address}/api/customer/me`, { headers });
+    expect(meRes.status).toBe(200);
+    const meBody = (await meRes.json()) as {
+      customer: { githubUserId: string | null };
+    };
+    expect(meBody.customer.githubUserId).toBeNull();
+  });
+
+  it("unlink when not linked returns 409 ERR_NOT_LINKED", async () => {
+    const email = `gh-link-${Date.now()}-notlinked@example.com`;
+    const { headers } = await signupAndVerify(email, testPassword);
+
+    const unlinkRes = await fetch(`${address}/api/customer/link-github`, {
+      method: "DELETE",
+      headers,
+    });
+    expect(unlinkRes.status).toBe(409);
+    const body = (await unlinkRes.json()) as { error: string };
+    expect(body.error).toBe("ERR_NOT_LINKED");
+  });
+
+  it("session is preserved across link and unlink", async () => {
+    const ghId = Date.now() + 4;
+    mockGitHubUserId = ghId;
+    mockGitHubLogin = "session-test-user";
+    const email = `gh-link-${Date.now()}-session@example.com`;
+    const { headers } = await signupAndVerify(email, testPassword);
+
+    // Verify session works before link
+    const me1 = await fetch(`${address}/api/customer/me`, { headers });
+    expect(me1.status).toBe(200);
+    const me1Body = (await me1.json()) as { customer: { email: string } };
+    expect(me1Body.customer.email).toBe(email);
+
+    // Link
+    const linkRes = await fetch(`${address}/api/customer/link-github`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ code: "mock-auth-code" }),
+    });
+    expect(linkRes.status).toBe(200);
+
+    // Session still works after link
+    const me2 = await fetch(`${address}/api/customer/me`, { headers });
+    expect(me2.status).toBe(200);
+    const me2Body = (await me2.json()) as {
+      customer: { email: string; githubUserId: string | null };
+    };
+    expect(me2Body.customer.email).toBe(email);
+    expect(me2Body.customer.githubUserId).toBe(String(ghId));
+
+    // Unlink
+    const unlinkRes = await fetch(`${address}/api/customer/link-github`, {
+      method: "DELETE",
+      headers,
+    });
+    expect(unlinkRes.status).toBe(200);
+
+    // Session still works after unlink
+    const me3 = await fetch(`${address}/api/customer/me`, { headers });
+    expect(me3.status).toBe(200);
+    const me3Body = (await me3.json()) as {
+      customer: { email: string; githubUserId: string | null };
+    };
+    expect(me3Body.customer.email).toBe(email);
+    expect(me3Body.customer.githubUserId).toBeNull();
+  });
+
+  it("unauthenticated request gets 401", async () => {
     const res = await fetch(`${address}/api/customer/link-github`, {
       method: "POST",
       headers: { "Content-Type": "application/json", origin: "http://localhost:3000" },
@@ -195,8 +283,9 @@ describe("GitHub OAuth: link GitHub account (T033)", () => {
     expect(res.status).toBe(401);
   });
 
-  it("missing code field gets 400", async function () {
-    const { headers } = await signupAndVerify(`gh-test3-${Date.now()}@example.com`, testPassword);
+  it("missing code field gets 400 ERR_VALIDATION", async () => {
+    const email = `gh-link-${Date.now()}-nocode@example.com`;
+    const { headers } = await signupAndVerify(email, testPassword);
 
     const res = await fetch(`${address}/api/customer/link-github`, {
       method: "POST",
@@ -205,7 +294,8 @@ describe("GitHub OAuth: link GitHub account (T033)", () => {
     });
 
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; message: string };
     expect(body.error).toBe("ERR_VALIDATION");
+    expect(body.message).toContain("code");
   });
 });

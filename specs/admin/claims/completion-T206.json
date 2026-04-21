@@ -1,0 +1,12 @@
+{
+  "task_id": "T206",
+  "status": "complete",
+  "summary": "Hardened github-link integration test: fixed stale GitHub ID collisions by using Date.now()-based unique IDs, migrated to createTestServer helper, expanded coverage to 8 tests covering all Done-when criteria (link, idempotent re-link, cross-account conflict, unlink, session preservation, auth/validation errors)",
+  "commands_run": [
+    {"command": "npx vitest run src/auth/github-link.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T206.json"],
+  "files_modified": ["api/src/auth/github-link.integration.test.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

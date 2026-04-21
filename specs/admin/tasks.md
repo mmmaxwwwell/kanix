@@ -431,7 +431,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T205 Harden `auth/email-conflict.integration.test.ts` — email collision handling [T054e]
   Done when: signup with an existing email returns 409 with `ERR_EMAIL_CONFLICT`; existing user's password/session unaffected; the conflict response doesn't leak whether the email exists at a different tier (enumeration defense); case-insensitive conflict detection verified.
 
-- [ ] T206 Harden `auth/github-link.integration.test.ts` — GitHub OAuth linking [T033, FR-068]
+- [x] T206 Harden `auth/github-link.integration.test.ts` — GitHub OAuth linking [T033, FR-068]
   Done when: OAuth callback creates customer + links `github_id`; re-linking same GitHub ID is idempotent; attempting to link a GitHub ID already on another account returns conflict; unlink flow verified; session is preserved across link/unlink.
 
 - [ ] T207 Harden `auth/guest-order-link.integration.test.ts` — guest-to-authenticated order linking [T036, FR-066]

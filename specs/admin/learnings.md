@@ -79,3 +79,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - SuperTokens `signUpPOST` override `input.formFields` values are typed `unknown` — cast to `string` for drizzle `ilike()`
 - For consistent enumeration defense, both the pre-signup customer-table check AND the SuperTokens `EMAIL_ALREADY_EXISTS_ERROR` path must return the same `GENERAL_ERROR` / `ERR_EMAIL_CONFLICT` response shape
 - `ilike()` from drizzle-orm handles case-insensitive matching against the `text` column in Postgres without needing `citext` extension
+
+## T206 — Harden auth/github-link.integration.test.ts
+- Mock GitHub user IDs must be unique per run (use `Date.now()` offsets) — hardcoded IDs like `12345` or `99001` collide with data from prior test runs since the shared Postgres instance isn't wiped between runs
+- The test already used `createTestServer` with `serverOverrides: { githubUserFetcher }` to inject a mock GitHub API fetcher — this is the correct pattern for external API boundaries (mock the fetcher, not the DB/auth)
