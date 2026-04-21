@@ -223,6 +223,9 @@ import {
   updateTaxDocumentStatus,
   createPayout,
   findContributorByCustomerId,
+  findContributorByGithubUsername,
+  listPublicContributors,
+  updateContributorProfileVisibility,
   getContributorDashboard,
   TAX_DOCUMENT_TYPES,
   type MilestoneType,
@@ -6768,6 +6771,8 @@ export async function createServer(options: CreateServerOptions): Promise<Server
               github_user_id: { type: "string" },
               customer_id: { type: "string" },
               cla_accepted_at: { type: "string" },
+              cla_version: { type: "string" },
+              profile_visibility: { type: "string", enum: ["public", "private"] },
             },
           },
         },
@@ -6778,6 +6783,8 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           github_user_id: string;
           customer_id?: string;
           cla_accepted_at?: string;
+          cla_version?: string;
+          profile_visibility?: string;
         };
 
         const contrib = await createContributor(db, {
@@ -6785,6 +6792,8 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           githubUserId: body.github_user_id,
           customerId: body.customer_id ?? null,
           claAcceptedAt: body.cla_accepted_at ? new Date(body.cla_accepted_at) : null,
+          claVersion: body.cla_version ?? null,
+          profileVisibility: body.profile_visibility ?? "public",
         });
 
         request.auditContext = {
@@ -6900,6 +6909,69 @@ export async function createServer(options: CreateServerOptions): Promise<Server
 
         const designs = await listDesignsByContributor(db, id);
         return { designs };
+      },
+    );
+
+    // PATCH /api/admin/contributors/:id/visibility — update profile visibility
+    app.patch(
+      "/api/admin/contributors/:id/visibility",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.CONTRIBUTORS_MANAGE),
+        ],
+        schema: {
+          body: {
+            type: "object",
+            required: ["profile_visibility"],
+            properties: {
+              profile_visibility: { type: "string", enum: ["public", "private"] },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { profile_visibility: "public" | "private" };
+
+        const updated = await updateContributorProfileVisibility(db, id, body.profile_visibility);
+        if (!updated) {
+          return reply.status(404).send({ error: "Contributor not found" });
+        }
+
+        request.auditContext = {
+          action: "contributor.visibility.update",
+          entityType: "contributor",
+          entityId: id,
+          afterJson: { profileVisibility: body.profile_visibility },
+        };
+
+        return { contributor: updated };
+      },
+    );
+
+    // GET /api/contributors/public — list public contributors (no auth)
+    app.get(
+      "/api/contributors/public",
+      async () => {
+        const contributors = await listPublicContributors(db);
+        return { contributors };
+      },
+    );
+
+    // GET /api/contributors/public/:username — get public contributor profile (no auth)
+    app.get(
+      "/api/contributors/public/:username",
+      async (request, reply) => {
+        const { username } = request.params as { username: string };
+        const contrib = await findContributorByGithubUsername(db, username);
+        if (!contrib || contrib.profileVisibility !== "public") {
+          return reply.status(404).send({ error: "Contributor not found" });
+        }
+
+        const designs = await listDesignsByContributor(db, contrib.id);
+        return { contributor: contrib, designs };
       },
     );
 

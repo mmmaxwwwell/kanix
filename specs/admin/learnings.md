@@ -261,3 +261,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `evidence_record` immutability triggers (`trg_evidence_record_no_delete`) must be disabled/re-enabled in a try/finally block for the admin DELETE endpoint — use `DISABLE TRIGGER trg_evidence_record_no_delete` (not `USER`) to scope to just the delete trigger.
 - Audit log query for removal must filter by `action = "evidence.manual_remove"` since the same `entityId` also has an `evidence.manual_attach` entry from creation.
 - No content-type validation existed on the `POST /api/admin/disputes/:id/evidence` endpoint — added `ALLOWED_EVIDENCE_CONTENT_TYPES` (same set as ticket attachments: jpeg, png, pdf) to reject executables and HTML.
+
+## T247 — Harden contributor.integration.test.ts
+- The `contributor` table had no `cla_version` or `profile_visibility` columns — added via Liquibase migration `014-contributor-profile-fields.xml` with a CHECK constraint on `profile_visibility IN ('public', 'private')` and default `'public'`.
+- Public contributor endpoints (`/api/contributors/public` and `/api/contributors/public/:username`) filter by `profile_visibility = 'public'` — the per-username endpoint also returns the contributor's designs for profile rendering.
+- The old test used DB-level queries only; hardened version uses HTTP-level tests through `createTestServer` with admin auth (signUp + signIn + admin_user + admin_role setup) following the same pattern as T227.

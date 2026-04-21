@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="014-contributor-profile-fields" author="kanix">
+        <comment>
+            Add cla_version and profile_visibility columns to contributor table.
+            cla_version tracks which CLA version the contributor accepted.
+            profile_visibility controls whether the contributor profile is
+            visible in public endpoints (default: public).
+        </comment>
+
+        <addColumn tableName="contributor">
+            <column name="cla_version" type="text" />
+            <column name="profile_visibility" type="text" defaultValue="public" />
+        </addColumn>
+
+        <addNotNullConstraint tableName="contributor" columnName="profile_visibility" defaultNullValue="public" />
+
+        <sql>
+            ALTER TABLE contributor ADD CONSTRAINT ck_contributor_profile_visibility
+                CHECK (profile_visibility IN ('public', 'private'));
+        </sql>
+
+        <rollback>
+            <sql>ALTER TABLE contributor DROP CONSTRAINT IF EXISTS ck_contributor_profile_visibility;</sql>
+            <dropColumn tableName="contributor" columnName="cla_version" />
+            <dropColumn tableName="contributor" columnName="profile_visibility" />
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

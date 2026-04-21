@@ -13,7 +13,9 @@ export const contributor = pgTable("contributor", {
   githubUserId: text("github_user_id").notNull(),
   customerId: uuid("customer_id").references(() => customer.id),
   claAcceptedAt: timestamp("cla_accepted_at", { withTimezone: true }),
+  claVersion: text("cla_version"),
   status: text().notNull().default("pending"),
+  profileVisibility: text("profile_visibility").notNull().default("public"),
   charityName: text("charity_name"),
   charityEin: text("charity_ein"),
 });

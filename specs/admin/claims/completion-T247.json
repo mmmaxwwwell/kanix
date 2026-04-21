@@ -1,0 +1,23 @@
+{
+  "task_id": "T247",
+  "status": "complete",
+  "summary": "Hardened contributor.integration.test.ts with HTTP-level tests through real server: admin CRUD with CLA version+timestamp, design linking, profile visibility (public/private) with public endpoints, auth gating, error paths. Added cla_version and profile_visibility columns via migration 014.",
+  "commands_run": [
+    {"command": "pnpm --dir api db:migrate", "exit_code": 0},
+    {"command": "pnpm --dir api vitest run src/contributor.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/migrations/changesets/014-contributor-profile-fields.xml",
+    "specs/admin/claims/completion-T247.json"
+  ],
+  "files_modified": [
+    "api/src/contributor.integration.test.ts",
+    "api/src/db/schema/contributor.ts",
+    "api/src/db/queries/contributor.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

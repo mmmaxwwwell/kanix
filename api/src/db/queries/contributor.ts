@@ -46,6 +46,8 @@ export interface CreateContributorInput {
   githubUserId: string;
   customerId?: string | null;
   claAcceptedAt?: Date | null;
+  claVersion?: string | null;
+  profileVisibility?: string;
 }
 
 export interface ContributorRow {
@@ -54,7 +56,9 @@ export interface ContributorRow {
   githubUserId: string;
   customerId: string | null;
   claAcceptedAt: Date | null;
+  claVersion: string | null;
   status: string;
+  profileVisibility: string;
   charityName: string | null;
   charityEin: string | null;
 }
@@ -83,7 +87,9 @@ const contributorColumns = {
   githubUserId: contributor.githubUserId,
   customerId: contributor.customerId,
   claAcceptedAt: contributor.claAcceptedAt,
+  claVersion: contributor.claVersion,
   status: contributor.status,
+  profileVisibility: contributor.profileVisibility,
   charityName: contributor.charityName,
   charityEin: contributor.charityEin,
 };
@@ -103,7 +109,9 @@ export async function createContributor(
       githubUserId: input.githubUserId,
       customerId: input.customerId ?? null,
       claAcceptedAt: input.claAcceptedAt ?? null,
+      claVersion: input.claVersion ?? null,
       status: input.claAcceptedAt ? "active" : "pending",
+      profileVisibility: input.profileVisibility ?? "public",
     })
     .returning(contributorColumns);
   return row;
@@ -127,6 +135,49 @@ export async function findContributorById(
 
 export async function listContributors(db: PostgresJsDatabase): Promise<ContributorRow[]> {
   return db.select(contributorColumns).from(contributor);
+}
+
+// ---------------------------------------------------------------------------
+// List public contributors (profile_visibility = 'public')
+// ---------------------------------------------------------------------------
+
+export async function listPublicContributors(db: PostgresJsDatabase): Promise<ContributorRow[]> {
+  return db
+    .select(contributorColumns)
+    .from(contributor)
+    .where(eq(contributor.profileVisibility, "public"));
+}
+
+// ---------------------------------------------------------------------------
+// Find contributor by GitHub username
+// ---------------------------------------------------------------------------
+
+export async function findContributorByGithubUsername(
+  db: PostgresJsDatabase,
+  githubUsername: string,
+): Promise<ContributorRow | null> {
+  const [row] = await db
+    .select(contributorColumns)
+    .from(contributor)
+    .where(eq(contributor.githubUsername, githubUsername));
+  return row ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Update contributor profile visibility
+// ---------------------------------------------------------------------------
+
+export async function updateContributorProfileVisibility(
+  db: PostgresJsDatabase,
+  id: string,
+  visibility: "public" | "private",
+): Promise<ContributorRow | null> {
+  const [row] = await db
+    .update(contributor)
+    .set({ profileVisibility: visibility })
+    .where(eq(contributor.id, id))
+    .returning(contributorColumns);
+  return row ?? null;
 }
 
 // ---------------------------------------------------------------------------
