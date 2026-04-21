@@ -7193,14 +7193,19 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       },
       async (request) => {
         const updates = request.body as Partial<ShippingSettings>;
+        const before = await getShippingSettings(db);
         const updated = await updateShippingSettings(db, updates);
         request.auditContext = {
           action: "settings_updated",
           entityType: "setting",
           entityId: "00000000-0000-0000-0000-000000000000",
-          beforeJson: null,
+          beforeJson: before,
           afterJson: updated,
         };
+        domainEvents.publish("settings.changed", "setting", "shipping", {
+          changes: updates,
+          result: updated,
+        });
         return updated;
       },
     );

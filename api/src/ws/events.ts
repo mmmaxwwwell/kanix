@@ -10,7 +10,8 @@ export type DomainEventType =
   | "shipment.delivered"
   | "ticket.updated"
   | "inventory.low_stock"
-  | "dispute.opened";
+  | "dispute.opened"
+  | "settings.changed";
 
 // ---------------------------------------------------------------------------
 // Domain event publisher

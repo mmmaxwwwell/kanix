@@ -191,3 +191,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The audit log hook (`onResponse`) fires asynchronously after the HTTP response is sent — tests that query `admin_audit_log` immediately after a request may find no entries. A 150ms `setTimeout` before the DB query reliably gives the hook time to complete.
 - Drizzle `returning()` fields are camelCase (`movementType`, `quantityDelta`), not snake_case — the old test typed response bodies with snake_case keys (`movement_type`, `quantity_delta`) which silently returned `undefined`, making assertions vacuously pass.
 - Fastify route registration order matters for parameterized paths — `/api/admin/inventory/reservations/list` and `/api/admin/inventory/reservations/stats` must be registered BEFORE `/api/admin/inventory/reservations/:id` to avoid the `:id` param matching `"list"` or `"stats"`.
+
+## T229 — Harden admin-settings.integration.test.ts
+- Ajv `removeAdditional: true` silently strips unknown JSON body properties — tests should verify stripping behavior (fields not persisted), not expect 400 rejection. Numbers coerced to strings too; only objects fail type validation for string fields.
+- Admin WS channels are hardcoded in `ws/manager.ts` — adding a new domain event entity (e.g. `setting`) requires adding `"setting:*"` to the admin channel set or events won't reach admin WS clients.
+- The `settings_updated` audit log `beforeJson` was `null` — changed to capture the before-state for proper audit diffing. The audit hook fires asynchronously (~150ms delay needed before DB query in tests).

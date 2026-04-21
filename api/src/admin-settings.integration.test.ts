@@ -1,44 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "node:events";
-import { createServer, markReady, markNotReady } from "./server.js";
-import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
-import type { Config } from "./config.js";
+import type { DatabaseConnection } from "./db/connection.js";
 import type { FastifyInstance } from "fastify";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { adminUser, adminRole, adminUserRole, adminAuditLog } from "./db/schema/admin.js";
 import { adminSetting } from "./db/schema/setting.js";
 import { ROLE_CAPABILITIES, CAPABILITIES } from "./auth/admin.js";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
-
-const DATABASE_URL = requireDatabaseUrl();
-const SUPERTOKENS_URI = getSuperTokensUri();
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: "whsec_xxx",
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
+import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
 
 async function signUpUser(address: string, email: string, password: string): Promise<string> {
   const res = await fetch(`${address}/auth/signup`, {
@@ -89,7 +56,9 @@ async function signInAndGetHeaders(
   return headers;
 }
 
-describe("admin settings APIs (T071c)", () => {
+describe("admin settings APIs (T229)", () => {
+  let ts_: TestServer;
+
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
@@ -108,17 +77,10 @@ describe("admin settings APIs (T071c)", () => {
   let noPermRoleId: string;
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-    });
-    address = await server.start();
-    markReady();
-    app = server.app;
+    ts_ = await createTestServer();
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+    address = ts_.address;
 
     // Create admin with settings capability (super_admin)
     const authSubject = await signUpUser(address, adminEmail, adminPassword);
@@ -147,7 +109,7 @@ describe("admin settings APIs (T071c)", () => {
     await dbConn.db.insert(adminUserRole).values({ adminUserId: user.id, adminRoleId: role.id });
     adminHeaders = await signInAndGetHeaders(address, adminEmail, adminPassword);
 
-    // Create admin WITHOUT settings capability
+    // Create admin WITHOUT settings capability (support role)
     const noPermAuthSubject = await signUpUser(address, noPermEmail, noPermPassword);
 
     const [noPermRole] = await dbConn.db
@@ -155,7 +117,7 @@ describe("admin settings APIs (T071c)", () => {
       .values({
         name: `test_settings_support_${ts}`,
         description: "Test support admin (no settings)",
-        capabilitiesJson: [CAPABILITIES.ORDERS_READ, CAPABILITIES.SUPPORT_READ],
+        capabilitiesJson: ROLE_CAPABILITIES.support,
       })
       .returning();
     noPermRoleId = noPermRole.id;
@@ -181,25 +143,19 @@ describe("admin settings APIs (T071c)", () => {
   }, 30000);
 
   afterAll(async () => {
-    markNotReady();
-    if (dbConn) {
-      try {
-        await dbConn.db.delete(adminSetting).where(eq(adminSetting.key, "shipping"));
-        await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, adminUsrId));
-        await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, noPermAdminId));
-        await dbConn.db.delete(adminAuditLog).where(eq(adminAuditLog.actorAdminUserId, adminUsrId));
-        await dbConn.db.delete(adminUser).where(eq(adminUser.id, adminUsrId));
-        await dbConn.db.delete(adminUser).where(eq(adminUser.id, noPermAdminId));
-        await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));
-        await dbConn.db.delete(adminRole).where(eq(adminRole.id, noPermRoleId));
-      } catch {
-        // Best-effort cleanup
-      }
-      await dbConn.close();
+    try {
+      await dbConn.db.delete(adminSetting).where(eq(adminSetting.key, "shipping"));
+      await dbConn.db.delete(adminAuditLog).where(eq(adminAuditLog.actorAdminUserId, adminUsrId));
+      await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, adminUsrId));
+      await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, noPermAdminId));
+      await dbConn.db.delete(adminUser).where(eq(adminUser.id, adminUsrId));
+      await dbConn.db.delete(adminUser).where(eq(adminUser.id, noPermAdminId));
+      await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));
+      await dbConn.db.delete(adminRole).where(eq(adminRole.id, noPermRoleId));
+    } catch {
+      // Best-effort cleanup
     }
-    if (app) {
-      await app.close();
-    }
+    await stopTestServer(ts_);
   }, 15000);
 
   // ---- GET /api/admin/settings/shipping ----
@@ -211,23 +167,22 @@ describe("admin settings APIs (T071c)", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
 
-    expect(body).toHaveProperty("defaultCarrier");
-    expect(body).toHaveProperty("serviceLevels");
-    expect(body).toHaveProperty("labelFormat");
-    expect(body).toHaveProperty("labelSize");
-    expect(body).toHaveProperty("requireSignature");
+    // Concrete value assertions for all default fields
     expect(body.defaultCarrier).toBe("USPS");
-    expect(Array.isArray(body.serviceLevels)).toBe(true);
+    expect(body.serviceLevels).toEqual(["Priority", "Express", "Ground"]);
+    expect(body.labelFormat).toBe("PDF");
+    expect(body.labelSize).toBe("4x6");
+    expect(body.requireSignature).toBe(false);
   });
 
-  it("requires authentication for shipping settings", async () => {
+  it("requires authentication for GET shipping settings", async () => {
     const res = await fetch(`${address}/api/admin/settings/shipping`, {
       headers: { origin: "http://localhost:3000" },
     });
     expect(res.status).toBe(401);
   });
 
-  it("requires admin.settings.manage capability", async () => {
+  it("requires SETTINGS_MANAGE capability for GET shipping settings", async () => {
     const res = await fetch(`${address}/api/admin/settings/shipping`, {
       headers: noPermHeaders,
     });
@@ -236,7 +191,7 @@ describe("admin settings APIs (T071c)", () => {
 
   // ---- PATCH /api/admin/settings/shipping ----
 
-  it("updates shipping settings", async () => {
+  it("updates shipping settings and persists changes", async () => {
     const res = await fetch(`${address}/api/admin/settings/shipping`, {
       method: "PATCH",
       headers: { ...adminHeaders, "content-type": "application/json" },
@@ -248,26 +203,27 @@ describe("admin settings APIs (T071c)", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
 
+    // Updated fields
     expect(body.defaultCarrier).toBe("FedEx");
     expect(body.requireSignature).toBe(true);
-    // Other fields should retain defaults
+    // Retained defaults
     expect(body.labelFormat).toBe("PDF");
     expect(body.labelSize).toBe("4x6");
-  });
+    expect(body.serviceLevels).toEqual(["Priority", "Express", "Ground"]);
 
-  it("persists changes across reads", async () => {
-    // Read back after the previous update
-    const res = await fetch(`${address}/api/admin/settings/shipping`, {
+    // Verify persistence: read back
+    const getRes = await fetch(`${address}/api/admin/settings/shipping`, {
       headers: adminHeaders,
     });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as Record<string, unknown>;
-
-    expect(body.defaultCarrier).toBe("FedEx");
-    expect(body.requireSignature).toBe(true);
+    expect(getRes.status).toBe(200);
+    const getBody = (await getRes.json()) as Record<string, unknown>;
+    expect(getBody.defaultCarrier).toBe("FedEx");
+    expect(getBody.requireSignature).toBe(true);
+    expect(getBody.labelFormat).toBe("PDF");
+    expect(getBody.labelSize).toBe("4x6");
   });
 
-  it("updates service levels", async () => {
+  it("updates service levels while retaining other changes", async () => {
     const res = await fetch(`${address}/api/admin/settings/shipping`, {
       method: "PATCH",
       headers: { ...adminHeaders, "content-type": "application/json" },
@@ -281,22 +237,157 @@ describe("admin settings APIs (T071c)", () => {
     expect(body.serviceLevels).toEqual(["Overnight", "TwoDay"]);
     // Previous update should persist
     expect(body.defaultCarrier).toBe("FedEx");
+    expect(body.requireSignature).toBe(true);
   });
 
-  it("rejects PATCH without admin.settings.manage capability", async () => {
+  it("fires settings.changed domain event on PATCH", async () => {
+    const wsManager = ts_.server.wsManager;
+    const bufferLenBefore = wsManager ? wsManager.messageBuffer.length : 0;
+
+    const res = await fetch(`${address}/api/admin/settings/shipping`, {
+      method: "PATCH",
+      headers: { ...adminHeaders, "content-type": "application/json" },
+      body: JSON.stringify({ labelFormat: "ZPL" }),
+    });
+    expect(res.status).toBe(200);
+
+    // Verify the event was buffered
+    expect(wsManager).toBeDefined();
+    const newMessages = wsManager!.messageBuffer.slice(bufferLenBefore);
+    const settingsEvent = newMessages.find(
+      (m) => m.message.type === "settings.changed",
+    );
+    expect(settingsEvent).toBeDefined();
+    expect(settingsEvent!.message.entity).toBe("setting");
+    expect(settingsEvent!.message.entityId).toBe("shipping");
+    expect(settingsEvent!.channel).toBe("setting:shipping");
+    expect(settingsEvent!.wildcardChannel).toBe("setting:*");
+
+    const data = settingsEvent!.message.data;
+    expect(data).toHaveProperty("changes");
+    expect(data).toHaveProperty("result");
+    expect((data.changes as Record<string, unknown>).labelFormat).toBe("ZPL");
+    expect((data.result as Record<string, unknown>).labelFormat).toBe("ZPL");
+  });
+
+  it("writes audit log entry on settings update", async () => {
+    // Count existing audit entries
+    const logsBefore = await dbConn.db
+      .select()
+      .from(adminAuditLog)
+      .where(
+        and(
+          eq(adminAuditLog.actorAdminUserId, adminUsrId),
+          eq(adminAuditLog.action, "settings_updated"),
+        ),
+      );
+    const countBefore = logsBefore.length;
+
+    // Make a settings change with a unique value
+    const uniqueCarrier = `TestCarrier_${Date.now()}`;
+    await fetch(`${address}/api/admin/settings/shipping`, {
+      method: "PATCH",
+      headers: { ...adminHeaders, "content-type": "application/json" },
+      body: JSON.stringify({ defaultCarrier: uniqueCarrier }),
+    });
+
+    // Audit log hook fires asynchronously — wait briefly
+    await new Promise((r) => setTimeout(r, 200));
+
+    const logsAfter = await dbConn.db
+      .select()
+      .from(adminAuditLog)
+      .where(
+        and(
+          eq(adminAuditLog.actorAdminUserId, adminUsrId),
+          eq(adminAuditLog.action, "settings_updated"),
+        ),
+      );
+
+    expect(logsAfter.length).toBeGreaterThan(countBefore);
+    const latest = logsAfter[logsAfter.length - 1];
+    expect(latest.entityType).toBe("setting");
+    expect(latest.entityId).toBe("00000000-0000-0000-0000-000000000000");
+    expect(latest.afterJson).not.toBeNull();
+    expect(latest.beforeJson).not.toBeNull();
+    const afterJson = latest.afterJson as Record<string, unknown>;
+    expect(afterJson.defaultCarrier).toBe(uniqueCarrier);
+  });
+
+  // ---- Role-gating: SETTINGS_MANAGE required for super_admin only ----
+
+  it("rejects PATCH from admin without SETTINGS_MANAGE capability", async () => {
     const res = await fetch(`${address}/api/admin/settings/shipping`, {
       method: "PATCH",
       headers: { ...noPermHeaders, "content-type": "application/json" },
       body: JSON.stringify({ defaultCarrier: "DHL" }),
     });
     expect(res.status).toBe(403);
+
+    // Verify settings were NOT changed
+    const getRes = await fetch(`${address}/api/admin/settings/shipping`, {
+      headers: adminHeaders,
+    });
+    const getBody = (await getRes.json()) as Record<string, unknown>;
+    expect(getBody.defaultCarrier).not.toBe("DHL");
   });
 
-  it("rejects unknown properties in PATCH body", async () => {
+  // ---- Invalid setting keys / body validation ----
+
+  it("strips unknown properties from PATCH body (removeAdditional)", async () => {
+    // First set a known state
+    await fetch(`${address}/api/admin/settings/shipping`, {
+      method: "PATCH",
+      headers: { ...adminHeaders, "content-type": "application/json" },
+      body: JSON.stringify({ defaultCarrier: "UPS" }),
+    });
+
+    // PATCH with only unknown fields — they get stripped, no actual changes
     const res = await fetch(`${address}/api/admin/settings/shipping`, {
       method: "PATCH",
       headers: { ...adminHeaders, "content-type": "application/json" },
-      body: JSON.stringify({ unknownField: "value" }),
+      body: JSON.stringify({ unknownField: "value", anotherBadKey: 123 }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+
+    // Unknown fields are NOT persisted
+    expect(body).not.toHaveProperty("unknownField");
+    expect(body).not.toHaveProperty("anotherBadKey");
+    // Existing values unchanged
+    expect(body.defaultCarrier).toBe("UPS");
+  });
+
+  it("returns 404 for non-existent settings key path", async () => {
+    const res = await fetch(`${address}/api/admin/settings/nonexistent`, {
+      headers: adminHeaders,
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 404 for PATCH to non-existent settings key path", async () => {
+    const res = await fetch(`${address}/api/admin/settings/nonexistent`, {
+      method: "PATCH",
+      headers: { ...adminHeaders, "content-type": "application/json" },
+      body: JSON.stringify({ key: "value" }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects PATCH with wrong value types with 400", async () => {
+    const res = await fetch(`${address}/api/admin/settings/shipping`, {
+      method: "PATCH",
+      headers: { ...adminHeaders, "content-type": "application/json" },
+      body: JSON.stringify({ requireSignature: "not-a-boolean" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects PATCH with object where string expected", async () => {
+    const res = await fetch(`${address}/api/admin/settings/shipping`, {
+      method: "PATCH",
+      headers: { ...adminHeaders, "content-type": "application/json" },
+      body: JSON.stringify({ defaultCarrier: { nested: "object" } }),
     });
     expect(res.status).toBe(400);
   });

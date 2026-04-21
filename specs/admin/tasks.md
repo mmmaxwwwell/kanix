@@ -510,7 +510,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T228 Harden `admin-reservation.integration.test.ts` — admin reservation view + override
   Done when: admin can list active reservations filtered by variant/customer/expiry; force-release reservation endpoint succeeds with audit entry; stats endpoint returns correct counts; non-admin access returns 403.
 
-- [ ] T229 Harden `admin-settings.integration.test.ts` — admin-writable settings
+- [x] T229 Harden `admin-settings.integration.test.ts` — admin-writable settings
   Done when: settings GET returns current values; PATCH persists changes and fires a `settings.changed` event; invalid setting keys rejected with 400; role-gated settings (e.g. payment processor keys) editable only by super_admin.
 
 ### Fulfillment + shipping (post-order physical flow)

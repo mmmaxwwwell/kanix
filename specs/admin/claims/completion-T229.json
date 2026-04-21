@@ -1,0 +1,19 @@
+{
+  "task_id": "T229",
+  "status": "complete",
+  "summary": "Hardened admin-settings.integration.test.ts with settings.changed domain event, audit log assertions, role-gating verification, invalid key/type rejection, and concrete value assertions for all fields",
+  "commands_run": [
+    {"command": "npx vitest run src/admin-settings.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T229.json"],
+  "files_modified": [
+    "api/src/admin-settings.integration.test.ts",
+    "api/src/server.ts",
+    "api/src/ws/events.ts",
+    "api/src/ws/manager.ts",
+    "specs/admin/learnings.md",
+    "specs/admin/tasks.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 2
+}
