@@ -2249,6 +2249,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
               category: { type: "string" },
               priority: { type: "string" },
               source: { type: "string" },
+              force_duplicate: { type: "boolean" },
             },
           },
         },
@@ -2262,6 +2263,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           category: string;
           priority?: string;
           source: string;
+          force_duplicate?: boolean;
         };
 
         const ticket = await createSupportTicket(database.db, {
@@ -2272,6 +2274,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           category: body.category,
           priority: body.priority,
           source: body.source,
+          forceDuplicate: body.force_duplicate,
         });
 
         request.auditContext = {

@@ -479,7 +479,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T219 Harden `resend-confirmation.integration.test.ts` — resend order confirmation email [T059d]
   Done when: resend triggers email with same order contents; rate-limited (can't spam-resend); only owner can resend their order; non-existent order returns 404; emails go to `logs/emails.jsonl` with full content asserted.
 
-- [ ] T220 Harden `duplicate-ticket.integration.test.ts` — duplicate support ticket detection [T061, T061a]
+- [x] T220 Harden `duplicate-ticket.integration.test.ts` — duplicate support ticket detection [T061, T061a]
   Done when: creating a duplicate ticket (same order + same category within N days) returns 409 with the existing ticket ID; not a duplicate if different category; not a duplicate if outside the window; admin override to force-create verified.
 
 ### Inventory + reservations (stock constraints)

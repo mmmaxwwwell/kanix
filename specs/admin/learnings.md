@@ -143,6 +143,11 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Audit log entries are written automatically via the `onResponse` hook in `auth/audit-log.ts` — no manual `insertAuditLog` call needed; just set `request.auditContext` in the route handler. Query `admin_audit_log` by `entityId` + `action="order.cancel"` to verify.
 - The old test used inline `testConfig`/`createFakeProcess` boilerplate — migrated to shared `createTestServer`/`stopTestServer` harness; the `env.sh` file lives at `.dev/e2e-state/env.sh` (not `test/e2e/.state/env.sh`).
 
+## T220 — Harden duplicate-ticket.integration.test.ts
+- The original `createSupportTicket` duplicate detection checked only same customer + same order within 24h — task T220 required same-category matching too, so added `eq(supportTicket.category, input.category)` to the detection query.
+- Added `forceDuplicate?: boolean` to `CreateTicketInput` to allow admin override of duplicate detection — the admin endpoint passes `force_duplicate` from the request body.
+- Running `duplicate-ticket` and `support-ticket` tests simultaneously causes `generateTicketNumber()` collisions (timestamp-based `TKT-<base36>`) — run them in isolation or use sequential mode.
+
 ## T219 — Harden resend-confirmation.integration.test.ts
 - Fastify rejects `POST` with `Content-Type: application/json` and no body (`FST_ERR_CTP_EMPTY_JSON_BODY` → 500). For admin action endpoints that take no body, omit the Content-Type header entirely.
 - The `resend-confirmation` endpoint is at `/api/admin/orders/:id/resend-confirmation` with `verifySession + requireAdmin + requireCapability(ORDERS_MANAGE)` — only `super_admin` role has `ORDERS_MANAGE`; `support`/`finance`/`fulfillment` do not.

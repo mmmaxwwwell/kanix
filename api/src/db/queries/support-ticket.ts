@@ -63,6 +63,8 @@ export interface CreateTicketInput {
   category: string;
   priority?: string;
   source: string;
+  /** Admin override: skip duplicate detection and force-create the ticket */
+  forceDuplicate?: boolean;
 }
 
 export interface TicketRecord {
@@ -92,11 +94,11 @@ export async function createSupportTicket(
   const ticketNumber = generateTicketNumber();
 
   // Duplicate detection: check if the same customer has an open/waiting ticket
-  // for the same order within the last 24 hours
+  // for the same order AND same category within the last 24 hours
   let potentialDuplicate = false;
   let linkedTicketId: string | null = null;
 
-  if (input.customerId && input.orderId) {
+  if (input.customerId && input.orderId && !input.forceDuplicate) {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const activeStatuses = ["open", "waiting_on_customer", "waiting_on_internal"];
 
@@ -107,6 +109,7 @@ export async function createSupportTicket(
         and(
           eq(supportTicket.customerId, input.customerId),
           eq(supportTicket.orderId, input.orderId),
+          eq(supportTicket.category, input.category),
           inArray(supportTicket.status, activeStatuses),
           gte(supportTicket.createdAt, twentyFourHoursAgo),
         ),

@@ -1,0 +1,18 @@
+{
+  "task_id": "T220",
+  "status": "complete",
+  "summary": "Hardened duplicate-ticket.integration.test.ts: added category-based duplicate detection, forceDuplicate admin override, different-category non-duplicate test, concrete UUID assertions replacing vacuous toBeTruthy, and isolated test fixtures per test case",
+  "commands_run": [
+    {"command": "npx vitest run src/duplicate-ticket.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T220.json"],
+  "files_modified": [
+    "api/src/db/queries/support-ticket.ts",
+    "api/src/server.ts",
+    "api/src/duplicate-ticket.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 2
+}
