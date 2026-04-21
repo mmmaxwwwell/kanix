@@ -14,10 +14,12 @@ import {
   requireVerifiedEmail,
   getCustomerByAuthSubject,
   linkGitHubToCustomer,
+  unlinkGitHubFromCustomer,
   createGitHubUserFetcher,
   createRequireAdmin,
   requireCapability,
   registerAdminAuditLog,
+  registerAuthEventLogger,
   checkSuperTokensConnectivity,
   CAPABILITIES,
 } from "./auth/index.js";
@@ -224,6 +226,7 @@ import {
   getCustomerTickets,
 } from "./db/queries/customer.js";
 import { getShippingSettings, updateShippingSettings } from "./db/queries/setting.js";
+import { listAuthEvents } from "./db/queries/auth-event.js";
 import type { ShippingSettings } from "./db/queries/setting.js";
 import {
   getAlertPreference,
@@ -268,6 +271,12 @@ export interface CreateServerOptions {
   processRef?: NodeJS.Process;
   database?: DatabaseConnection;
   githubUserFetcher?: GitHubUserFetcher;
+  /**
+   * Override the function the shutdown manager calls after running hooks.
+   * Defaults to `process.exit`. Pass a no-op for tests so hooks run without
+   * terminating the worker.
+   */
+  exitFn?: (code: number) => void;
   /** Override the reservation cleanup interval in ms (default 60 000). Set to 0 to disable. */
   reservationCleanupIntervalMs?: number;
   /** Override the low-stock alert service (useful for testing). */
@@ -302,6 +311,13 @@ export interface ServerInstance {
   wsManager?: WsManager;
   domainEvents: import("./ws/events.js").DomainEventPublisher;
   start(): Promise<string>;
+  /**
+   * Run every registered shutdown hook (close DB pool, stop the reservation
+   * cleanup cron, clear rate limiter state, close WS connections, …) without
+   * terminating the process. Use from test `afterAll` so integration-test
+   * workers don't leak a server's worth of intervals and state per file.
+   */
+  stop(): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -389,6 +405,11 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       : undefined);
 
   await registerAuthMiddleware(app);
+
+  // Register auth event logger (login, logout, signup, failed_login)
+  if (database) {
+    registerAuthEventLogger(app, database.db);
+  }
 
   // -------------------------------------------------------------------------
   // Security middleware — CORS, rate limiting, security headers
@@ -549,13 +570,6 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         });
       }
 
-      if (cust.githubUserId) {
-        return reply.status(409).send({
-          error: "ERR_ALREADY_LINKED",
-          message: "GitHub account already linked to this customer",
-        });
-      }
-
       let githubUser;
       try {
         githubUser = await resolvedGitHubFetcher(body.code);
@@ -567,12 +581,87 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       }
 
       const githubUserId = String(githubUser.id);
+
+      // Idempotent: same customer re-linking the same GitHub ID → 200
+      if (cust.githubUserId === githubUserId) {
+        return {
+          customer: {
+            id: cust.id,
+            github_user_id: cust.githubUserId,
+          },
+        };
+      }
+
+      // Already linked to a DIFFERENT GitHub ID
+      if (cust.githubUserId) {
+        return reply.status(409).send({
+          error: "ERR_ALREADY_LINKED",
+          message: "GitHub account already linked to this customer",
+        });
+      }
+
       const updated = await linkGitHubToCustomer(database.db, cust.id, githubUserId);
 
       if (!updated) {
         return reply.status(409).send({
           error: "ERR_DUPLICATE_LINK",
           message: "This GitHub account is already linked to another customer",
+        });
+      }
+
+      return {
+        customer: {
+          id: updated.id,
+          github_user_id: updated.githubUserId,
+        },
+      };
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // Unlink GitHub Account endpoint — requires verified email
+  // -------------------------------------------------------------------------
+
+  app.delete(
+    "/api/customer/link-github",
+    { preHandler: [verifySession, requireVerifiedEmail] },
+    async (request, reply) => {
+      const session = request.session;
+      if (!session) {
+        return reply.status(401).send({
+          error: "ERR_AUTHENTICATION_FAILED",
+          message: "Authentication required",
+        });
+      }
+
+      if (!database) {
+        return reply.status(503).send({
+          error: "ERR_SERVICE_UNAVAILABLE",
+          message: "Database not available",
+        });
+      }
+
+      const userId = session.getUserId();
+      const cust = await getCustomerByAuthSubject(database.db, userId);
+      if (!cust) {
+        return reply.status(404).send({
+          error: "ERR_NOT_FOUND",
+          message: "Customer record not found",
+        });
+      }
+
+      if (!cust.githubUserId) {
+        return reply.status(409).send({
+          error: "ERR_NOT_LINKED",
+          message: "No GitHub account linked to this customer",
+        });
+      }
+
+      const updated = await unlinkGitHubFromCustomer(database.db, cust.id);
+      if (!updated) {
+        return reply.status(500).send({
+          error: "ERR_INTERNAL",
+          message: "Failed to unlink GitHub account",
         });
       }
 
@@ -968,6 +1057,33 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             capabilities: request.adminContext.capabilities,
           },
         };
+      },
+    );
+
+    // Admin audit log — auth events (login, logout, signup, failed_login, password_reset)
+    app.get(
+      "/api/admin/audit-log",
+      {
+        preHandler: [verifySession, requireAdmin],
+      },
+      async (request) => {
+        const query = request.query as {
+          actor_id?: string;
+          event_type?: string;
+          from?: string;
+          to?: string;
+          page?: string;
+          limit?: string;
+        };
+        const result = await listAuthEvents(database.db, {
+          actorId: query.actor_id,
+          eventType: query.event_type,
+          from: query.from ? new Date(query.from) : undefined,
+          to: query.to ? new Date(query.to) : undefined,
+          page: query.page ? parseInt(query.page, 10) : undefined,
+          limit: query.limit ? parseInt(query.limit, 10) : undefined,
+        });
+        return result;
       },
     );
 
@@ -6835,6 +6951,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
   const shutdownManager = createShutdownManager({
     logger,
     processRef,
+    ...(options.exitFn ? { exitFn: options.exitFn } : {}),
   });
 
   if (database) {
@@ -6889,6 +7006,10 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     return address;
   }
 
+  async function stop(): Promise<void> {
+    await shutdownManager.shutdown();
+  }
+
   return {
     app,
     shutdownManager,
@@ -6903,5 +7024,6 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     wsManager,
     domainEvents,
     start,
+    stop,
   };
 }

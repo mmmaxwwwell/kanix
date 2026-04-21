@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="012-auth-event-log" author="kanix">
+        <comment>
+            Create auth_event_log table for auth event audit trail.
+            Tracks login, logout, signup, failed-login, and password-reset events.
+        </comment>
+
+        <sql>
+CREATE TABLE auth_event_log (
+    id              uuid        NOT NULL DEFAULT gen_random_uuid(),
+    event_type      text        NOT NULL,
+    actor_id        text        NOT NULL,
+    ip_address      inet,
+    user_agent      text,
+    metadata_json   jsonb,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_auth_event_log PRIMARY KEY (id),
+    CONSTRAINT ck_auth_event_type CHECK (event_type IN ('login', 'logout', 'signup', 'failed_login', 'password_reset'))
+);
+
+CREATE INDEX idx_auth_event_log_actor ON auth_event_log (actor_id, created_at DESC);
+CREATE INDEX idx_auth_event_log_type ON auth_event_log (event_type, created_at DESC);
+CREATE INDEX idx_auth_event_log_created ON auth_event_log (created_at DESC);
+        </sql>
+
+        <rollback>
+            <dropTable tableName="auth_event_log" />
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

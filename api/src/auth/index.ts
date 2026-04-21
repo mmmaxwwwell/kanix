@@ -3,6 +3,7 @@ export {
   isEmailVerified,
   getCustomerByAuthSubject,
   linkGitHubToCustomer,
+  unlinkGitHubFromCustomer,
 } from "./supertokens.js";
 export type { SuperTokensConfig } from "./supertokens.js";
 export { registerAuthMiddleware, verifySession, requireVerifiedEmail } from "./middleware.js";
@@ -19,4 +20,5 @@ export {
 export type { AdminContext } from "./admin.js";
 export { registerAdminAuditLog } from "./audit-log.js";
 export type { AuditContext } from "./audit-log.js";
+export { registerAuthEventLogger } from "./auth-event-logger.js";
 export { checkSuperTokensConnectivity } from "./health.js";

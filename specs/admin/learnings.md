@@ -88,3 +88,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Order status check constraint (`ck_order_status`) only allows: `draft`, `pending_payment`, `confirmed`, `completed`, `canceled`, `closed` — NOT `placed`. Use `"draft"` for test fixture orders.
 - Guest order linking happens in the `verifyEmailPOST` override (not `signUpPOST`), so orders remain unlinked until email verification — this is by design per FR-066.
 - The old test used inline `createServer`/`testConfig`/`createFakeProcess` boilerplate; replaced with the shared `createTestServer`/`stopTestServer` harness from `test-server.ts`.
+
+## T208 — Harden auth/audit-log.integration.test.ts
+- The existing `admin_audit_log` table has `actor_admin_user_id NOT NULL` with FK to `admin_user`, so it can't store customer auth events. A separate `auth_event_log` table is needed for login/logout/signup/failed_login events.
+- SuperTokens handles `/auth/signout` internally — `request.session` is not set by custom `verifySession` preHandler on that route. To capture the user ID before signout, use `Session.getSession` directly in an `onRequest` hook with `sessionRequired: false`.
+- Capturing SuperTokens response bodies requires an `onSend` hook (which receives the payload before it's flushed) storing the parsed JSON on the request object, since `onResponse` can't read the response body.

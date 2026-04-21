@@ -1,0 +1,26 @@
+{
+  "task_id": "T208",
+  "status": "complete",
+  "summary": "Hardened auth/audit-log.integration.test.ts: added auth_event_log table, auth event logger for login/logout/signup/failed_login, admin audit-log endpoint with pagination+filtering, 15 comprehensive integration tests all passing",
+  "commands_run": [
+    {"command": "pnpm db:migrate", "exit_code": 0},
+    {"command": "npx vitest run src/auth/audit-log.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/migrations/changesets/012-auth-event-log.xml",
+    "api/src/db/schema/auth-event.ts",
+    "api/src/db/queries/auth-event.ts",
+    "api/src/auth/auth-event-logger.ts",
+    "specs/admin/claims/completion-T208.json"
+  ],
+  "files_modified": [
+    "api/src/auth/audit-log.integration.test.ts",
+    "api/src/auth/index.ts",
+    "api/src/db/schema/index.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 3
+}

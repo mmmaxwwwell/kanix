@@ -437,7 +437,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T207 Harden `auth/guest-order-link.integration.test.ts` — guest-to-authenticated order linking [T036, FR-066]
   Done when: guest order created with email matches a new signup → order associates on signup; existing account signup pulls in prior guest orders with same email; linking respects email verification (doesn't link unverified); duplicate link attempts are idempotent.
 
-- [ ] T208 Harden `auth/audit-log.integration.test.ts` — auth event audit trail
+- [x] T208 Harden `auth/audit-log.integration.test.ts` — auth event audit trail
   Done when: every auth event (login, logout, signup, password reset, failed-login) writes a row to the audit table with correct event_type, actor_id, timestamp, ip_address, user_agent; admin audit-log endpoint returns paginated entries filtered by actor / event_type / date range; non-admins can't read audit log.
 
 ### Catalog + kits (products must exist before orders)
