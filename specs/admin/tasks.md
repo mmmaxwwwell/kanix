@@ -507,7 +507,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T227 Harden `admin-products.integration.test.ts` — admin product CRUD
   Done when: create product with variants + media + pricing succeeds; updating price updates the active snapshot; archive propagates to variants (cannot add to cart); slug collision returns 400; media upload URL signing verified.
 
-- [ ] T228 Harden `admin-reservation.integration.test.ts` — admin reservation view + override
+- [x] T228 Harden `admin-reservation.integration.test.ts` — admin reservation view + override
   Done when: admin can list active reservations filtered by variant/customer/expiry; force-release reservation endpoint succeeds with audit entry; stats endpoint returns correct counts; non-admin access returns 403.
 
 - [ ] T229 Harden `admin-settings.integration.test.ts` — admin-writable settings

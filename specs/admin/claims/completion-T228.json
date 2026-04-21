@@ -1,0 +1,20 @@
+{
+  "task_id": "T228",
+  "status": "complete",
+  "summary": "Added list/stats/force-release reservation endpoints, rewrote integration test with 21 concrete tests covering all T228 requirements: filtered listing, stats counts, force-release with audit, non-admin 403, plus retained lifecycle/error tests",
+  "commands_run": [
+    {"command": "cd api && pnpm vitest run --reporter=verbose src/admin-reservation.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": [
+    "specs/admin/claims/completion-T228.json"
+  ],
+  "files_modified": [
+    "api/src/admin-reservation.integration.test.ts",
+    "api/src/db/queries/reservation.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

@@ -186,3 +186,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Drizzle wraps postgres.js errors: the top-level error has `{ query, params, cause }` — the original postgres.js error (with `code: "23505"` for unique violations) is in `err.cause`. Use `err.cause?.code ?? err.code` to handle both raw and wrapped errors.
 - Product archive does NOT automatically propagate to variants — had to add explicit propagation in the PATCH `/api/admin/products/:id` handler that loops over `findVariantsByProductId` and archives each non-archived variant.
 - No media upload URL signing endpoint exists in the codebase — the media POST endpoint just stores a provided URL string directly. Tests verify URL round-trip through create and GET.
+
+## T228 — Harden admin-reservation.integration.test.ts
+- The audit log hook (`onResponse`) fires asynchronously after the HTTP response is sent — tests that query `admin_audit_log` immediately after a request may find no entries. A 150ms `setTimeout` before the DB query reliably gives the hook time to complete.
+- Drizzle `returning()` fields are camelCase (`movementType`, `quantityDelta`), not snake_case — the old test typed response bodies with snake_case keys (`movement_type`, `quantity_delta`) which silently returned `undefined`, making assertions vacuously pass.
+- Fastify route registration order matters for parameterized paths — `/api/admin/inventory/reservations/list` and `/api/admin/inventory/reservations/stats` must be registered BEFORE `/api/admin/inventory/reservations/:id` to avoid the `:id` param matching `"list"` or `"stats"`.

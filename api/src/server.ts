@@ -100,6 +100,9 @@ import {
   consumeReservation,
   releaseReservation,
   findReservationById,
+  listReservations,
+  getReservationStats,
+  forceReleaseReservation,
 } from "./db/queries/reservation.js";
 import { startReservationCleanup } from "./cron/reservation-cleanup.js";
 import {
@@ -3971,6 +3974,40 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       },
     );
 
+    // List reservations with filters
+    app.get(
+      "/api/admin/inventory/reservations/list",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.INVENTORY_READ)],
+      },
+      async (request) => {
+        const query = request.query as {
+          variant_id?: string;
+          status?: string;
+          expires_before?: string;
+        };
+        const reservations = await listReservations(database.db, {
+          variantId: query.variant_id,
+          status: query.status,
+          expiresBefore: query.expires_before ? new Date(query.expires_before) : undefined,
+        });
+        return { reservations };
+      },
+    );
+
+    // Reservation stats
+    app.get(
+      "/api/admin/inventory/reservations/stats",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.INVENTORY_READ)],
+      },
+      async (request) => {
+        const query = request.query as { variant_id?: string };
+        const stats = await getReservationStats(database.db, query.variant_id);
+        return { stats };
+      },
+    );
+
     // Get reservation by ID
     app.get(
       "/api/admin/inventory/reservations/:id",
@@ -3987,6 +4024,48 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           });
         }
         return { reservation };
+      },
+    );
+
+    // Force-release reservation (admin override)
+    app.post(
+      "/api/admin/inventory/reservations/:id/force-release",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.INVENTORY_ADJUST)],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+
+        try {
+          const result = await forceReleaseReservation(database.db, id);
+
+          request.auditContext = {
+            action: "UPDATE",
+            entityType: "inventory_reservation",
+            entityId: id,
+            afterJson: { status: "released", forceRelease: true },
+          };
+
+          return reply.status(200).send({
+            reservation: result.reservation,
+            movement: result.movement,
+          });
+        } catch (err: unknown) {
+          const appErr = err as { code?: string };
+          if (appErr.code === "ERR_RESERVATION_NOT_FOUND") {
+            return reply.status(404).send({
+              error: "ERR_RESERVATION_NOT_FOUND",
+              message: "Reservation not found",
+            });
+          }
+          if (appErr.code === "ERR_INVALID_STATUS_TRANSITION") {
+            return reply.status(422).send({
+              error: "ERR_INVALID_STATUS_TRANSITION",
+              message: (err as Error).message,
+            });
+          }
+          throw err;
+        }
       },
     );
 

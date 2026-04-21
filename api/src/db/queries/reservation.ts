@@ -1,4 +1,4 @@
-import { eq, and, sql, lt, gte, count } from "drizzle-orm";
+import { eq, and, sql, lt, lte, gte, count, desc } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { inventoryReservation, inventoryBalance, inventoryMovement } from "../schema/inventory.js";
 
@@ -362,4 +362,139 @@ export async function findReservationById(
     .from(inventoryReservation)
     .where(eq(inventoryReservation.id, id));
   return found;
+}
+
+// ---------------------------------------------------------------------------
+// List reservations with filters
+// ---------------------------------------------------------------------------
+
+export interface ListReservationsFilter {
+  variantId?: string;
+  status?: string;
+  expiresBefore?: Date;
+}
+
+export async function listReservations(
+  db: PostgresJsDatabase,
+  filter: ListReservationsFilter,
+): Promise<InventoryReservation[]> {
+  const conditions = [];
+
+  if (filter.variantId) {
+    conditions.push(eq(inventoryReservation.variantId, filter.variantId));
+  }
+  if (filter.status) {
+    conditions.push(eq(inventoryReservation.status, filter.status));
+  }
+  if (filter.expiresBefore) {
+    conditions.push(lte(inventoryReservation.expiresAt, filter.expiresBefore));
+  }
+
+  const query = db
+    .select()
+    .from(inventoryReservation);
+
+  if (conditions.length > 0) {
+    return query.where(and(...conditions)).orderBy(desc(inventoryReservation.createdAt));
+  }
+  return query.orderBy(desc(inventoryReservation.createdAt));
+}
+
+// ---------------------------------------------------------------------------
+// Reservation stats
+// ---------------------------------------------------------------------------
+
+export interface ReservationStats {
+  active: number;
+  consumed: number;
+  released: number;
+  expired: number;
+}
+
+export async function getReservationStats(
+  db: PostgresJsDatabase,
+  variantId?: string,
+): Promise<ReservationStats> {
+  const statuses = ["active", "consumed", "released", "expired"] as const;
+  const result: ReservationStats = { active: 0, consumed: 0, released: 0, expired: 0 };
+
+  for (const status of statuses) {
+    const conditions = [eq(inventoryReservation.status, status)];
+    if (variantId) {
+      conditions.push(eq(inventoryReservation.variantId, variantId));
+    }
+    const [row] = await db
+      .select({ count: count() })
+      .from(inventoryReservation)
+      .where(and(...conditions));
+    result[status] = row?.count ?? 0;
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Force-release (admin override — releases even expired/consumed if active)
+// ---------------------------------------------------------------------------
+
+export async function forceReleaseReservation(
+  db: PostgresJsDatabase,
+  reservationId: string,
+): Promise<ReleaseResult> {
+  return db.transaction(async (tx) => {
+    const [reservation] = await tx.execute(
+      sql`SELECT * FROM inventory_reservation WHERE id = ${reservationId} FOR UPDATE`,
+    );
+
+    if (!reservation) {
+      throw Object.assign(new Error("Reservation not found"), {
+        code: "ERR_RESERVATION_NOT_FOUND",
+      });
+    }
+
+    if (reservation.status !== "active") {
+      throw Object.assign(
+        new Error(`Cannot force-release reservation with status '${reservation.status}'`),
+        { code: "ERR_INVALID_STATUS_TRANSITION" },
+      );
+    }
+
+    const qty = reservation.quantity as number;
+    const variantId = reservation.variant_id as string;
+    const locationId = reservation.location_id as string;
+
+    // Update balance: decrement reserved, increment available
+    await tx.execute(
+      sql`UPDATE inventory_balance
+          SET reserved = reserved - ${qty},
+              available = available + ${qty},
+              updated_at = now()
+          WHERE variant_id = ${variantId} AND location_id = ${locationId}`,
+    );
+
+    // Mark as released
+    const [updated] = await tx
+      .update(inventoryReservation)
+      .set({
+        status: "released",
+        releasedAt: new Date(),
+      })
+      .where(eq(inventoryReservation.id, reservationId))
+      .returning();
+
+    // Movement entry
+    const [movement] = await tx
+      .insert(inventoryMovement)
+      .values({
+        variantId,
+        locationId,
+        movementType: "release",
+        quantityDelta: qty,
+        referenceType: "inventory_reservation",
+        referenceId: reservationId,
+      })
+      .returning();
+
+    return { reservation: updated, movement };
+  });
 }
