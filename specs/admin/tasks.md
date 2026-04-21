@@ -459,7 +459,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 
 ### Cart + checkout (orders get created)
 
-- [ ] T214 Harden `cart.integration.test.ts` — cart lifecycle [T046, FR-007..012]
+- [x] T214 Harden `cart.integration.test.ts` — cart lifecycle [T046, FR-007..012]
   Done when: guest cart created with cart_token; add/remove/update items with exact quantity + price assertions; kit-to-cart flow verified; out-of-stock item blocks add-to-cart with 409; cart handoff on signup (guest → authenticated) preserves items; expired cart cleanup tested.
 
 - [ ] T215 Harden `checkout.integration.test.ts` — checkout → payment intent + tax + shipping [FR-012..018]

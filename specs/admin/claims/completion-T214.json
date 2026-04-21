@@ -1,0 +1,12 @@
+{
+  "task_id": "T214",
+  "status": "complete",
+  "summary": "Hardened cart.integration.test.ts: 17 tests covering guest cart creation, add/remove/update items with exact price+quantity assertions, kit-to-cart flow, OOS rejection, authenticated cart with customerId, expired cart filtering, and validation error paths",
+  "commands_run": [
+    {"command": "npx vitest run src/cart.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T214.json"],
+  "files_modified": ["api/src/cart.integration.test.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 2
+}

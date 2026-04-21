@@ -117,3 +117,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Cross-user address isolation works via `customerId` scoping in `updateAddress`/`deleteAddress` queries — returns 404 (not 403) which avoids existence leaks. The list endpoint is scoped by `findAddressesByCustomerId`, so another user's addresses never appear.
 - `validateAddressFields` returns one error at a time (first failing field wins) — per-field validation tests need one test per missing field to cover the cascade (full_name → line1 → city → state → postal_code).
 - The old test file used inline `testConfig`/`createFakeProcess` boilerplate — migrated to shared `createTestServer`/`stopTestServer` harness from `test-server.ts`.
+
+## T214 — Harden cart.integration.test.ts
+- OOS add-to-cart returns 400 (not 409 as task description suggests) with `ERR_INVENTORY_INSUFFICIENT` — the route handler in `server.ts` maps the query-layer error to 400, not 409.
+- Kit-to-cart test requires full product class + membership + kit definition + kit class requirement setup — `productClass.name` has a unique constraint so use `Date.now()` suffix.
+- `findCartByToken` filters by `status = 'active'` only — setting cart status to `"expired"` in DB makes it invisible to the API, which is the mechanism for expired cart cleanup even without a dedicated cleanup endpoint.
