@@ -399,7 +399,265 @@
 
 ---
 
-## Phase 14: Integration + E2E [SC-001 through SC-018]
+## Phase 14: Integration Test Hardening [gates Phase 15 E2E]
+
+Every integration test must exercise the whole app against live services (Postgres + SuperTokens + API brought up by `bash test/e2e/setup.sh`; source env from `test/e2e/.state/env.sh` before running `pnpm --dir api test`). No `describe.skip`, no `canRun` guards, no try/catch that swallows `beforeAll` errors, no vacuous assertions (`toBeDefined()` / `toBeTruthy()` / bare `typeof` as the only check). See [../../.claude/skills/spec-kit/reference/testing.md](../../.claude/skills/spec-kit/reference/testing.md) § "Test tier taxonomy" and § "Zero-skips rule" for the full pattern.
+
+Tasks in this phase run **sequentially** — integration tests share one Postgres/SuperTokens instance; parallel execution pollutes fixtures. Ordering follows subdomain dependency (infra → auth → catalog → cart → orders → inventory → admin → fulfillment → payments → support → evidence → contributors → notifications) so downstream fix agents can assume upstream tiers are green.
+
+Every per-file task (T200-range) has the same done-when shape: file runs green against live services, all skip guards removed, all vacuous assertions replaced with concrete behavior checks, every public handler the file covers has both happy-path AND error-path tests, no mocking of DB / auth / internal service calls, every FR mapped in the description is verified by at least one `it()` block that drives the real path end-to-end.
+
+Every user-flow task (T260-range) creates a new multi-step integration test that mirrors an E2E flow at the API layer — same business flow the E2E drives via UI, but exercised via HTTP calls through the real API against real services. These are the cheap sibling to the E2E tier: when an E2E fails, the mirror flow test tells you whether the bug is in the API or past it.
+
+### Infrastructure + DB (foundation — everything else depends on these)
+
+- [ ] T200 Harden `db/db.integration.test.ts` — Postgres connection, migrations, query helpers
+  Done when: file runs green against live services (source `test/e2e/.state/env.sh` first); no skip guards; every DB helper touched by the file has a concrete-value assertion (not just `toBeDefined()`); connection failure path tested (bad URL → loud failure, not silent); no FR tags in the file — infer from `api/src/db/connection.ts` what behaviors need coverage.
+
+- [ ] T201 Harden `ready.integration.test.ts` — `/ready` readiness probe [FR-103]
+  Done when: file runs green; no skip guards; `/ready` tested for all three states (not-ready at startup, ready when DB up, back to 503 when DB disconnected); every response body field (status, uptime, dependencies, version) has a concrete-value assertion; error paths (DB down, SuperTokens unreachable) produce the correct HTTP status with correct error shape.
+
+- [ ] T202 Harden `critical-path.integration.test.ts` — multi-phase end-to-end checkpoint [Phase 3, Phase 5, Phase 6]
+  Done when: both Phase 3 and Phase 5/6 `describe` blocks run green; no skip guards anywhere (including the outer try/catch that swallowed setup errors); every assertion checks specific state (order status, inventory balance, snapshot contents), not existence; if the test needs test fixtures, it creates them in `beforeAll` and tears them down in `afterAll` — no shared state with other integration tests.
+
+### Auth (everything downstream needs sessions working)
+
+- [ ] T203 Harden `auth/auth.integration.test.ts` — customer email/password + email verification [T032, FR-064]
+  Done when: signup creates user + customer row (assert both); unverified user gets 401 on protected routes; verified user can access protected routes; login returns valid session tokens (assert token shape); bad credentials return 401 with correct error code; integration covers rate-limit rejection on repeated bad attempts.
+
+- [ ] T204 Harden `auth/admin-auth.integration.test.ts` — admin auth + role-based access
+  Done when: admin login succeeds with correct role claim; non-admin users get 403 on admin routes (not 401); capability checks verified for each role tier (super_admin vs operator vs support); session expiry path tested.
+
+- [ ] T205 Harden `auth/email-conflict.integration.test.ts` — email collision handling [T054e]
+  Done when: signup with an existing email returns 409 with `ERR_EMAIL_CONFLICT`; existing user's password/session unaffected; the conflict response doesn't leak whether the email exists at a different tier (enumeration defense); case-insensitive conflict detection verified.
+
+- [ ] T206 Harden `auth/github-link.integration.test.ts` — GitHub OAuth linking [T033, FR-068]
+  Done when: OAuth callback creates customer + links `github_id`; re-linking same GitHub ID is idempotent; attempting to link a GitHub ID already on another account returns conflict; unlink flow verified; session is preserved across link/unlink.
+
+- [ ] T207 Harden `auth/guest-order-link.integration.test.ts` — guest-to-authenticated order linking [T036, FR-066]
+  Done when: guest order created with email matches a new signup → order associates on signup; existing account signup pulls in prior guest orders with same email; linking respects email verification (doesn't link unverified); duplicate link attempts are idempotent.
+
+- [ ] T208 Harden `auth/audit-log.integration.test.ts` — auth event audit trail
+  Done when: every auth event (login, logout, signup, password reset, failed-login) writes a row to the audit table with correct event_type, actor_id, timestamp, ip_address, user_agent; admin audit-log endpoint returns paginated entries filtered by actor / event_type / date range; non-admins can't read audit log.
+
+### Catalog + kits (products must exist before orders)
+
+- [ ] T209 Harden `public-catalog.integration.test.ts` — public product catalog API [T044]
+  Done when: `GET /api/products` returns only active products (draft/archived filtered); `GET /api/products/:slug` returns full product with variants + media + pricing + inStock flag; non-existent slug returns 404; out-of-stock variant flagged correctly; response shape matches exactly (every field asserted).
+
+- [ ] T210 Harden `catalog/variant-class.integration.test.ts` — product variant classification
+  Done when: variant-class CRUD endpoints return correct shapes; invalid class assignments return 400; archived classes don't appear in public endpoints but do appear in admin endpoints; class-to-product mapping persists and round-trips.
+
+- [ ] T211 Harden `kit-composition.integration.test.ts` — kit definition + class requirements [T047]
+  Done when: kit with multiple classes validates that a selection satisfies each class; missing-class selection returns 400 with which class is missing; wrong-variant-for-class returns 400; active-only product selection enforced; kit savings calculation is concrete (assert exact price math).
+
+- [ ] T212 Harden `kit-revalidation.integration.test.ts` — kit cart re-validation on state change [T054a]
+  Done when: kit in cart with a variant that goes out-of-stock revalidates with 409 and specific out-of-stock detail; product archived after add triggers revalidation; price change triggers revalidation; revalidation is idempotent (repeated calls return same conclusion).
+
+- [ ] T213 Harden `customer-address.integration.test.ts` — customer address CRUD [T045]
+  Done when: authenticated user can create/read/update/delete own addresses; trying to access another user's address returns 404 (not 403, to avoid existence leak); address validation rejects incomplete addresses with per-field errors; default-address behavior verified (only one default per user at a time).
+
+### Cart + checkout (orders get created)
+
+- [ ] T214 Harden `cart.integration.test.ts` — cart lifecycle [T046, FR-007..012]
+  Done when: guest cart created with cart_token; add/remove/update items with exact quantity + price assertions; kit-to-cart flow verified; out-of-stock item blocks add-to-cart with 409; cart handoff on signup (guest → authenticated) preserves items; expired cart cleanup tested.
+
+- [ ] T215 Harden `checkout.integration.test.ts` — checkout → payment intent + tax + shipping [FR-012..018]
+  Done when: happy-path checkout produces client_secret + correct totals; invalid shipping address returns 400 with field errors; Stripe Tax calculation path verified (TX address → non-zero tax); shipping rate selection persists; checkout against stale cart (items changed) returns 409 with the conflict detail; repeated checkout on same cart returns consistent totals.
+
+- [ ] T216 Harden `policy-acknowledgment.integration.test.ts` — customer policy acknowledgment
+  Done when: checkout requires policy acknowledgment (ToS, warranty disclaimer); submission without acknowledgment returns 400 naming the missing policy; acknowledgment persists with timestamp + policy version; re-acknowledgment required when policy version bumps.
+
+### Orders + state machine (lifecycle transitions)
+
+- [ ] T217 Harden `order-state-machine.integration.test.ts` — order state transitions [T050]
+  Done when: every legal transition from the state machine diagram produces correct side effects (events, notifications, inventory); every illegal transition returns 409 with ERR_INVALID_TRANSITION; terminal states (shipped, cancelled, refunded) reject all further transitions; state transition audit log entries written.
+
+- [ ] T218 Harden `order-cancel.integration.test.ts` — order cancellation
+  Done when: customer-initiated cancel before ship succeeds + releases reservation + refunds via Stripe; cancel after ship returns 409; admin force-cancel path with audit log entry; partial cancel (single line item) produces correct recalculated totals.
+
+- [ ] T219 Harden `resend-confirmation.integration.test.ts` — resend order confirmation email [T059d]
+  Done when: resend triggers email with same order contents; rate-limited (can't spam-resend); only owner can resend their order; non-existent order returns 404; emails go to `logs/emails.jsonl` with full content asserted.
+
+- [ ] T220 Harden `duplicate-ticket.integration.test.ts` — duplicate support ticket detection [T061, T061a]
+  Done when: creating a duplicate ticket (same order + same category within N days) returns 409 with the existing ticket ID; not a duplicate if different category; not a duplicate if outside the window; admin override to force-create verified.
+
+### Inventory + reservations (stock constraints)
+
+- [ ] T221 Harden `low-stock-alert.integration.test.ts` — low-stock threshold + admin notification [FR-038, FR-085]
+  Done when: variant dropping below safety_stock fires an alert via admin WebSocket + email within expected latency; threshold changes update alert behavior; alert includes variant SKU + product title + available count + threshold; alerts deduplicated within cooldown window.
+
+- [ ] T222 Harden `reservation-cleanup.integration.test.ts` — expired reservation cleanup job
+  Done when: reservations past TTL get released by the cleanup job; released inventory is available for new reservations; cleanup is idempotent; cleanup job writes metrics (count released, count kept).
+
+- [ ] T223 Harden `reservation-expiry-race.integration.test.ts` — expiry ↔ late payment race [FR-E008]
+  Done when: reservation expires then payment_intent.succeeded arrives: either re-reserves successfully OR flags the order for manual review with admin alert (both branches exercised); stock-available and stock-exhausted setups both tested; order final state is deterministic.
+
+### Admin (admin tooling over the product + order domain)
+
+- [ ] T224 Harden `admin-customers.integration.test.ts` — admin customer lookup + actions
+  Done when: admin can search customers by email/name/order ID; customer detail view shows orders + addresses + audit trail; ban/unban customer endpoint verified; PII access gated by role (super_admin only for full PII, operator sees redacted).
+
+- [ ] T225 Harden `admin-dashboard.integration.test.ts` — admin dashboard aggregates
+  Done when: dashboard endpoint returns correct aggregates (open orders, pending fulfillments, stuck reservations, low-stock count) against seeded fixture data; date range filter verified; timezone handling asserted.
+
+- [ ] T226 Harden `admin-inventory.integration.test.ts` — admin inventory adjustments
+  Done when: positive adjustment (restock) increases balance with audit; negative adjustment (shrinkage) decreases with reason required; attempting to drive balance negative returns 400; adjustment history queryable per variant; bulk adjustment endpoint verified.
+
+- [ ] T227 Harden `admin-products.integration.test.ts` — admin product CRUD
+  Done when: create product with variants + media + pricing succeeds; updating price updates the active snapshot; archive propagates to variants (cannot add to cart); slug collision returns 400; media upload URL signing verified.
+
+- [ ] T228 Harden `admin-reservation.integration.test.ts` — admin reservation view + override
+  Done when: admin can list active reservations filtered by variant/customer/expiry; force-release reservation endpoint succeeds with audit entry; stats endpoint returns correct counts; non-admin access returns 403.
+
+- [ ] T229 Harden `admin-settings.integration.test.ts` — admin-writable settings
+  Done when: settings GET returns current values; PATCH persists changes and fires a `settings.changed` event; invalid setting keys rejected with 400; role-gated settings (e.g. payment processor keys) editable only by super_admin.
+
+### Fulfillment + shipping (post-order physical flow)
+
+- [ ] T230 Harden `fulfillment-task.integration.test.ts` — fulfillment task lifecycle [T056]
+  Done when: task auto-created on order confirmation; task assignment persists; state transitions (pending → picking → packed → shipped) fire correct events; abandoned task (stale) flagged for admin review.
+
+- [ ] T231 Harden `shipment.integration.test.ts` — shipment creation + tracking [T058]
+  Done when: buy-label produces shipment row with carrier + tracking number + rate; tracking updates via EasyPost webhook move shipment state; void-label path creates correct void record; shipment linked back to order + fulfillment task.
+
+- [ ] T232 Harden `fulfillment-propagation.integration.test.ts` — fulfillment events propagate to order [T060]
+  Done when: shipment.created updates order.status = shipped; shipment tracking event (delivered) updates order.status = delivered; out-of-order events handled idempotently; customer + admin WebSocket notifications fire with exact payloads asserted.
+
+- [ ] T233 Harden `fulfillment-edge-cases.integration.test.ts` — fulfillment edge cases [T066c]
+  Done when: returned shipment, partial ship, split ship, multi-parcel ship all handled; label voided after ship flagged for investigation; carrier API timeout falls back to retry queue; each edge case has a concrete assertion on the final DB + event state.
+
+- [ ] T234 Harden `shipping-edge-cases.integration.test.ts` — shipping address/rate edge cases [T066d]
+  Done when: invalid shipping address returns 400 with specific field errors; no-rate-available path handled; PO Box rejection for ship-only carriers; international address rejected with clear reason (US-only); address normalization (street abbreviations, state codes) verified.
+
+- [ ] T235 Harden `void-label.integration.test.ts` — label voiding [T059a]
+  Done when: void within carrier window succeeds; void after carrier window rejects with 409; void of already-scanned label rejects; void creates correct refund accounting on the shipment cost; audit entry for each void.
+
+### Payments + webhooks (external integrations)
+
+- [ ] T236 Harden `webhook.integration.test.ts` — Stripe webhook event handling [FR-030, FR-080]
+  Done when: every webhook event type the API subscribes to (payment_intent.succeeded, payment_intent.payment_failed, charge.dispute.created, etc.) is processed with specific-state assertion; signature verification rejects bogus webhooks with 400; idempotency keys prevent duplicate processing; event ordering handled (succeeded-then-dispute vs dispute-then-succeeded).
+
+- [ ] T237 Harden `easypost-webhook.integration.test.ts` — EasyPost tracking webhooks [T059]
+  Done when: tracker_updated events update shipment state with correct timestamp; signature verification rejects unsigned/bogus payloads; out-of-order events (delivered before in_transit) handled without regression; unknown tracking ID logs + discards without erroring.
+
+- [ ] T238 Harden `refund.integration.test.ts` — admin refund (full + partial) through Stripe [FR-030]
+  Done when: full refund against a paid order succeeds + updates order status + fires event; partial refund with specific amount verified; refund on already-refunded order returns 409; refund failure from Stripe logged + order kept in pending-refund state; admin audit entry for each refund with actor + reason.
+
+- [ ] T239 Harden `stripe-unreachable.integration.test.ts` — Stripe API outage handling
+  Done when: checkout with Stripe unreachable returns 503 with retry-after header (not 500); partially-processed orders roll back cleanly; circuit-breaker triggers after N consecutive failures; health endpoint reflects degraded payment state.
+
+### Support + warranty (tickets)
+
+- [ ] T240 Harden `support-ticket.integration.test.ts` — support ticket CRUD [T061, FR-050]
+  Done when: customer creates ticket linked to order; admin replies thread into ticket; ticket state transitions (open → pending → resolved) audit correctly; SLA overdue flag set after N hours without admin response; ticket search by order/customer/status verified.
+
+- [ ] T241 Harden `ticket-attachment.integration.test.ts` — ticket attachments [T062]
+  Done when: upload attachment returns signed URL; attachment size limit enforced (413 response); content-type whitelist enforced; cross-tenant access blocked (customer can only see their own ticket's attachments); deletion revokes access.
+
+- [ ] T242 Harden `warranty-claim.integration.test.ts` — warranty claim submission [T063, FR-055]
+  Done when: submit claim with order + issue description + photos; warranty period check (rejects claims past window); valid claim creates ticket with `category=warranty`; material-specific checks (TPU heat disclaimer) verified; non-owner can't submit claim for someone else's order.
+
+### Evidence + disputes (dispute lifecycle)
+
+- [ ] T243 Harden `evidence-auto-collection.integration.test.ts` — auto-collection of dispute evidence [T065]
+  Done when: charge.dispute.created triggers evidence collection job; collected evidence includes order + shipping + customer + policy acknowledgments; evidence bundle size within Stripe limit; collection is idempotent (same dispute twice = same bundle).
+
+- [ ] T244 Harden `evidence-browsing.integration.test.ts` — admin evidence browser [T066b]
+  Done when: admin can list open disputes with evidence status; drill-down shows each piece of evidence with source; filter by status (pending, submitted, won, lost) returns correct counts.
+
+- [ ] T245 Harden `evidence-bundle.integration.test.ts` — submitting evidence bundle to Stripe [T066]
+  Done when: bundle submission to Stripe test mode succeeds; Stripe rejection (bad format) captured with specific error; resubmit after correction path verified; bundle submission locks further evidence edits.
+
+- [ ] T246 Harden `manual-evidence.integration.test.ts` — admin-added manual evidence [T066a]
+  Done when: admin can attach additional documents to evidence bundle; admin-added evidence tagged with actor; rejected content types blocked; removal path verified with audit.
+
+### Contributors + royalties (derived numbers)
+
+- [ ] T247 Harden `contributor.integration.test.ts` — contributor onboarding + profile [T067]
+  Done when: contributor signup via GitHub; profile with STL upload flow; CLA acceptance persists with version + timestamp; profile visibility setting (public/private) respected in public endpoints.
+
+- [ ] T248 Harden `contributor-dashboard.integration.test.ts` — contributor dashboard data [T071]
+  Done when: dashboard shows units-sold, earned royalties, milestone progress with exact number assertions; date range filter works; timezone handling verified; non-owner can't see another contributor's dashboard.
+
+- [ ] T249 Harden `contributor-milestones.integration.test.ts` — milestone transitions [T070, FR-071..075]
+  Done when: 25-unit threshold triggers retroactive 10% royalty on first 25 units; 50-unit starter kit milestone awarded; 500-unit milestone switches to 20% rate; milestone events fire WebSocket notifications; milestone state visible in contributor profile.
+
+- [ ] T250 Harden `contributor-sales.integration.test.ts` — sales attribution [T068]
+  Done when: order with a contributor-authored product credits the contributor with correct share; multi-product orders split attribution correctly; refunds reverse attribution; kits with mixed-contributor products split per product line.
+
+- [ ] T251 Harden `royalty-engine.integration.test.ts` — royalty calculation engine [T069]
+  Done when: engine computes royalty per order-line with correct rate tier; edge cases (zero-price promo, refunded line) produce correct zero/negative; monthly rollup aggregates match per-order sum; donation-option path (501(c)(3)) routes amount correctly.
+
+### Notifications + realtime (delivery layer)
+
+- [ ] T252 Harden `notification-dispatch.integration.test.ts` — notification delivery via email + WebSocket
+  Done when: every notification type in the spec has both delivery channels tested; customer email preference respects opt-out; admin notifications broadcast to connected admins; delivery retries on transient failure; permanent failure logged to dead-letter queue.
+
+- [ ] T253 Harden `websocket.integration.test.ts` — WebSocket session + event broadcast [FR-081, FR-082]
+  Done when: customer connects with session cookie → receives own order events; admin connects → receives admin-channel events; cross-customer isolation verified (customer A doesn't see customer B's events); unauthenticated connection rejected; reconnect-with-last-event-id replays missed events.
+
+- [ ] T254 Harden `domain-events.integration.test.ts` — domain event publishing + subscribers
+  Done when: each domain event has a concrete producer + at least one subscriber asserted; event ordering preserved per-aggregate; failed subscribers don't block other subscribers; event table persists with full payload for audit replay.
+
+### Cross-domain user-flow integration tests (mirror of E2E flows)
+
+Each task below creates a NEW file under `api/src/flows/` that walks the same multi-step flow an E2E task drives, but via HTTP calls against the real stack — no emulator / browser. Purpose: fast (seconds, not minutes) coverage of the complete user journey. When an E2E fails, the mirror flow test tells you whether the bug is in the API layer or past it.
+
+- [ ] T260 Flow test: guest checkout on Astro [mirrors T096, SC-001]
+  Done when: new `api/src/flows/guest-checkout.integration.test.ts` walks: fetch catalog → add to cart → set shipping address → compute totals → create payment intent → simulate Stripe confirm via webhook → verify order.status=paid → verify snapshots (price, tax, shipping) are frozen on the order. Runs green against live services with zero skips.
+
+- [ ] T261 Flow test: authenticated checkout [mirrors T097, SC-001]
+  Done when: new `api/src/flows/authenticated-checkout.integration.test.ts` walks: signup → verify email → login → add to cart → use saved address → checkout → Stripe webhook → order confirmed → order appears in customer order history with correct status transitions.
+
+- [ ] T262 Flow test: kit purchase [mirrors T098, SC-010]
+  Done when: new `api/src/flows/kit-purchase.integration.test.ts` walks: fetch kits → select a kit → choose variant per class → add-to-cart → checkout → verify kit row-items in order with correct per-variant pricing and kit savings; also tests the invalid-selection branch (missing class → 400).
+
+- [ ] T263 Flow test: full fulfillment + shipping [mirrors T099, SC-005, SC-006]
+  Done when: new `api/src/flows/fulfillment-shipping.integration.test.ts` walks: paid order → fulfillment task created → admin assigns → admin buys label → shipment created → EasyPost webhook simulating in_transit + delivered → order.status transitions correctly → customer receives WebSocket notifications for each step (asserted via live WS connection).
+
+- [ ] T264 Flow test: dispute lifecycle [mirrors T100, SC-005]
+  Done when: new `api/src/flows/dispute-lifecycle.integration.test.ts` walks: paid+shipped order → simulate `charge.dispute.created` webhook → auto-evidence collection fires → admin reviews + submits evidence bundle → simulate dispute won/lost webhooks → verify final order state + refund accounting.
+
+- [ ] T265 Flow test: contributor royalty [mirrors T101, SC-011]
+  Done when: new `api/src/flows/contributor-royalty.integration.test.ts` walks: contributor signup → product created and attributed → N units sold crossing each milestone → royalty ledger entries verified at each threshold (retroactive 10%, 20% rate change, starter kit); also verifies contributor dashboard totals match ledger sum.
+
+- [ ] T266 Flow test: concurrent inventory [mirrors T102, SC-003]
+  Done when: new `api/src/flows/concurrent-inventory.integration.test.ts` walks: N concurrent checkouts against a variant with stock M<N → exactly M succeed, N-M fail with 409 and specific out-of-stock; final balance = 0; no over-sell, no negative balance; all reservations accounted for.
+
+- [ ] T267 Flow test: WebSocket real-time propagation [mirrors T103, SC-007]
+  Done when: new `api/src/flows/websocket-realtime.integration.test.ts` walks: customer + admin both connected via WS → admin creates shipment → customer receives `shipment.created` + tracking events within latency budget (asserted); customer posts support ticket message → admin receives `ticket.updated`; admin internal note NOT delivered to customer (asserted absence).
+
+- [ ] T268 Flow test: security boundary enforcement [mirrors T104, SC-008, SC-015]
+  Done when: new `api/src/flows/security-boundaries.integration.test.ts` exercises each trust boundary: unauthenticated → 401 on protected routes; customer token on admin route → 403; cross-customer access (customer A reads customer B) → 404 (existence hidden); session token replay after logout → 401; rate-limit exceeded → 429 with Retry-After.
+
+- [ ] T269 Flow test: guest-order → account linking [mirrors T104a, FR-066]
+  Done when: new `api/src/flows/guest-order-link.integration.test.ts` walks: guest checkout with email X → signup with email X → verify guest order linked to new account → guest order appears in authenticated order history → link is idempotent on repeat signup attempts.
+
+- [ ] T270 Flow test: warranty claim submission [mirrors T104b, FR-055]
+  Done when: new `api/src/flows/warranty-claim.integration.test.ts` walks: customer submits warranty claim for their order → verify ticket created with category=warranty → admin reviews → resolution path (approve/deny) → notifications delivered; also tests out-of-window claim rejection.
+
+- [ ] T271 Flow test: admin refund (full + partial) through Stripe [mirrors T104c, FR-030]
+  Done when: new `api/src/flows/admin-refund.integration.test.ts` walks: paid order → admin initiates full refund → Stripe test-mode refund succeeds → verify refund row + order state + customer notification; second walkthrough for partial refund verifying balance math; third walkthrough for double-refund attempt returning 409.
+
+- [ ] T272 Flow test: reservation expiry → late payment race [mirrors T104d, FR-E008]
+  Done when: new `api/src/flows/reservation-late-payment.integration.test.ts` walks: checkout creates short-TTL reservation → force expiry via cleanup job → fire `payment_intent.succeeded` webhook → both outcome branches exercised (re-reservation succeeded + order confirmed, OR order flagged for manual review with admin alert); stock-available and stock-exhausted setups.
+
+- [ ] T273 Flow test: low-stock alert → notification delivery [mirrors T104e, FR-038, FR-085]
+  Done when: new `api/src/flows/low-stock-alert.integration.test.ts` walks: variant with safety_stock=10 → inventory adjustment drops available to 9 → admin WebSocket receives alert within 2s → email logged to `logs/emails.jsonl` with variant SKU + product title + available count + threshold (all asserted).
+
+- [ ] T274 Flow test: Stripe Tax calculation [mirrors T104f, FR-117, FR-118]
+  Done when: new `api/src/flows/stripe-tax.integration.test.ts` walks: checkout with TX shipping → Stripe Tax API called → non-zero tax line on the order + PaymentIntent metadata includes tax breakdown; tax-exempt state → zero tax; missing-state returns 400. Preconditions: `STRIPE_TAX_ENABLED=true`, real `sk_test_...` key — if missing, setup fails loudly (no skip). This task may be deferred if test keys aren't provisioned.
+
+- [ ] T275 Flow test: out-of-stock cart + kit rejection [mirrors T104h, FR-010]
+  Done when: new `api/src/flows/out-of-stock-flow.integration.test.ts` walks: drive variant `available→0` via `POST /api/admin/inventory/adjustments` → assert public catalog returns `inStock: false` → `POST /api/cart/:id/items` returns 409 with `ERR_OUT_OF_STOCK` → kit containing the variant rejected at checkout → after `+N` restock, variant orderable again.
+
+- [ ] T276 Phase 14 validation
+  Done when: `bash test/e2e/setup.sh` exits 0; `source test/e2e/.state/env.sh && pnpm --dir api test` exits 0 with the reporter showing 0 failures AND 0 skips across all integration tests; every FR referenced in tasks T200–T275 has at least one `it()` block that drives the real end-to-end path; runner-verified.json for phase 14 shows passed=true.
+
+---
+
+## Phase 15: Integration + E2E [SC-001 through SC-018]
 
 **MCP-driven E2E**: uses `nix-mcp-debugkit` servers (`mcp-browser` for Astro site, `mcp-android` for Flutter apps on Android emulator). iOS coverage via `mcp-ios` is deferred — Android exercises the same Flutter code paths for now. Tasks annotated `[needs: mcp-*, e2e-loop]` use the explore-fix-verify cycle: MCP agent takes screenshots, taps elements, reads accessibility trees, finds bugs, fixes code, writes a regression test, re-runs. **Every bug fix gets a scripted regression test (Playwright for web, Patrol for Flutter) before the task is marked done — a fix without a test is not done.**
 
@@ -418,7 +676,7 @@
 - [x] T095e Set up Playwright + Patrol regression harnesses
   Done when: `site/tests/e2e/` has Playwright config running against local Astro served by `test/e2e/setup.sh`; `admin/integration_test/` and `customer/integration_test/` have Patrol config wired to `flutter test integration_test/`; both emit structured JSON to `test-logs/e2e/` for agent + CI consumption; `.github/workflows/e2e.yml` runs Playwright headless + Patrol on Android CI emulator on push
 
-- [ ] T096 E2E: guest checkout on Astro [SC-001] [needs: mcp-browser, e2e-loop, stripe-listen]
+- [x] T096 E2E: guest checkout on Astro [SC-001] [needs: mcp-browser, e2e-loop, stripe-listen]
   Prereq: `pnpm --dir api stripe:listen:start` before running (see [test/e2e/README.md](../../test/e2e/README.md)); tear down with `stripe:listen:stop` after.
   Done when: MCP agent drives live Astro site: navigate to product → select variant → add to cart → checkout with email + address → pay via Stripe test → order confirmation; completes in <3 minutes; order exists in DB with correct snapshots; Playwright regression test exists for the full flow; every bug found during exploration has its own Playwright regression test
 
@@ -465,17 +723,27 @@
 
 - [ ] T104f E2E: Stripe Tax calculation with live test key [FR-117, FR-118] [needs: mcp-browser, e2e-loop, stripe-listen]
   Prereq: `pnpm --dir api stripe:listen:start` before running (see [test/e2e/README.md](../../test/e2e/README.md)); tear down with `stripe:listen:stop` after.
-  Done when: MCP agent drives Astro checkout with TX shipping address (gated on STRIPE_TAX_ENABLED=true + Stripe test key present) → verify Stripe Tax API called → non-zero tax displayed in UI → tax reflected in PaymentIntent metadata and order totals; separate MCP run with tax-exempt state → correct tax displayed; test skipped cleanly when Stripe test key unavailable; Playwright regression test
+  Done when: MCP agent drives Astro checkout with TX shipping address → verify Stripe Tax API called → non-zero tax displayed in UI → tax reflected in PaymentIntent metadata and order totals; separate MCP run with tax-exempt state → correct tax displayed; Playwright regression test. Preconditions (MUST all be live before the test starts; setup fails loudly if any is missing — no skip fallback): `STRIPE_TAX_ENABLED=true`, real Stripe test key in `STRIPE_SECRET_KEY`, Stripe webhook listener running. If credentials are not present in the runner environment, provision them or exclude this task from the run — never silently skip.
 
 - [ ] T104g E2E: cross-app real-time propagation [FR-081, FR-082] [needs: mcp-android, e2e-loop]
   Done when: MCP agent opens customer app (customer session) and admin app (admin session) simultaneously → MCP on admin creates shipment + buys label for customer's order → MCP verifies customer app receives shipment.created + tracking events in UI within 2s; MCP on customer posts support ticket message → MCP verifies admin app receives ticket.updated in UI within 2s; admin internal note NOT delivered to customer UI (MCP verifies absence); Patrol regression tests on both sides
+
+- [ ] T104h E2E: out-of-stock cart + kit rejection [FR-010, spec.md AS-2, AS-51] [needs: mcp-browser, e2e-loop]
+  Drive state through the admin inventory API — NEVER edit `api/src/db/scripts/seed.ts`. See [test/e2e/README.md § Controlling test state](../../test/e2e/README.md#controlling-test-state-stock-reservations-etc).
+  Done when: test picks a dedicated variant (or creates one), drives `available → 0` via `POST /api/admin/inventory/adjustments` with a negative `quantity_delta`, then asserts:
+    (a) public catalog endpoint flags the variant `inStock: false`;
+    (b) Astro site PDP shows "Out of Stock" and the add-to-cart button is disabled;
+    (c) `POST /api/cart/:id/items` for that variant returns 409 with `ERR_OUT_OF_STOCK` (or equivalent);
+    (d) a kit containing that variant in one of its classes cannot check out — customer must swap to an available alternative (FR-010);
+    (e) after a `+N` restock adjustment, the same variant becomes orderable again.
+  Test creates its own fixture variant where possible; if it must reuse seeded data, it MUST restock to the original count in teardown. Test writes structured output to `test-logs/e2e/` and appears in `summary.json` with `pass > 0`. Skips are never acceptable — `skip > 0` fails the build unconditionally (see [api/src/test-reporter.ts](../../api/src/test-reporter.ts) and spec-kit `reference/testing.md` § "Zero-skips rule").
 
 - [ ] T105 Create/verify UI_FLOW.md for admin and customer apps
   Done when: UI_FLOW.md documents all screens, routes, state machines, API calls, field validations, and real-time connections for both Flutter apps and Astro checkout; every flow has a corresponding E2E test reference and an MCP exploration task above
 
 ---
 
-## Phase 15: Infrastructure + Deploy [FR-093 through FR-097]
+## Phase 16: Infrastructure + Deploy [FR-093 through FR-097]
 
 - [ ] T106 Write OpenTofu configurations [FR-093, FR-094]
   Done when: `deploy/tofu/` provisions: server(s), Cloudflare DNS records, networking; `tofu plan` from fresh state shows create-only; `tofu apply` provisions infrastructure; variables for all configurable values
@@ -491,7 +759,7 @@
 
 ---
 
-## Phase 16: Operations Runbook + Final Validation [FR-102]
+## Phase 17: Operations Runbook + Final Validation [FR-102]
 
 - [ ] T110 Write RUNBOOK.md [FR-102]
   Done when: RUNBOOK.md documents: day-1 developer setup, day-2 ops with cadence (DB backups daily, vacuum weekly, dep updates weekly, cert monitoring, inventory cleanup, Stripe health, log rotation), failure recovery per component (Postgres down, Stripe webhook failures, SuperTokens unreachable, EasyPost errors), escalation procedures, Liquibase rollback procedures, OpenTofu plan/apply workflow.
