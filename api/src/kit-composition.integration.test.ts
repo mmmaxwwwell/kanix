@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "node:events";
-import { createServer, markReady, markNotReady } from "./server.js";
-import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
-import type { Config } from "./config.js";
+import type { DatabaseConnection } from "./db/connection.js";
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { product, productVariant } from "./db/schema/catalog.js";
@@ -14,38 +11,11 @@ import {
 } from "./db/schema/product-class.js";
 import { inventoryBalance, inventoryLocation } from "./db/schema/inventory.js";
 import { cart, cartLine, cartKitSelection } from "./db/schema/cart.js";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
-
-const DATABASE_URL = requireDatabaseUrl();
-const SUPERTOKENS_URI = getSuperTokensUri();
-
-function testConfig(): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: "whsec_xxx",
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
+import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
 
 describe("kit composition (T047)", () => {
+  let ts_: TestServer;
+
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
@@ -63,35 +33,29 @@ describe("kit composition (T047)", () => {
   let variantB1Id = "";
   let variantC1Id = "";
   let oosVariantId = "";
+  let inactiveVariantId = "";
   let locationId = "";
   let kitDefId = "";
+  let inactiveKitDefId = "";
   let cartToken = "";
   let cartId = "";
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-      reservationCleanupIntervalMs: 0,
-    });
-    address = await server.start();
-    markReady();
-    app = server.app;
+    ts_ = await createTestServer();
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+    address = ts_.address;
 
     // --- Seed product classes ---
     const [platesClass] = await dbConn.db
       .insert(productClass)
-      .values({ name: "Plates", slug: `plates-${ts}`, sortOrder: 0 })
+      .values({ name: `Plates-${ts}`, slug: `plates-${ts}`, sortOrder: 0 })
       .returning();
     platesClassId = platesClass.id;
 
     const [bowlsClass] = await dbConn.db
       .insert(productClass)
-      .values({ name: "Bowls", slug: `bowls-${ts}`, sortOrder: 1 })
+      .values({ name: `Bowls-${ts}`, slug: `bowls-${ts}`, sortOrder: 1 })
       .returning();
     bowlsClassId = bowlsClass.id;
 
@@ -192,6 +156,20 @@ describe("kit composition (T047)", () => {
       .returning();
     oosVariantId = oosV.id;
 
+    // Inactive variant on prodA — tests active-only enforcement
+    const [inactiveV] = await dbConn.db
+      .insert(productVariant)
+      .values({
+        productId: productAId,
+        sku: `KIT-INACT-${ts}`,
+        title: "Plate A - Inactive",
+        optionValuesJson: { material: "PLA" },
+        priceMinor: 1900,
+        status: "archived",
+      })
+      .returning();
+    inactiveVariantId = inactiveV.id;
+
     // --- Inventory ---
     const [loc] = await dbConn.db
       .insert(inventoryLocation)
@@ -220,7 +198,17 @@ describe("kit composition (T047)", () => {
       safetyStock: 5,
     });
 
-    // --- Kit definition ---
+    // Inactive variant has stock (tests that status is checked, not just inventory)
+    await dbConn.db.insert(inventoryBalance).values({
+      variantId: inactiveVariantId,
+      locationId,
+      onHand: 50,
+      reserved: 0,
+      available: 50,
+      safetyStock: 5,
+    });
+
+    // --- Kit definition (active) ---
     const [kit] = await dbConn.db
       .insert(kitDefinition)
       .values({
@@ -232,6 +220,23 @@ describe("kit composition (T047)", () => {
       })
       .returning();
     kitDefId = kit.id;
+
+    // --- Kit definition (inactive) ---
+    const [inactiveKit] = await dbConn.db
+      .insert(kitDefinition)
+      .values({
+        slug: `test-kit-inactive-${ts}`,
+        title: "Inactive Kit",
+        description: "Should not be orderable",
+        priceMinor: 3000,
+        status: "draft",
+      })
+      .returning();
+    inactiveKitDefId = inactiveKit.id;
+
+    await dbConn.db.insert(kitClassRequirement).values([
+      { kitDefinitionId: inactiveKitDefId, productClassId: platesClassId, quantity: 1 },
+    ]);
 
     // Kit requires: 2 from Plates, 1 from Bowls
     await dbConn.db.insert(kitClassRequirement).values([
@@ -251,57 +256,56 @@ describe("kit composition (T047)", () => {
   }, 30000);
 
   afterAll(async () => {
-    markNotReady();
-    if (dbConn) {
-      try {
-        // Clean kit selections
-        if (cartId) {
-          const lines = await dbConn.db.select().from(cartLine).where(eq(cartLine.cartId, cartId));
-          for (const line of lines) {
-            await dbConn.db
-              .delete(cartKitSelection)
-              .where(eq(cartKitSelection.cartLineId, line.id));
-          }
-          await dbConn.db.delete(cartLine).where(eq(cartLine.cartId, cartId));
-          await dbConn.db.delete(cart).where(eq(cart.id, cartId));
+    try {
+      // Clean kit selections
+      if (cartId) {
+        const lines = await dbConn.db.select().from(cartLine).where(eq(cartLine.cartId, cartId));
+        for (const line of lines) {
+          await dbConn.db
+            .delete(cartKitSelection)
+            .where(eq(cartKitSelection.cartLineId, line.id));
         }
-        // Clean kit definition + requirements
-        if (kitDefId) {
+        await dbConn.db.delete(cartLine).where(eq(cartLine.cartId, cartId));
+        await dbConn.db.delete(cart).where(eq(cart.id, cartId));
+      }
+      // Clean kit definition + requirements
+      for (const kid of [kitDefId, inactiveKitDefId]) {
+        if (kid) {
           await dbConn.db
             .delete(kitClassRequirement)
-            .where(eq(kitClassRequirement.kitDefinitionId, kitDefId));
-          await dbConn.db.delete(kitDefinition).where(eq(kitDefinition.id, kitDefId));
+            .where(eq(kitClassRequirement.kitDefinitionId, kid));
+          await dbConn.db.delete(kitDefinition).where(eq(kitDefinition.id, kid));
         }
-        // Clean inventory
-        await dbConn.db.delete(inventoryBalance).where(eq(inventoryBalance.locationId, locationId));
-        await dbConn.db.delete(inventoryLocation).where(eq(inventoryLocation.id, locationId));
-        // Clean class memberships
-        for (const pid of [productAId, productBId, productCId]) {
-          if (pid)
-            await dbConn.db
-              .delete(productClassMembership)
-              .where(eq(productClassMembership.productId, pid));
-        }
-        // Clean variants and products
-        for (const pid of [productAId, productBId, productCId]) {
-          if (pid) await dbConn.db.delete(productVariant).where(eq(productVariant.productId, pid));
-        }
-        for (const pid of [productAId, productBId, productCId]) {
-          if (pid) await dbConn.db.delete(product).where(eq(product.id, pid));
-        }
-        // Clean product classes
-        for (const cid of [platesClassId, bowlsClassId]) {
-          if (cid) await dbConn.db.delete(productClass).where(eq(productClass.id, cid));
-        }
-      } catch {
-        // best-effort cleanup
       }
-      await dbConn.close();
+      // Clean inventory
+      await dbConn.db.delete(inventoryBalance).where(eq(inventoryBalance.locationId, locationId));
+      // Clean class memberships
+      for (const pid of [productAId, productBId, productCId]) {
+        if (pid)
+          await dbConn.db
+            .delete(productClassMembership)
+            .where(eq(productClassMembership.productId, pid));
+      }
+      // Clean variants and products
+      for (const pid of [productAId, productBId, productCId]) {
+        if (pid) await dbConn.db.delete(productVariant).where(eq(productVariant.productId, pid));
+      }
+      for (const pid of [productAId, productBId, productCId]) {
+        if (pid) await dbConn.db.delete(product).where(eq(product.id, pid));
+      }
+      // Clean product classes
+      for (const cid of [platesClassId, bowlsClassId]) {
+        if (cid) await dbConn.db.delete(productClass).where(eq(productClass.id, cid));
+      }
+      // Clean inventory location
+      await dbConn.db.delete(inventoryLocation).where(eq(inventoryLocation.id, locationId));
+    } catch {
+      // best-effort cleanup
     }
-    if (app) await app.close();
+    await stopTestServer(ts_);
   }, 15000);
 
-  it("valid kit → added to cart with savings", async () => {
+  it("valid kit selection satisfies all classes and computes exact savings", async () => {
     const res = await fetch(`${address}/api/cart/kits`, {
       method: "POST",
       headers: {
@@ -340,22 +344,48 @@ describe("kit composition (T047)", () => {
       };
     };
 
+    // Kit metadata
     expect(body.kit.kitDefinitionId).toBe(kitDefId);
     expect(body.kit.kitPriceMinor).toBe(4500);
-    // Individual: 2000 (A1) + 1800 (B1) + 1500 (C1) = 5300
-    expect(body.kit.individualTotalMinor).toBe(5300);
-    expect(body.kit.savingsMinor).toBe(800);
-    expect(body.kit.selections.length).toBe(3);
 
-    // Cart should have the kit as a line item at kit price
-    expect(body.cart.items.length).toBeGreaterThanOrEqual(1);
+    // Exact price math: 2000 (A1-TPU) + 1800 (B1-TPU) + 1500 (C1-TPU) = 5300
+    expect(body.kit.individualTotalMinor).toBe(5300);
+    // Savings: 5300 - 4500 = 800
+    expect(body.kit.savingsMinor).toBe(800);
+
+    // All 3 selections returned with correct details
+    expect(body.kit.selections).toHaveLength(3);
+
+    const selA1 = body.kit.selections.find((s) => s.variantId === variantA1Id);
+    expect(selA1).toMatchObject({
+      productClassId: platesClassId,
+      variantId: variantA1Id,
+      variantTitle: "Plate A - TPU",
+      individualPriceMinor: 2000,
+    });
+
+    const selB1 = body.kit.selections.find((s) => s.variantId === variantB1Id);
+    expect(selB1).toMatchObject({
+      productClassId: platesClassId,
+      variantId: variantB1Id,
+      variantTitle: "Plate B - TPU",
+      individualPriceMinor: 1800,
+    });
+
+    const selC1 = body.kit.selections.find((s) => s.variantId === variantC1Id);
+    expect(selC1).toMatchObject({
+      productClassId: bowlsClassId,
+      variantId: variantC1Id,
+      variantTitle: "Bowl C - TPU",
+      individualPriceMinor: 1500,
+    });
+
+    // Cart line created at kit price
     const kitLine = body.cart.items.find((i) => i.id === body.kit.cartLineId);
-    expect(kitLine).toBeDefined();
-    if (!kitLine) return;
-    expect(kitLine.unitPriceMinor).toBe(4500);
+    expect(kitLine).toMatchObject({ unitPriceMinor: 4500 });
   });
 
-  it("incomplete kit → rejected with message 'Select 2 more from Plates'", async () => {
+  it("missing class selection returns 400 identifying which class is missing", async () => {
     const res = await fetch(`${address}/api/cart/kits`, {
       method: "POST",
       headers: {
@@ -365,7 +395,7 @@ describe("kit composition (T047)", () => {
       body: JSON.stringify({
         kit_definition_id: kitDefId,
         selections: [
-          // Only 1 from Bowls, but need 2 from Plates + 1 from Bowls
+          // Only 1 from Bowls — missing both Plates selections
           { product_class_id: bowlsClassId, variant_id: variantC1Id },
         ],
       }),
@@ -375,10 +405,10 @@ describe("kit composition (T047)", () => {
 
     const body = (await res.json()) as { error: string; message: string };
     expect(body.error).toBe("ERR_KIT_INCOMPLETE");
-    expect(body.message).toContain("Select 2 more from Plates");
+    expect(body.message).toBe(`Select 2 more from Plates-${ts}`);
   });
 
-  it("out-of-stock component → rejected with swap suggestion", async () => {
+  it("out-of-stock component returns 400 with specific alternatives", async () => {
     const res = await fetch(`${address}/api/cart/kits`, {
       method: "POST",
       headers: {
@@ -403,11 +433,14 @@ describe("kit composition (T047)", () => {
       alternatives: string[];
     };
     expect(body.error).toBe("ERR_KIT_COMPONENT_OUT_OF_STOCK");
-    expect(body.alternatives).toBeDefined();
-    expect(body.alternatives.length).toBeGreaterThan(0);
+    expect(body.message).toBe("Component out of stock");
+    // Alternatives are in-stock variants from the same class (Plates) excluding prodB's variants
+    // prodA has variantA1Id and variantA2Id in stock → those are the alternatives
+    expect(body.alternatives).toEqual(expect.arrayContaining([variantA1Id, variantA2Id]));
+    expect(body.alternatives.length).toBe(2);
   });
 
-  it("variant not in class → rejected", async () => {
+  it("wrong variant for class returns 400 with ERR_KIT_CLASS_MISMATCH", async () => {
     // Try to put a bowl variant in a plates slot
     const res = await fetch(`${address}/api/cart/kits`, {
       method: "POST",
@@ -427,11 +460,58 @@ describe("kit composition (T047)", () => {
 
     expect(res.status).toBe(400);
 
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; message: string };
     expect(body.error).toBe("ERR_KIT_CLASS_MISMATCH");
+    expect(body.message).toBe("Variant's product does not belong to the specified class");
   });
 
-  it("nonexistent kit → 404", async () => {
+  it("inactive variant rejected even when in stock (active-only enforcement)", async () => {
+    const res = await fetch(`${address}/api/cart/kits`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Cart-Token": cartToken,
+      },
+      body: JSON.stringify({
+        kit_definition_id: kitDefId,
+        selections: [
+          { product_class_id: platesClassId, variant_id: inactiveVariantId }, // archived!
+          { product_class_id: platesClassId, variant_id: variantB1Id },
+          { product_class_id: bowlsClassId, variant_id: variantC1Id },
+        ],
+      }),
+    });
+
+    expect(res.status).toBe(400);
+
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe("ERR_VARIANT_NOT_AVAILABLE");
+    expect(body.message).toBe("Variant is not available");
+  });
+
+  it("inactive kit definition returns 400 ERR_KIT_NOT_AVAILABLE", async () => {
+    const res = await fetch(`${address}/api/cart/kits`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Cart-Token": cartToken,
+      },
+      body: JSON.stringify({
+        kit_definition_id: inactiveKitDefId,
+        selections: [
+          { product_class_id: platesClassId, variant_id: variantA1Id },
+        ],
+      }),
+    });
+
+    expect(res.status).toBe(400);
+
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe("ERR_KIT_NOT_AVAILABLE");
+    expect(body.message).toBe("Kit is not available");
+  });
+
+  it("nonexistent kit returns 404 with ERR_KIT_NOT_FOUND", async () => {
     const res = await fetch(`${address}/api/cart/kits`, {
       method: "POST",
       headers: {
@@ -445,11 +525,12 @@ describe("kit composition (T047)", () => {
     });
 
     expect(res.status).toBe(404);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; message: string };
     expect(body.error).toBe("ERR_KIT_NOT_FOUND");
+    expect(body.message).toBe("Kit definition not found");
   });
 
-  it("missing selections → 400", async () => {
+  it("missing selections array returns 400 ERR_VALIDATION", async () => {
     const res = await fetch(`${address}/api/cart/kits`, {
       method: "POST",
       headers: {
@@ -462,7 +543,53 @@ describe("kit composition (T047)", () => {
     });
 
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; message: string };
     expect(body.error).toBe("ERR_VALIDATION");
+    expect(body.message).toBe("selections array is required and must not be empty");
+  });
+
+  it("different variant selection yields different savings math", async () => {
+    // Use the pricier PA11 variant instead of TPU for plate A
+    const res = await fetch(`${address}/api/cart/kits`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Cart-Token": cartToken,
+      },
+      body: JSON.stringify({
+        kit_definition_id: kitDefId,
+        selections: [
+          { product_class_id: platesClassId, variant_id: variantA2Id }, // PA11 @ 2500
+          { product_class_id: platesClassId, variant_id: variantB1Id }, // TPU @ 1800
+          { product_class_id: bowlsClassId, variant_id: variantC1Id },  // TPU @ 1500
+        ],
+      }),
+    });
+
+    expect(res.status).toBe(201);
+
+    const body = (await res.json()) as {
+      kit: {
+        kitPriceMinor: number;
+        individualTotalMinor: number;
+        savingsMinor: number;
+        selections: Array<{
+          variantId: string;
+          individualPriceMinor: number;
+        }>;
+      };
+    };
+
+    // Individual: 2500 + 1800 + 1500 = 5800
+    expect(body.kit.individualTotalMinor).toBe(5800);
+    expect(body.kit.kitPriceMinor).toBe(4500);
+    // Savings: 5800 - 4500 = 1300
+    expect(body.kit.savingsMinor).toBe(1300);
+
+    // Verify each selection's price
+    const selA2 = body.kit.selections.find((s) => s.variantId === variantA2Id);
+    expect(selA2!.individualPriceMinor).toBe(2500);
+    const selB1 = body.kit.selections.find((s) => s.variantId === variantB1Id);
+    expect(selB1!.individualPriceMinor).toBe(1800);
   });
 });

@@ -442,13 +442,13 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 
 ### Catalog + kits (products must exist before orders)
 
-- [ ] T209 Harden `public-catalog.integration.test.ts` — public product catalog API [T044]
+- [x] T209 Harden `public-catalog.integration.test.ts` — public product catalog API [T044]
   Done when: `GET /api/products` returns only active products (draft/archived filtered); `GET /api/products/:slug` returns full product with variants + media + pricing + inStock flag; non-existent slug returns 404; out-of-stock variant flagged correctly; response shape matches exactly (every field asserted).
 
-- [ ] T210 Harden `catalog/variant-class.integration.test.ts` — product variant classification
+- [x] T210 Harden `catalog/variant-class.integration.test.ts` — product variant classification
   Done when: variant-class CRUD endpoints return correct shapes; invalid class assignments return 400; archived classes don't appear in public endpoints but do appear in admin endpoints; class-to-product mapping persists and round-trips.
 
-- [ ] T211 Harden `kit-composition.integration.test.ts` — kit definition + class requirements [T047]
+- [x] T211 Harden `kit-composition.integration.test.ts` — kit definition + class requirements [T047]
   Done when: kit with multiple classes validates that a selection satisfies each class; missing-class selection returns 400 with which class is missing; wrong-variant-for-class returns 400; active-only product selection enforced; kit savings calculation is concrete (assert exact price math).
 
 - [ ] T212 Harden `kit-revalidation.integration.test.ts` — kit cart re-validation on state change [T054a]

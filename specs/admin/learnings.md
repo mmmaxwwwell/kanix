@@ -93,3 +93,17 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The existing `admin_audit_log` table has `actor_admin_user_id NOT NULL` with FK to `admin_user`, so it can't store customer auth events. A separate `auth_event_log` table is needed for login/logout/signup/failed_login events.
 - SuperTokens handles `/auth/signout` internally — `request.session` is not set by custom `verifySession` preHandler on that route. To capture the user ID before signout, use `Session.getSession` directly in an `onRequest` hook with `sessionRequired: false`.
 - Capturing SuperTokens response bodies requires an `onSend` hook (which receives the payload before it's flushed) storing the parsed JSON on the request object, since `onResponse` can't read the response body.
+
+## T209 — Harden public-catalog.integration.test.ts
+- The old test file used inline `createServer`/`testConfig`/`createFakeProcess` boilerplate instead of the shared `createTestServer`/`stopTestServer` harness from `test-server.ts` — the migration was needed alongside the assertion hardening.
+- `findActiveProductsWithDetails` filters to products with at least one `productClassMembership` row — test products without class membership won't appear in `GET /api/products` (but the slug detail endpoint has no such requirement). Both endpoints filter to `status = "active"` variants only.
+
+## T210 — Harden catalog/variant-class.integration.test.ts
+- The `product_class` table has no `status` column, so "archived classes in public" is tested by verifying that archived *variants* are hidden from public catalog while still visible in admin endpoints.
+- The audit log for `product_class_membership` has a pre-existing bug: `entityId` uses `productId:classId` concatenation which isn't valid UUID for the `entity_id uuid` column — this causes audit log write failures but doesn't block the membership operation itself.
+- Sequential `it()` tests that depend on state from previous tests (e.g., variant status transitions) must set up that state in `beforeAll` or the test itself — remove silent `if (!id) return` skip guards that hide broken setup.
+
+## T211 — Harden kit-composition.integration.test.ts
+- `product_class.name` has a unique constraint (`uq_product_class_name`) — use `Date.now()` suffix on names (not just slugs) to avoid collisions with data from prior test runs on the shared DB.
+- The kit `ERR_KIT_CLASS_MISMATCH` error message comes from the query layer (`addKitToCart`), not the route handler — server re-throws the query error's message. Actual message: "Variant's product does not belong to the specified class" (not the handler's fallback).
+- OOS variant alternatives only include variants from *other products* in the same class (the query skips the OOS variant's own product) — so test fixtures need at least 2 products per class to produce alternatives.

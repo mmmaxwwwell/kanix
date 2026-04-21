@@ -1,0 +1,16 @@
+{
+  "task_id": "T211",
+  "status": "complete",
+  "summary": "Hardened kit-composition.integration.test.ts: replaced vacuous assertions with concrete value checks, added active-only variant enforcement test, inactive kit test, different savings math test, migrated to shared test harness, made seed data unique per run",
+  "commands_run": [
+    {"command": "npx vitest run api/src/kit-composition.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": [],
+  "files_modified": [
+    "api/src/kit-composition.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 2
+}

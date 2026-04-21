@@ -1,0 +1,12 @@
+{
+  "task_id": "T209",
+  "status": "complete",
+  "summary": "Hardened public-catalog.integration.test.ts: replaced all vacuous assertions (toBeDefined, toBeGreaterThanOrEqual) with concrete value checks, added full CatalogProduct/CatalogVariant/CatalogMedia response shape interfaces with every field asserted, added error body assertions on 404 tests for draft/archived products, migrated from inline server boilerplate to shared createTestServer harness",
+  "commands_run": [
+    {"command": "source .dev/e2e-state/env.sh && pnpm --dir api test -- --reporter=verbose public-catalog.integration.test", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T209.json"],
+  "files_modified": ["api/src/public-catalog.integration.test.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 1
+}
