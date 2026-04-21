@@ -236,3 +236,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Attachment upload endpoints need `bodyLimit: 15 * 1024 * 1024` because base64 encoding inflates 10MB files to ~14MB, exceeding Fastify's default 1MB body limit. Without this, the server returns 500 before the handler runs.
 - The `evidence_record` table FK column referencing `support_ticket` is `support_ticket_id` (not `ticket_id`). Cleanup requires `ALTER TABLE evidence_record DISABLE TRIGGER USER` before deleting tickets.
 - `admin_role.capabilitiesJson` is the Drizzle field name (maps to `capabilities_json` column), not `capabilities` — using the wrong field silently inserts `null` causing FK/NOT NULL violations downstream.
+
+## T242 — Harden warranty-claim.integration.test.ts
+- `order_line.variant_id` has FK constraint `fk_order_line_variant` to `product_variant` — fake UUIDs like `00000000-...-000001` cause FK violations. Must create real product + variant rows first (same pattern as T231 shipment tests).
+- `support_ticket` has a self-referencing FK (`fk_support_ticket_linked_ticket` on `linked_ticket_id`) — cleanup must `UPDATE SET linked_ticket_id = NULL` before deleting tickets, otherwise deletion fails with FK violation.
+- The warranty claim HTTP endpoint (`POST /api/support/warranty-claims`) returns `material_limitation_flagged` / `material_limitation_note` (snake_case) in the HTTP response, but the `createWarrantyClaim` function returns `materialLimitationFlagged` / `materialLimitationNote` (camelCase) — the server handler maps between the two.

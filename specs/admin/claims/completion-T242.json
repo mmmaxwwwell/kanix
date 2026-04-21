@@ -1,0 +1,12 @@
+{
+  "task_id": "T242",
+  "status": "complete",
+  "summary": "Hardened warranty-claim.integration.test.ts: converted from DB-level to HTTP-level testing through POST /api/support/warranty-claims with real SuperTokens auth, added 8 tests covering happy path, expired warranty, TPU heat flag, undelivered order, non-owner rejection, invalid order line, unauthenticated access, and missing fields",
+  "commands_run": [
+    {"command": "npx vitest run src/warranty-claim.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T242.json"],
+  "files_modified": ["api/src/warranty-claim.integration.test.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 0
+}

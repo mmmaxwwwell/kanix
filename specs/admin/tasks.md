@@ -555,7 +555,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T241 Harden `ticket-attachment.integration.test.ts` — ticket attachments [T062]
   Done when: upload attachment returns signed URL; attachment size limit enforced (413 response); content-type whitelist enforced; cross-tenant access blocked (customer can only see their own ticket's attachments); deletion revokes access.
 
-- [ ] T242 Harden `warranty-claim.integration.test.ts` — warranty claim submission [T063, FR-055]
+- [x] T242 Harden `warranty-claim.integration.test.ts` — warranty claim submission [T063, FR-055]
   Done when: submit claim with order + issue description + photos; warranty period check (rejects claims past window); valid claim creates ticket with `category=warranty`; material-specific checks (TPU heat disclaimer) verified; non-owner can't submit claim for someone else's order.
 
 ### Evidence + disputes (dispute lifecycle)
