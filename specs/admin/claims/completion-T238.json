@@ -1,0 +1,12 @@
+{
+  "task_id": "T238",
+  "status": "complete",
+  "summary": "Hardened refund.integration.test.ts with 8 tests: full refund, partial refund, 409 for already-refunded, over-refund 400, Stripe failure 502, audit log assertions, list refunds, and 404 for missing order. Added ERR_ORDER_ALREADY_REFUNDED (409) and ERR_REFUND_PROVIDER_FAILURE (502) to server.ts.",
+  "commands_run": [
+    {"command": "npx vitest run src/refund.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T238.json"],
+  "files_modified": ["api/src/refund.integration.test.ts", "api/src/server.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

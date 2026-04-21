@@ -1245,6 +1245,13 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             .send({ error: "ERR_ORDER_NOT_FOUND", message: "Order not found" });
         }
 
+        // Reject refund on already-fully-refunded order
+        if (found.paymentStatus === "refunded") {
+          return reply
+            .status(409)
+            .send({ error: "ERR_ORDER_ALREADY_REFUNDED", message: "Order has already been fully refunded" });
+        }
+
         const actorAdminUserId = request.adminContext?.adminUserId ?? "";
 
         try {
@@ -1295,7 +1302,12 @@ export async function createServer(options: CreateServerOptions): Promise<Server
               message: error.message,
             });
           }
-          throw err;
+          // Stripe adapter or other unexpected failure — log and return 502
+          request.log.error({ err, orderId }, "Refund processing failed");
+          return reply.status(502).send({
+            error: "ERR_REFUND_PROVIDER_FAILURE",
+            message: "Payment provider error during refund",
+          });
         }
       },
     );

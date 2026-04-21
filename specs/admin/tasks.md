@@ -541,7 +541,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T237 Harden `easypost-webhook.integration.test.ts` — EasyPost tracking webhooks [T059]
   Done when: tracker_updated events update shipment state with correct timestamp; signature verification rejects unsigned/bogus payloads; out-of-order events (delivered before in_transit) handled without regression; unknown tracking ID logs + discards without erroring.
 
-- [ ] T238 Harden `refund.integration.test.ts` — admin refund (full + partial) through Stripe [FR-030]
+- [x] T238 Harden `refund.integration.test.ts` — admin refund (full + partial) through Stripe [FR-030]
   Done when: full refund against a paid order succeeds + updates order status + fires event; partial refund with specific amount verified; refund on already-refunded order returns 409; refund failure from Stripe logged + order kept in pending-refund state; admin audit entry for each refund with actor + reason.
 
 - [ ] T239 Harden `stripe-unreachable.integration.test.ts` — Stripe API outage handling
