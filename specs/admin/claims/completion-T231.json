@@ -1,0 +1,12 @@
+{
+  "task_id": "T231",
+  "status": "complete",
+  "summary": "Hardened shipment.integration.test.ts with void-label tests, concrete assertions replacing toBeTruthy, findShipmentByTrackingNumber coverage, fulfillment task linkage verification, and proper test fixture setup with real product variants",
+  "commands_run": [
+    {"command": "pnpm vitest run src/shipment.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T231.json"],
+  "files_modified": ["api/src/shipment.integration.test.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

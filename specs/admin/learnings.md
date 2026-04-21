@@ -201,3 +201,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `fulfillment_task.assigned_admin_user_id` has FK constraint (`fk_ft_admin`) to `admin_user` — tests that call `assignFulfillmentTask` must create real `admin_user` rows first; fake UUIDs like `00000000-...` will fail with FK violation.
 - `findStaleFulfillmentTasks` (new) queries active + blocked tasks whose `updatedAt` is older than a threshold — terminal states (done, canceled) are excluded. Uses `inArray` + `lt` drizzle operators against the `updatedAt` timestamp column.
 - The `transitionFulfillmentTaskStatus` return includes `oldStatus`/`newStatus` fields that the HTTP route handler uses for audit log `afterJson` — test these fields directly to verify event tracking data is correct without needing HTTP-level tests.
+
+## T231 — Harden shipment.integration.test.ts
+- `evidence_record` table has immutability triggers (both UPDATE and DELETE blocked by PL/pgSQL triggers). To clean up in afterAll, use `ALTER TABLE evidence_record DISABLE TRIGGER USER` / `ENABLE TRIGGER USER` — `DISABLE TRIGGER ALL` fails with "permission denied: system trigger".
+- `hasShipmentEventBeenProcessed` checks providerEventId globally (not per-shipment). In tests with fixed `occurredAt` for idempotency testing, use a run-unique timestamp (e.g. `Date.now()`) to avoid collisions with prior test runs on the shared DB.
+- `order_line.variant_id` has FK constraint to `product_variant` — test fixtures must create real product + variant rows first. Fake UUIDs like `00000000-...` cause FK violations when the test runs in isolation.

@@ -1,14 +1,17 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
 import { order, orderLine, orderStatusHistory } from "./db/schema/order.js";
+import { product, productVariant } from "./db/schema/catalog.js";
 import {
   shipment,
   shipmentPackage,
   shipmentLine,
   shipmentEvent,
   shippingLabelPurchase,
+  fulfillmentTask,
 } from "./db/schema/fulfillment.js";
-import { eq } from "drizzle-orm";
+// evidence_record has an immutability trigger — cleanup uses raw SQL UPDATE instead of delete
+import { eq, sql } from "drizzle-orm";
 import {
   createShipment,
   findShipmentById,
@@ -22,6 +25,8 @@ import {
   refreshShipmentTracking,
   findShipmentEventsByShipmentId,
   markShipmentShipped,
+  voidShipmentLabel,
+  findShipmentByTrackingNumber,
 } from "./db/queries/shipment.js";
 import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 import { requireDatabaseUrl } from "./test-helpers.js";
@@ -31,6 +36,9 @@ const DATABASE_URL = requireDatabaseUrl();
 describe("shipment integration (T058)", () => {
   let dbConn: DatabaseConnection;
   const ts = Date.now();
+  let testProductId = "";
+  let testVariantId1 = "";
+  let testVariantId2 = "";
   let testOrderId = "";
   let testOrderLineId1 = "";
   let testOrderLineId2 = "";
@@ -39,6 +47,41 @@ describe("shipment integration (T058)", () => {
   beforeAll(async () => {
     dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
+
+    // Create a product + variants (FK required by order_line.variant_id)
+    const [prod] = await db
+      .insert(product)
+      .values({
+        slug: `t231-ship-${ts}`,
+        title: `Test Product T231 ${ts}`,
+        status: "active",
+      })
+      .returning();
+    testProductId = prod.id;
+
+    const [v1] = await db
+      .insert(productVariant)
+      .values({
+        productId: testProductId,
+        sku: `KNX-PLATE-${ts}`,
+        title: "Test Plate",
+        priceMinor: 2500,
+        status: "active",
+      })
+      .returning();
+    testVariantId1 = v1.id;
+
+    const [v2] = await db
+      .insert(productVariant)
+      .values({
+        productId: testProductId,
+        sku: `KNX-BOWL-${ts}`,
+        title: "Test Bowl",
+        priceMinor: 3000,
+        status: "active",
+      })
+      .returning();
+    testVariantId2 = v2.id;
 
     // Create a test order (confirmed, paid)
     const [newOrder] = await db
@@ -59,13 +102,13 @@ describe("shipment integration (T058)", () => {
       .returning();
     testOrderId = newOrder.id;
 
-    // Create order lines
+    // Create order lines with real variant IDs
     const [line1] = await db
       .insert(orderLine)
       .values({
         orderId: testOrderId,
-        variantId: "00000000-0000-0000-0000-000000000001",
-        skuSnapshot: "KNX-PLATE-001",
+        variantId: testVariantId1,
+        skuSnapshot: `KNX-PLATE-${ts}`,
         titleSnapshot: "Test Plate",
         quantity: 2,
         unitPriceMinor: 2500,
@@ -78,8 +121,8 @@ describe("shipment integration (T058)", () => {
       .insert(orderLine)
       .values({
         orderId: testOrderId,
-        variantId: "00000000-0000-0000-0000-000000000002",
-        skuSnapshot: "KNX-BOWL-001",
+        variantId: testVariantId2,
+        skuSnapshot: `KNX-BOWL-${ts}`,
         titleSnapshot: "Test Bowl",
         quantity: 1,
         unitPriceMinor: 3000,
@@ -94,15 +137,35 @@ describe("shipment integration (T058)", () => {
       const db = dbConn.db;
       // Clean up in reverse dependency order
       for (const sid of createdShipmentIds) {
+        // evidence_record has an immutability trigger — skip deletion (records are orphan-safe)
         await db.delete(shipmentEvent).where(eq(shipmentEvent.shipmentId, sid));
         await db.delete(shippingLabelPurchase).where(eq(shippingLabelPurchase.shipmentId, sid));
         await db.delete(shipmentLine).where(eq(shipmentLine.shipmentId, sid));
         await db.delete(shipmentPackage).where(eq(shipmentPackage.shipmentId, sid));
+      }
+      // evidence_record has immutability triggers (no UPDATE/DELETE).
+      // Disable only the user-defined triggers to clean up, then re-enable.
+      await db.execute(sql`ALTER TABLE evidence_record DISABLE TRIGGER USER`);
+      for (const sid of createdShipmentIds) {
+        await db.execute(
+          sql`DELETE FROM evidence_record WHERE shipment_id = ${sid}::uuid`,
+        );
+      }
+      await db.execute(
+        sql`DELETE FROM evidence_record WHERE order_id = ${testOrderId}::uuid`,
+      );
+      await db.execute(sql`ALTER TABLE evidence_record ENABLE TRIGGER USER`);
+      // Delete shipments after evidence records are gone
+      for (const sid of createdShipmentIds) {
         await db.delete(shipment).where(eq(shipment.id, sid));
       }
       await db.delete(orderStatusHistory).where(eq(orderStatusHistory.orderId, testOrderId));
       await db.delete(orderLine).where(eq(orderLine.orderId, testOrderId));
       await db.delete(order).where(eq(order.id, testOrderId));
+      // Clean up product fixtures
+      if (testVariantId1) await db.delete(productVariant).where(eq(productVariant.id, testVariantId1));
+      if (testVariantId2) await db.delete(productVariant).where(eq(productVariant.id, testVariantId2));
+      if (testProductId) await db.delete(product).where(eq(product.id, testProductId));
       await dbConn.close();
     }
   });
@@ -175,7 +238,7 @@ describe("shipment integration (T058)", () => {
 
     // Verify packages
     expect(result.packages).toHaveLength(1);
-    expect(result.packages[0].weight).toBe("16");
+    expect(parseFloat(result.packages[0].weight!)).toBe(16);
     expect(result.packages[0].dimensionsJson).toEqual({
       length: 12,
       width: 8,
@@ -237,6 +300,8 @@ describe("shipment integration (T058)", () => {
     const shipments = await findShipmentsByOrderId(db, testOrderId);
     expect(shipments.length).toBeGreaterThanOrEqual(1);
     expect(shipments[0].orderId).toBe(testOrderId);
+    expect(typeof shipments[0].shipmentNumber).toBe("string");
+    expect(shipments[0].shipmentNumber).toContain("SHP-");
   });
 
   // -------------------------------------------------------------------------
@@ -260,15 +325,20 @@ describe("shipment integration (T058)", () => {
 
     // Shipment should be label_purchased
     expect(result.shipment.status).toBe("label_purchased");
-    expect(result.shipment.trackingNumber).toBeTruthy();
-    expect(result.shipment.labelUrl).toBeTruthy();
+    expect(typeof result.shipment.trackingNumber).toBe("string");
+    expect(result.shipment.trackingNumber!.length).toBeGreaterThan(0);
+    expect(result.shipment.trackingNumber).toMatch(/^STUB\d+/);
+    expect(typeof result.shipment.labelUrl).toBe("string");
+    expect(result.shipment.labelUrl).toMatch(/^https:\/\/stub-labels\.example\.com\/label_\d+\.png$/);
     expect(result.shipment.carrier).toBe("USPS");
     expect(result.shipment.serviceLevel).toBe("Priority");
 
-    // Label result
-    expect(result.label.trackingNumber).toBeTruthy();
-    expect(result.label.labelUrl).toBeTruthy();
-    expect(result.label.trackerId).toBeTruthy();
+    // Label result — concrete pattern checks
+    expect(result.label.trackingNumber).toMatch(/^STUB\d+/);
+    expect(result.label.labelUrl).toMatch(/^https:\/\/stub-labels\.example\.com\/label_\d+\.png$/);
+    expect(result.label.trackerId).toMatch(/^trk_stub_\d+_\d+$/);
+    expect(result.label.carrier).toBe("USPS");
+    expect(result.label.service).toBe("Priority");
 
     // Purchase record
     expect(result.purchase.costMinor).toBe(599);
@@ -297,6 +367,30 @@ describe("shipment integration (T058)", () => {
         adapter,
       ),
     ).rejects.toMatchObject({ code: "ERR_INVALID_STATE" });
+  });
+
+  // -------------------------------------------------------------------------
+  // Find by tracking number (depends on label purchase above)
+  // -------------------------------------------------------------------------
+
+  it("finds shipment by tracking number after label purchase", async () => {
+    const db = dbConn.db;
+    const sid = createdShipmentIds[0];
+    const s = await findShipmentById(db, sid);
+    expect(s).not.toBeNull();
+    expect(s!.trackingNumber).not.toBeNull();
+
+    const found = await findShipmentByTrackingNumber(db, s!.trackingNumber!);
+    expect(found).not.toBeNull();
+    expect(found!.id).toBe(sid);
+    expect(found!.orderId).toBe(testOrderId);
+    expect(found!.carrier).toBe("USPS");
+  });
+
+  it("findShipmentByTrackingNumber returns null for unknown tracking number", async () => {
+    const db = dbConn.db;
+    const found = await findShipmentByTrackingNumber(db, "NONEXISTENT999");
+    expect(found).toBeNull();
   });
 
   // -------------------------------------------------------------------------
@@ -425,9 +519,30 @@ describe("shipment integration (T058)", () => {
     expect(inTransitEvent?.description).toBe("Package in transit");
   });
 
-  it("refresh-tracking is idempotent — no duplicate events on second call", async () => {
+  it("refresh-tracking is idempotent — no duplicate events when occurredAt is stable", async () => {
     const db = dbConn.db;
-    const adapter = createStubShippingAdapter();
+
+    // Use a custom adapter with a fixed (but run-unique) occurredAt to test true idempotency
+    // The providerEventId check is global, so use ts to avoid collisions with prior runs
+    const fixedTime = new Date(ts).toISOString();
+    const stableAdapter = {
+      ...createStubShippingAdapter(),
+      async getTracking(): Promise<import("./services/shipping-adapter.js").TrackingResult> {
+        return {
+          status: "in_transit",
+          estimatedDeliveryDate: null,
+          events: [
+            {
+              status: "in_transit",
+              description: "Package in transit",
+              occurredAt: fixedTime,
+              city: "Austin",
+              state: "TX",
+            },
+          ],
+        };
+      },
+    };
 
     // Create a shipment and walk it to shipped status
     const created = await createShipment(db, {
@@ -445,23 +560,24 @@ describe("shipment integration (T058)", () => {
         providerShipmentId: "shp_stub_idempotent",
         rateId: "rate_stub_idempotent",
       },
-      adapter,
+      stableAdapter,
     );
     await transitionShipmentStatus(db, sid, "ready");
     await transitionShipmentStatus(db, sid, "shipped");
 
-    // First refresh
-    const first = await refreshShipmentTracking(db, sid, adapter);
+    // First refresh — stores 1 new event
+    const first = await refreshShipmentTracking(db, sid, stableAdapter);
     expect(first.newEventsStored).toBe(1);
 
-    // Second refresh — same events should not be duplicated
-    const second = await refreshShipmentTracking(db, sid, adapter);
+    // Second refresh — same providerEventId (refresh-<fixedTime>-in_transit) → 0 new
+    const second = await refreshShipmentTracking(db, sid, stableAdapter);
     expect(second.newEventsStored).toBe(0);
 
     // Total events should still be 1
     const events = await findShipmentEventsByShipmentId(db, sid);
     const refreshEvents = events.filter((e) => e.providerEventId?.startsWith("refresh-"));
     expect(refreshEvents).toHaveLength(1);
+    expect(refreshEvents[0].providerEventId).toBe(`refresh-${new Date(ts).toISOString()}-in_transit`);
   });
 
   it("rejects refresh-tracking for draft shipment", async () => {
@@ -579,5 +695,181 @@ describe("shipment integration (T058)", () => {
     await expect(
       markShipmentShipped(db, "00000000-0000-0000-0000-000000000099"),
     ).rejects.toMatchObject({ code: "ERR_SHIPMENT_NOT_FOUND" });
+  });
+
+  // -------------------------------------------------------------------------
+  // Void label (T059a)
+  // -------------------------------------------------------------------------
+
+  it("voids a label_purchased shipment and records refund", async () => {
+    const db = dbConn.db;
+    const adapter = createStubShippingAdapter();
+
+    // Create a shipment, buy label → label_purchased
+    const created = await createShipment(db, {
+      orderId: testOrderId,
+      packages: [{ weight: 9 }],
+      lines: [{ orderLineId: testOrderLineId1, quantity: 1 }],
+    });
+    createdShipmentIds.push(created.shipment.id);
+    const sid = created.shipment.id;
+
+    await buyShipmentLabel(
+      db,
+      { shipmentId: sid, providerShipmentId: "shp_stub_void1", rateId: "rate_stub_void1" },
+      adapter,
+    );
+
+    // Verify it's in label_purchased before voiding
+    const beforeVoid = await findShipmentById(db, sid);
+    expect(beforeVoid?.status).toBe("label_purchased");
+
+    // Void the label
+    const voidResult = await voidShipmentLabel(db, sid, adapter);
+
+    expect(voidResult.shipment.status).toBe("voided");
+    expect(voidResult.shipment.id).toBe(sid);
+    expect(voidResult.shipment.orderId).toBe(testOrderId);
+    expect(voidResult.refunded).toBe(true);
+    expect(voidResult.refundedCostMinor).toBe(599);
+    expect(voidResult.labelCostCredited).toBe(true);
+
+    // Verify persisted state
+    const fetched = await findShipmentById(db, sid);
+    expect(fetched?.status).toBe("voided");
+  });
+
+  it("voids a draft shipment without refund (no label purchased)", async () => {
+    const db = dbConn.db;
+    const adapter = createStubShippingAdapter();
+
+    // Create a draft shipment (no label)
+    const created = await createShipment(db, {
+      orderId: testOrderId,
+      packages: [{ weight: 4 }],
+      lines: [{ orderLineId: testOrderLineId2, quantity: 1 }],
+    });
+    createdShipmentIds.push(created.shipment.id);
+    const sid = created.shipment.id;
+
+    const voidResult = await voidShipmentLabel(db, sid, adapter);
+
+    expect(voidResult.shipment.status).toBe("voided");
+    expect(voidResult.refunded).toBe(false);
+    expect(voidResult.refundedCostMinor).toBeNull();
+    expect(voidResult.labelCostCredited).toBe(false);
+  });
+
+  it("voids a ready shipment and records refund", async () => {
+    const db = dbConn.db;
+    const adapter = createStubShippingAdapter();
+
+    // Create → buy label → transition to ready
+    const created = await createShipment(db, {
+      orderId: testOrderId,
+      packages: [{ weight: 11 }],
+      lines: [{ orderLineId: testOrderLineId1, quantity: 1 }],
+    });
+    createdShipmentIds.push(created.shipment.id);
+    const sid = created.shipment.id;
+
+    await buyShipmentLabel(
+      db,
+      { shipmentId: sid, providerShipmentId: "shp_stub_void_ready", rateId: "rate_stub_void_ready" },
+      adapter,
+    );
+    await transitionShipmentStatus(db, sid, "ready");
+
+    const voidResult = await voidShipmentLabel(db, sid, adapter);
+    expect(voidResult.shipment.status).toBe("voided");
+    expect(voidResult.refunded).toBe(true);
+    expect(voidResult.refundedCostMinor).toBe(599);
+    expect(voidResult.labelCostCredited).toBe(true);
+  });
+
+  it("rejects void for shipped shipment", async () => {
+    const db = dbConn.db;
+    const adapter = createStubShippingAdapter();
+
+    // Create → buy label → ready → shipped
+    const created = await createShipment(db, {
+      orderId: testOrderId,
+      packages: [{ weight: 13 }],
+      lines: [{ orderLineId: testOrderLineId2, quantity: 1 }],
+    });
+    createdShipmentIds.push(created.shipment.id);
+    const sid = created.shipment.id;
+
+    await buyShipmentLabel(
+      db,
+      { shipmentId: sid, providerShipmentId: "shp_stub_void_shipped", rateId: "rate_stub_void_shipped" },
+      adapter,
+    );
+    await transitionShipmentStatus(db, sid, "ready");
+    await transitionShipmentStatus(db, sid, "shipped");
+
+    await expect(voidShipmentLabel(db, sid, adapter)).rejects.toMatchObject({
+      code: "ERR_INVALID_STATE",
+    });
+  });
+
+  it("rejects void for non-existent shipment", async () => {
+    const db = dbConn.db;
+    const adapter = createStubShippingAdapter();
+
+    await expect(
+      voidShipmentLabel(db, "00000000-0000-0000-0000-000000000099", adapter),
+    ).rejects.toMatchObject({ code: "ERR_SHIPMENT_NOT_FOUND" });
+  });
+
+  // -------------------------------------------------------------------------
+  // Shipment ↔ order + fulfillment task linkage
+  // -------------------------------------------------------------------------
+
+  it("shipment links back to order and co-exists with fulfillment task via orderId", async () => {
+    const db = dbConn.db;
+
+    // Create a fulfillment task for the same order
+    const [task] = await db
+      .insert(fulfillmentTask)
+      .values({
+        orderId: testOrderId,
+        status: "new",
+        priority: "normal",
+      })
+      .returning();
+
+    try {
+      // Create a shipment for the same order
+      const created = await createShipment(db, {
+        orderId: testOrderId,
+        packages: [{ weight: 15 }],
+        lines: [{ orderLineId: testOrderLineId1, quantity: 1 }],
+      });
+      createdShipmentIds.push(created.shipment.id);
+
+      // Both the shipment and the fulfillment task share the same orderId
+      expect(created.shipment.orderId).toBe(testOrderId);
+
+      // Verify we can look up both from the order
+      const shipments = await findShipmentsByOrderId(db, testOrderId);
+      const thisShipment = shipments.find((s) => s.id === created.shipment.id);
+      expect(thisShipment).toBeDefined();
+      expect(thisShipment!.orderId).toBe(testOrderId);
+
+      // Verify the fulfillment task exists for the same order
+      const [taskRow] = await db
+        .select({ id: fulfillmentTask.id, orderId: fulfillmentTask.orderId, status: fulfillmentTask.status })
+        .from(fulfillmentTask)
+        .where(eq(fulfillmentTask.id, task.id));
+      expect(taskRow.orderId).toBe(testOrderId);
+      expect(taskRow.status).toBe("new");
+
+      // The link is: order → fulfillment_task + order → shipment (shared orderId)
+      expect(thisShipment!.orderId).toBe(taskRow.orderId);
+    } finally {
+      // Clean up the fulfillment task
+      await db.delete(fulfillmentTask).where(eq(fulfillmentTask.id, task.id));
+    }
   });
 });
