@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
-import { order, orderLine } from "./db/schema/order.js";
+import { order, orderLine, orderStatusHistory } from "./db/schema/order.js";
 import { shipment, shipmentPackage, shipmentLine, shipmentEvent } from "./db/schema/fulfillment.js";
-import { eq } from "drizzle-orm";
+import { product, productVariant } from "./db/schema/catalog.js";
+import { eq, sql } from "drizzle-orm";
 import {
   findShipmentById,
   findShipmentEventsByShipmentId,
@@ -15,10 +16,14 @@ import {
 } from "./db/queries/shipment.js";
 import { findOrderById } from "./db/queries/order-state-machine.js";
 import { createHmac } from "node:crypto";
+import { requireDatabaseUrl } from "./test-helpers.js";
+import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
 
 const DATABASE_URL = requireDatabaseUrl();
 
 const EP_WEBHOOK_SECRET = "ep_test_webhook_secret_for_tests";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Generate a signed EasyPost webhook payload for testing.
@@ -58,12 +63,37 @@ describe("EasyPost tracking webhook (T059)", () => {
   let dbConn: DatabaseConnection;
   const ts = Date.now();
   let testOrderId = "";
+  let testProductId = "";
+  let testVariantId = "";
   const trackingNumber = `EP-TRACK-${ts}`;
   let testShipmentId = "";
 
   beforeAll(async () => {
     dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
+
+    // Create real product + variant (FK constraint on order_line.variant_id)
+    const [prod] = await db
+      .insert(product)
+      .values({
+        slug: `ep-webhook-test-${ts}`,
+        title: `EP Webhook Test Product ${ts}`,
+        status: "active",
+      })
+      .returning();
+    testProductId = prod.id;
+
+    const [variant] = await db
+      .insert(productVariant)
+      .values({
+        productId: testProductId,
+        sku: `KNX-EP-${ts}`,
+        title: `EP Variant ${ts}`,
+        priceMinor: 5000,
+        status: "active",
+      })
+      .returning();
+    testVariantId = variant.id;
 
     // Create a test order (confirmed, paid, shipped)
     const [newOrder] = await db
@@ -84,14 +114,14 @@ describe("EasyPost tracking webhook (T059)", () => {
       .returning();
     testOrderId = newOrder.id;
 
-    // Create order line
+    // Create order line with real variant
     const [line] = await db
       .insert(orderLine)
       .values({
         orderId: testOrderId,
-        variantId: "00000000-0000-0000-0000-000000000001",
-        skuSnapshot: "KNX-T059-001",
-        titleSnapshot: "Test Item T059",
+        variantId: testVariantId,
+        skuSnapshot: `KNX-EP-${ts}`,
+        titleSnapshot: `EP Variant ${ts}`,
         quantity: 1,
         unitPriceMinor: 5000,
         totalMinor: 5000,
@@ -131,12 +161,25 @@ describe("EasyPost tracking webhook (T059)", () => {
   afterAll(async () => {
     if (dbConn) {
       const db = dbConn.db;
+      try {
+        // evidence_record has immutability triggers; disable before cleanup
+        await db.execute(sql`ALTER TABLE evidence_record DISABLE TRIGGER USER`);
+        await db.execute(
+          sql`DELETE FROM evidence_record WHERE shipment_id = ${testShipmentId}`,
+        );
+        await db.execute(sql`ALTER TABLE evidence_record ENABLE TRIGGER USER`);
+      } catch {
+        // Best-effort — evidence may not exist
+      }
       await db.delete(shipmentEvent).where(eq(shipmentEvent.shipmentId, testShipmentId));
       await db.delete(shipmentLine).where(eq(shipmentLine.shipmentId, testShipmentId));
       await db.delete(shipmentPackage).where(eq(shipmentPackage.shipmentId, testShipmentId));
       await db.delete(shipment).where(eq(shipment.id, testShipmentId));
+      await db.delete(orderStatusHistory).where(eq(orderStatusHistory.orderId, testOrderId));
       await db.delete(orderLine).where(eq(orderLine.orderId, testOrderId));
       await db.delete(order).where(eq(order.id, testOrderId));
+      await db.delete(productVariant).where(eq(productVariant.id, testVariantId));
+      await db.delete(product).where(eq(product.id, testProductId));
       await dbConn.close();
     }
   });
@@ -170,12 +213,15 @@ describe("EasyPost tracking webhook (T059)", () => {
   // Integration tests: query layer
   // ---------------------------------------------------------------------------
 
-  it("finds shipment by tracking number", async () => {
+  it("finds shipment by tracking number with correct fields", async () => {
     const db = dbConn.db;
     const found = await findShipmentByTrackingNumber(db, trackingNumber);
     expect(found).not.toBeNull();
-    expect(found?.id).toBe(testShipmentId);
-    expect(found?.trackingNumber).toBe(trackingNumber);
+    expect(found!.id).toBe(testShipmentId);
+    expect(found!.trackingNumber).toBe(trackingNumber);
+    expect(found!.carrier).toBe("USPS");
+    expect(found!.orderId).toBe(testOrderId);
+    expect(found!.status).toBe("shipped");
   });
 
   it("returns null for unknown tracking number", async () => {
@@ -184,18 +230,19 @@ describe("EasyPost tracking webhook (T059)", () => {
     expect(found).toBeNull();
   });
 
-  it("stores a shipment event", async () => {
+  it("stores a shipment event with correct fields and timestamp", async () => {
     const db = dbConn.db;
     const eventId = `evt_test_store_${ts}`;
+    const eventTime = new Date("2026-04-21T10:00:00Z");
     const result = await storeShipmentEvent(db, {
       shipmentId: testShipmentId,
       providerEventId: eventId,
       status: "in_transit",
       description: "Package picked up by carrier",
-      occurredAt: new Date(),
-      rawPayloadJson: { test: true },
+      occurredAt: eventTime,
+      rawPayloadJson: { test: true, trackingCode: trackingNumber },
     });
-    expect(result.id).toBeTruthy();
+    expect(result.id).toMatch(UUID_RE);
 
     // Verify idempotency check
     const processed = await hasShipmentEventBeenProcessed(db, eventId);
@@ -206,14 +253,18 @@ describe("EasyPost tracking webhook (T059)", () => {
     expect(notProcessed).toBe(false);
   });
 
-  it("finds shipment events by shipment ID", async () => {
+  it("finds shipment events by shipment ID with concrete values", async () => {
     const db = dbConn.db;
     const events = await findShipmentEventsByShipmentId(db, testShipmentId);
     expect(events.length).toBeGreaterThanOrEqual(1);
     const ev = events.find((e) => e.providerEventId === `evt_test_store_${ts}`);
-    expect(ev).toBeDefined();
-    expect(ev?.status).toBe("in_transit");
-    expect(ev?.description).toBe("Package picked up by carrier");
+    expect(ev).not.toBeNull();
+    expect(ev!.status).toBe("in_transit");
+    expect(ev!.description).toBe("Package picked up by carrier");
+    expect(ev!.shipmentId).toBe(testShipmentId);
+    // Verify timestamp was stored correctly
+    expect(ev!.occurredAt).toBeInstanceOf(Date);
+    expect(ev!.occurredAt.toISOString()).toBe("2026-04-21T10:00:00.000Z");
   });
 
   // ---------------------------------------------------------------------------
@@ -223,7 +274,6 @@ describe("EasyPost tracking webhook (T059)", () => {
   it("handles in_transit tracking update: shipment + order status", async () => {
     const db = dbConn.db;
 
-    // Shipment is currently "shipped", order shipping_status is "shipped"
     const result = await handleTrackingUpdate(
       db,
       { id: testShipmentId, orderId: testOrderId, status: "shipped" } as Parameters<
@@ -234,22 +284,21 @@ describe("EasyPost tracking webhook (T059)", () => {
 
     expect(result.shipmentTransitioned).toBe(true);
     expect(result.orderTransitioned).toBe(true);
+    expect(result.orderCompleted).toBe(false);
 
     // Verify shipment status
     const updatedShipment = await findShipmentById(db, testShipmentId);
-    expect(updatedShipment).not.toBeNull();
-    expect(updatedShipment?.status).toBe("in_transit");
+    expect(updatedShipment!.status).toBe("in_transit");
 
     // Verify order shipping_status
     const updatedOrder = await findOrderById(db, testOrderId);
-    expect(updatedOrder).not.toBeNull();
-    expect(updatedOrder?.shippingStatus).toBe("in_transit");
+    expect(updatedOrder!.shippingStatus).toBe("in_transit");
   });
 
-  it("handles delivered tracking update: shipment + order status", async () => {
+  it("handles delivered tracking update: shipment + order status + deliveredAt timestamp", async () => {
     const db = dbConn.db;
 
-    // Shipment is now "in_transit", order shipping_status is "in_transit"
+    const beforeUpdate = new Date();
     const result = await handleTrackingUpdate(
       db,
       { id: testShipmentId, orderId: testOrderId, status: "in_transit" } as Parameters<
@@ -263,13 +312,19 @@ describe("EasyPost tracking webhook (T059)", () => {
 
     // Verify shipment status
     const updatedShipment = await findShipmentById(db, testShipmentId);
-    expect(updatedShipment).not.toBeNull();
-    expect(updatedShipment?.status).toBe("delivered");
+    expect(updatedShipment!.status).toBe("delivered");
+
+    // Verify deliveredAt timestamp was set (not in findShipmentById select, query raw table)
+    const [rawShipment] = await db
+      .select({ deliveredAt: shipment.deliveredAt })
+      .from(shipment)
+      .where(eq(shipment.id, testShipmentId));
+    expect(rawShipment.deliveredAt).toBeInstanceOf(Date);
+    expect(rawShipment.deliveredAt!.getTime()).toBeGreaterThanOrEqual(beforeUpdate.getTime() - 1000);
 
     // Verify order shipping_status
     const updatedOrder = await findOrderById(db, testOrderId);
-    expect(updatedOrder).not.toBeNull();
-    expect(updatedOrder?.shippingStatus).toBe("delivered");
+    expect(updatedOrder!.shippingStatus).toBe("delivered");
   });
 
   it("ignores pre_transit events (no status change)", async () => {
@@ -285,6 +340,36 @@ describe("EasyPost tracking webhook (T059)", () => {
 
     expect(result.shipmentTransitioned).toBe(false);
     expect(result.orderTransitioned).toBe(false);
+    expect(result.orderCompleted).toBe(false);
+
+    // Verify shipment status unchanged
+    const unchangedShipment = await findShipmentById(db, testShipmentId);
+    expect(unchangedShipment!.status).toBe("delivered");
+  });
+
+  it("handles out-of-order events (in_transit after delivered) without regression", async () => {
+    const db = dbConn.db;
+
+    // Shipment is "delivered", now we receive a late "in_transit" event
+    const result = await handleTrackingUpdate(
+      db,
+      { id: testShipmentId, orderId: testOrderId, status: "delivered" } as Parameters<
+        typeof handleTrackingUpdate
+      >[1],
+      "in_transit",
+    );
+
+    // in_transit maps to shipment status "in_transit", but delivered→in_transit is invalid
+    // so the transition is silently skipped (isTransitionError caught)
+    expect(result.shipmentTransitioned).toBe(false);
+    expect(result.orderTransitioned).toBe(false);
+
+    // Verify statuses remain at "delivered" — no regression
+    const unchangedShipment = await findShipmentById(db, testShipmentId);
+    expect(unchangedShipment!.status).toBe("delivered");
+
+    const unchangedOrder = await findOrderById(db, testOrderId);
+    expect(unchangedOrder!.shippingStatus).toBe("delivered");
   });
 
   it("handles duplicate/idempotent transitions gracefully", async () => {
@@ -299,9 +384,12 @@ describe("EasyPost tracking webhook (T059)", () => {
       "delivered",
     );
 
-    // Should not crash - transition errors are caught
     expect(result.shipmentTransitioned).toBe(false);
     expect(result.orderTransitioned).toBe(false);
+
+    // Status still delivered
+    const unchangedShipment = await findShipmentById(db, testShipmentId);
+    expect(unchangedShipment!.status).toBe("delivered");
   });
 
   // ---------------------------------------------------------------------------
@@ -328,11 +416,14 @@ describe("EasyPost tracking webhook (T059)", () => {
       EP_WEBHOOK_SECRET,
     );
 
-    // Verify signature
     const parsed = JSON.parse(body);
     expect(parsed.id).toBe("evt_test_1");
+    expect(parsed.object).toBe("Event");
     expect(parsed.description).toBe("tracker.updated");
     expect(parsed.result.tracking_code).toBe("TEST123");
+    expect(parsed.result.status).toBe("in_transit");
+    expect(parsed.result.tracking_details).toHaveLength(1);
+    expect(parsed.result.tracking_details[0].message).toBe("Package in transit");
 
     const expectedSig = createHmac("sha256", EP_WEBHOOK_SECRET).update(body).digest("hex");
     const sigValue = signature.replace("hmac-sha256-hex=", "");
@@ -344,41 +435,10 @@ describe("EasyPost tracking webhook (T059)", () => {
 // HTTP-level webhook tests (server-based)
 // ---------------------------------------------------------------------------
 
-import { EventEmitter } from "node:events";
-import { createServer, markReady } from "./server.js";
-import type { Config } from "./config.js";
 import type { FastifyInstance } from "fastify";
 import type { TaxAdapter } from "./services/tax-adapter.js";
 import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 import type { PaymentAdapter } from "./services/payment-adapter.js";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: "whsec_test_xxx",
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: getSuperTokensUri(),
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: EP_WEBHOOK_SECRET,
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
 
 function createStubTaxAdapter(): TaxAdapter {
   return {
@@ -400,32 +460,56 @@ function createStubPaymentAdapter(): PaymentAdapter {
 }
 
 describe("EasyPost webhook HTTP handler (T059)", () => {
+  let ts_: TestServer;
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
 
   const ts2 = Date.now() + 1;
   let testOrderId2 = "";
   let testShipmentId2 = "";
+  let testProductId2 = "";
+  let testVariantId2 = "";
   const trackingNumber2 = `EP-HTTP-TRACK-${ts2}`;
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-    dbConn = createDatabaseConnection(DATABASE_URL);
+    ts_ = await createTestServer({
+      skipListen: true,
+      configOverrides: {
+        STRIPE_WEBHOOK_SECRET: "whsec_test_xxx",
+        EASYPOST_WEBHOOK_SECRET: EP_WEBHOOK_SECRET,
+      },
+      serverOverrides: {
+        taxAdapter: createStubTaxAdapter(),
+        shippingAdapter: createStubShippingAdapter(),
+        paymentAdapter: createStubPaymentAdapter(),
+      },
+    });
+    app = ts_.app;
+    dbConn = ts_.dbConn;
     const db = dbConn.db;
 
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-      reservationCleanupIntervalMs: 0,
-      taxAdapter: createStubTaxAdapter(),
-      shippingAdapter: createStubShippingAdapter(),
-      paymentAdapter: createStubPaymentAdapter(),
-    });
-    app = server.app;
+    // Create real product + variant (FK constraint on order_line.variant_id)
+    const [prod] = await db
+      .insert(product)
+      .values({
+        slug: `ep-http-test-${ts2}`,
+        title: `EP HTTP Test Product ${ts2}`,
+        status: "active",
+      })
+      .returning();
+    testProductId2 = prod.id;
 
-    await server.start();
-    markReady();
+    const [variant] = await db
+      .insert(productVariant)
+      .values({
+        productId: testProductId2,
+        sku: `KNX-EPH-${ts2}`,
+        title: `EP HTTP Variant ${ts2}`,
+        priceMinor: 3000,
+        status: "active",
+      })
+      .returning();
+    testVariantId2 = variant.id;
 
     // Seed test data: order + shipment in "shipped" status
     const [newOrder] = await db
@@ -450,9 +534,9 @@ describe("EasyPost webhook HTTP handler (T059)", () => {
       .insert(orderLine)
       .values({
         orderId: testOrderId2,
-        variantId: "00000000-0000-0000-0000-000000000001",
-        skuSnapshot: "KNX-T059H-001",
-        titleSnapshot: "Test Item T059H",
+        variantId: testVariantId2,
+        skuSnapshot: `KNX-EPH-${ts2}`,
+        titleSnapshot: `EP HTTP Variant ${ts2}`,
         quantity: 1,
         unitPriceMinor: 3000,
         totalMinor: 3000,
@@ -487,19 +571,29 @@ describe("EasyPost webhook HTTP handler (T059)", () => {
   });
 
   afterAll(async () => {
-    if (app) {
-      await app.close();
-    }
     if (dbConn) {
-      const db = dbConn.db;
-      await db.delete(shipmentEvent).where(eq(shipmentEvent.shipmentId, testShipmentId2));
-      await db.delete(shipmentLine).where(eq(shipmentLine.shipmentId, testShipmentId2));
-      await db.delete(shipmentPackage).where(eq(shipmentPackage.shipmentId, testShipmentId2));
-      await db.delete(shipment).where(eq(shipment.id, testShipmentId2));
-      await db.delete(orderLine).where(eq(orderLine.orderId, testOrderId2));
-      await db.delete(order).where(eq(order.id, testOrderId2));
-      await dbConn.close();
+      try {
+        const db = dbConn.db;
+        // evidence_record has immutability triggers; disable before cleanup
+        await db.execute(sql`ALTER TABLE evidence_record DISABLE TRIGGER USER`);
+        await db.execute(
+          sql`DELETE FROM evidence_record WHERE shipment_id = ${testShipmentId2}`,
+        );
+        await db.execute(sql`ALTER TABLE evidence_record ENABLE TRIGGER USER`);
+        await db.delete(shipmentEvent).where(eq(shipmentEvent.shipmentId, testShipmentId2));
+        await db.delete(shipmentLine).where(eq(shipmentLine.shipmentId, testShipmentId2));
+        await db.delete(shipmentPackage).where(eq(shipmentPackage.shipmentId, testShipmentId2));
+        await db.delete(shipment).where(eq(shipment.id, testShipmentId2));
+        await db.delete(orderStatusHistory).where(eq(orderStatusHistory.orderId, testOrderId2));
+        await db.delete(orderLine).where(eq(orderLine.orderId, testOrderId2));
+        await db.delete(order).where(eq(order.id, testOrderId2));
+        await db.delete(productVariant).where(eq(productVariant.id, testVariantId2));
+        await db.delete(product).where(eq(product.id, testProductId2));
+      } catch {
+        // Best-effort cleanup
+      }
     }
+    await stopTestServer(ts_);
   });
 
   it("rejects webhook with missing signature", async () => {
@@ -536,8 +630,9 @@ describe("EasyPost webhook HTTP handler (T059)", () => {
     expect(body.error).toBe("ERR_INVALID_SIGNATURE");
   });
 
-  it("processes tracker.updated in_transit: shipment + order transitions", async () => {
+  it("processes tracker.updated in_transit: shipment + order transitions + event stored with timestamp", async () => {
     const eventId = `evt_http_in_transit_${ts2}`;
+    const eventDatetime = "2026-04-21T14:30:00.000Z";
     const { body, signature } = generateEasyPostWebhookPayload(
       eventId,
       "tracker.updated",
@@ -549,7 +644,7 @@ describe("EasyPost webhook HTTP handler (T059)", () => {
           {
             status: "in_transit",
             message: "In transit to destination",
-            datetime: new Date().toISOString(),
+            datetime: eventDatetime,
             tracking_location: { city: "Dallas", state: "TX" },
           },
         ],
@@ -574,20 +669,21 @@ describe("EasyPost webhook HTTP handler (T059)", () => {
     // Verify shipment status updated
     const db = dbConn.db;
     const updatedShipment = await findShipmentById(db, testShipmentId2);
-    expect(updatedShipment).not.toBeNull();
-    expect(updatedShipment?.status).toBe("in_transit");
+    expect(updatedShipment!.status).toBe("in_transit");
+    expect(updatedShipment!.carrier).toBe("USPS");
 
     // Verify order shipping_status updated
     const updatedOrder = await findOrderById(db, testOrderId2);
-    expect(updatedOrder).not.toBeNull();
-    expect(updatedOrder?.shippingStatus).toBe("in_transit");
+    expect(updatedOrder!.shippingStatus).toBe("in_transit");
 
-    // Verify event stored
+    // Verify event stored with correct timestamp and payload
     const events = await findShipmentEventsByShipmentId(db, testShipmentId2);
     const stored = events.find((e) => e.providerEventId === eventId);
-    expect(stored).toBeDefined();
-    expect(stored?.status).toBe("in_transit");
-    expect(stored?.description).toBe("In transit to destination");
+    expect(stored).not.toBeNull();
+    expect(stored!.status).toBe("in_transit");
+    expect(stored!.description).toBe("In transit to destination");
+    expect(stored!.occurredAt).toBeInstanceOf(Date);
+    expect(stored!.occurredAt.toISOString()).toBe(eventDatetime);
   });
 
   it("returns duplicate for already-processed event", async () => {
@@ -620,8 +716,9 @@ describe("EasyPost webhook HTTP handler (T059)", () => {
     expect(resBody.duplicate).toBe(true);
   });
 
-  it("processes tracker.updated delivered: shipment + order", async () => {
+  it("processes tracker.updated delivered: shipment + order + deliveredAt timestamp", async () => {
     const eventId = `evt_http_delivered_${ts2}`;
+    const deliveredDatetime = "2026-04-21T18:00:00.000Z";
     const { body, signature } = generateEasyPostWebhookPayload(
       eventId,
       "tracker.updated",
@@ -633,7 +730,7 @@ describe("EasyPost webhook HTTP handler (T059)", () => {
           {
             status: "delivered",
             message: "Delivered to front door",
-            datetime: new Date().toISOString(),
+            datetime: deliveredDatetime,
             tracking_location: { city: "Houston", state: "TX" },
           },
         ],
@@ -655,12 +752,70 @@ describe("EasyPost webhook HTTP handler (T059)", () => {
 
     const db = dbConn.db;
     const updatedShipment = await findShipmentById(db, testShipmentId2);
-    expect(updatedShipment).not.toBeNull();
-    expect(updatedShipment?.status).toBe("delivered");
+    expect(updatedShipment!.status).toBe("delivered");
+
+    // Verify deliveredAt timestamp set (query raw table)
+    const [rawShipment] = await db
+      .select({ deliveredAt: shipment.deliveredAt })
+      .from(shipment)
+      .where(eq(shipment.id, testShipmentId2));
+    expect(rawShipment.deliveredAt).toBeInstanceOf(Date);
 
     const updatedOrder = await findOrderById(db, testOrderId2);
-    expect(updatedOrder).not.toBeNull();
-    expect(updatedOrder?.shippingStatus).toBe("delivered");
+    expect(updatedOrder!.shippingStatus).toBe("delivered");
+
+    // Verify event stored with correct timestamp
+    const events = await findShipmentEventsByShipmentId(db, testShipmentId2);
+    const stored = events.find((e) => e.providerEventId === eventId);
+    expect(stored).not.toBeNull();
+    expect(stored!.status).toBe("delivered");
+    expect(stored!.description).toBe("Delivered to front door");
+    expect(stored!.occurredAt.toISOString()).toBe(deliveredDatetime);
+  });
+
+  it("handles out-of-order event via HTTP (in_transit after delivered) without regression", async () => {
+    const eventId = `evt_http_ooo_${ts2}`;
+    const { body, signature } = generateEasyPostWebhookPayload(
+      eventId,
+      "tracker.updated",
+      {
+        id: `trk_http_ooo_${ts2}`,
+        tracking_code: trackingNumber2,
+        status: "in_transit",
+        tracking_details: [
+          {
+            status: "in_transit",
+            message: "Late in_transit event",
+            datetime: "2026-04-20T08:00:00.000Z",
+            tracking_location: { city: "Austin", state: "TX" },
+          },
+        ],
+      },
+      EP_WEBHOOK_SECRET,
+    );
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhooks/easypost",
+      headers: {
+        "content-type": "application/json",
+        "x-hmac-signature": signature,
+      },
+      payload: body,
+    });
+
+    // Webhook accepted (200) — the event is stored but transition is silently skipped
+    expect(res.statusCode).toBe(200);
+    const resBody = JSON.parse(res.body);
+    expect(resBody.received).toBe(true);
+
+    // Verify statuses remain at "delivered" — no regression
+    const db = dbConn.db;
+    const unchangedShipment = await findShipmentById(db, testShipmentId2);
+    expect(unchangedShipment!.status).toBe("delivered");
+
+    const unchangedOrder = await findOrderById(db, testOrderId2);
+    expect(unchangedOrder!.shippingStatus).toBe("delivered");
   });
 
   it("skips non-tracker events", async () => {
@@ -687,10 +842,11 @@ describe("EasyPost webhook HTTP handler (T059)", () => {
 
     expect(res.statusCode).toBe(200);
     const resBody = JSON.parse(res.body);
+    expect(resBody.received).toBe(true);
     expect(resBody.skipped).toBe(true);
   });
 
-  it("skips tracker event with unknown tracking code", async () => {
+  it("skips tracker event with unknown tracking code (logs + discards without erroring)", async () => {
     const { body, signature } = generateEasyPostWebhookPayload(
       `evt_http_unknown_${ts2}`,
       "tracker.updated",
@@ -712,8 +868,10 @@ describe("EasyPost webhook HTTP handler (T059)", () => {
       payload: body,
     });
 
+    // Returns 200 (webhook acknowledged) with skipped=true — does not error
     expect(res.statusCode).toBe(200);
     const resBody = JSON.parse(res.body);
+    expect(resBody.received).toBe(true);
     expect(resBody.skipped).toBe(true);
   });
 });

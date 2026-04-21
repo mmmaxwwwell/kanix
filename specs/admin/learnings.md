@@ -211,3 +211,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `voidShipmentLabel` didn't catch adapter errors — carrier window expiry (adapter throws) caused unhandled error propagation. Added `ERR_VOID_WINDOW_EXPIRED` error code with adapter error wrapping; HTTP endpoint maps it to 409.
 - `voidShipmentLabel` had no audit trail — added `shipmentEvent` insert for every void with refund/no-refund description, using `void-{shipmentId}-{timestamp}` as the providerEventId to avoid collisions.
 - The stub adapter's `voidLabel` always returns `{ refunded: true }` — to test carrier-window-expired or no-refund scenarios, override just that method via spread: `{ ...adapter, async voidLabel() { ... } }`.
+
+## T237 — Harden easypost-webhook.integration.test.ts
+- `findShipmentById` does NOT select `deliveredAt`/`shippedAt`/`labelPurchasedAt` — to verify these timestamps, query the raw `shipment` table directly with `db.select({ deliveredAt: shipment.deliveredAt })`.
+- `storeShipmentEvent` returns only `{ id }` (not the full event row); `findShipmentEventsByShipmentId` returns 6 fields but omits `rawPayloadJson`. Use UUID regex to validate the returned ID.
+- Cleanup must handle `order_status_history` (FK `fk_osh_order`) and `evidence_record` (FK `fk_er_shipment` + immutability triggers) before deleting orders/shipments — use `ALTER TABLE evidence_record DISABLE TRIGGER USER` then re-enable.

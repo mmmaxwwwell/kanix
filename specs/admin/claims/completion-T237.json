@@ -1,0 +1,16 @@
+{
+  "task_id": "T237",
+  "status": "complete",
+  "summary": "Hardened easypost-webhook.integration.test.ts: fixed FK constraints with real product/variant fixtures, replaced vacuous assertions, added timestamp verification for tracker events and deliveredAt, added out-of-order event tests (both query-layer and HTTP), fixed cleanup for evidence_record and order_status_history FK constraints",
+  "commands_run": [
+    {"command": "npx vitest run src/easypost-webhook.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T237.json"],
+  "files_modified": [
+    "api/src/easypost-webhook.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 1
+}
