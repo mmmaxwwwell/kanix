@@ -142,3 +142,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The cancel endpoint (`/api/admin/orders/:id/cancel`) returns 400 (not 409) for both `ERR_ORDER_ALREADY_SHIPPED` and `ERR_INVALID_TRANSITION` — the handler maps all domain errors to 400.
 - Audit log entries are written automatically via the `onResponse` hook in `auth/audit-log.ts` — no manual `insertAuditLog` call needed; just set `request.auditContext` in the route handler. Query `admin_audit_log` by `entityId` + `action="order.cancel"` to verify.
 - The old test used inline `testConfig`/`createFakeProcess` boilerplate — migrated to shared `createTestServer`/`stopTestServer` harness; the `env.sh` file lives at `.dev/e2e-state/env.sh` (not `test/e2e/.state/env.sh`).
+
+## T219 — Harden resend-confirmation.integration.test.ts
+- Fastify rejects `POST` with `Content-Type: application/json` and no body (`FST_ERR_CTP_EMPTY_JSON_BODY` → 500). For admin action endpoints that take no body, omit the Content-Type header entirely.
+- The `resend-confirmation` endpoint is at `/api/admin/orders/:id/resend-confirmation` with `verifySession + requireAdmin + requireCapability(ORDERS_MANAGE)` — only `super_admin` role has `ORDERS_MANAGE`; `support`/`finance`/`fulfillment` do not.
+- Updated `createNotificationService` to accept an optional `{ emailLogPath }` and write email entries to a JSONL file alongside the in-memory queue, enabling `logs/emails.jsonl` assertions in integration tests.

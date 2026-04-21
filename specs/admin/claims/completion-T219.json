@@ -1,0 +1,17 @@
+{
+  "task_id": "T219",
+  "status": "complete",
+  "summary": "Hardened resend-confirmation.integration.test.ts: rewrote from direct DB calls to full HTTP endpoint tests via createTestServer, added auth/RBAC tests (admin, customer, unauthenticated, support role), rate-limit 429 checks, 404 for missing orders, and emails.jsonl file-level content assertions",
+  "commands_run": [
+    {"command": "npx vitest run src/resend-confirmation.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T219.json"],
+  "files_modified": [
+    "api/src/resend-confirmation.integration.test.ts",
+    "api/src/services/notification.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 2
+}
