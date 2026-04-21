@@ -470,7 +470,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 
 ### Orders + state machine (lifecycle transitions)
 
-- [ ] T217 Harden `order-state-machine.integration.test.ts` — order state transitions [T050]
+- [x] T217 Harden `order-state-machine.integration.test.ts` — order state transitions [T050]
   Done when: every legal transition from the state machine diagram produces correct side effects (events, notifications, inventory); every illegal transition returns 409 with ERR_INVALID_TRANSITION; terminal states (shipped, cancelled, refunded) reject all further transitions; state transition audit log entries written.
 
 - [ ] T218 Harden `order-cancel.integration.test.ts` — order cancellation

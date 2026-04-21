@@ -132,3 +132,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `policy_snapshot` has FK RESTRICT from `order_policy_acknowledgment` — can't delete snapshots referenced by acknowledgments from prior test runs. To test "missing policy" scenarios, UPDATE `effective_at` to far future (3000-01-01) so `findCurrentPolicyByType` returns null, then restore in `finally`.
 - `policy_snapshot` has a unique constraint on `(policy_type, version)` — version bump tests must use a unique high version number (e.g. `900000 + random`) to avoid collisions with prior runs on the shared DB.
 - The original checkout handler wrapped `createCheckoutAcknowledgments` in try/catch as non-critical — hardening required moving policy validation before order creation and returning 400 `ERR_MISSING_POLICY` with `missing_policies[]` array.
+
+## T217 — Harden order-state-machine.integration.test.ts
+- The state machine is DB-only (no HTTP server needed) — test directly against `transitionOrderStatus` / `findOrderById` / `findOrderStatusHistory` from `order-state-machine.js`. Each test creates its own order via direct DB insert at the desired starting state, avoiding sequential test dependencies.
+- Terminal states are defined by having `[]` (empty array) in the transition maps — use the exported `*_TRANSITIONS` records to dynamically generate exhaustive rejection tests for every terminal state × every possible target.
+- `transitionOrderStatus` throws plain objects (not Error instances) with `{ code, message, statusType, from, to }` — cast `catch (err: unknown)` as the specific shape rather than using `instanceof Error`.

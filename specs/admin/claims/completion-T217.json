@@ -1,0 +1,16 @@
+{
+  "task_id": "T217",
+  "status": "complete",
+  "summary": "Hardened order-state-machine.integration.test.ts: 75 tests covering full lifecycle, cancellation, dispute, refund, partial fulfillment, delivery exception/return paths, exhaustive terminal-state rejection for all 4 status types, illegal transition rejection, audit history verification, and result shape assertions",
+  "commands_run": [
+    {"command": "DATABASE_URL=\"postgresql://kanix:kanix@127.0.0.1:5432/kanix\" pnpm --dir api exec vitest run --reporter=verbose src/order-state-machine.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": [],
+  "files_modified": [
+    "api/src/order-state-machine.integration.test.ts",
+    "specs/admin/learnings.md",
+    "specs/admin/tasks.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 1
+}
