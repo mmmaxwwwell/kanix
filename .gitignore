@@ -65,3 +65,6 @@ build/
 
 reasoning/
 claims/
+
+# code-review-graph state — SQLite knowledge graph db, watcher logs, pid files
+.code-review-graph/

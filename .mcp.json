@@ -2,7 +2,9 @@
   "mcpServers": {
     "mcp-android": {
       "command": "mcp-android",
-      "args": ["--emulator"],
+      "args": [
+        "--emulator"
+      ],
       "env": {
         "ANDROID_USER_HOME": ".dev/android-user-home",
         "ANDROID_AVD_HOME": ".dev/android-user-home/avd",
@@ -11,6 +13,13 @@
     },
     "mcp-browser": {
       "command": "mcp-browser"
+    },
+    "code-review-graph": {
+      "command": "code-review-graph",
+      "args": [
+        "serve"
+      ],
+      "type": "stdio"
     }
   }
 }

@@ -5,6 +5,9 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     nix-mcp-debugkit.url = "github:mmmaxwwwell/nix-mcp-debugkit";
+    # code-review-graph — spec-kit-managed knowledge graph, pinned in the
+    # skill's flake (single source of truth, bumped centrally).
+    code-review-graph.url = "path:/home/max/git/agent-framework/.claude/skills/spec-kit/code-review-graph";
     scad.url = "path:./scad";
     site.url = "path:./site";
     api.url = "path:./api";
@@ -13,7 +16,7 @@
     deploy.url = "path:./deploy";
   };
 
-  outputs = { self, nixpkgs, flake-utils, nix-mcp-debugkit, scad, site, api, admin, customer, deploy }:
+  outputs = { self, nixpkgs, flake-utils, nix-mcp-debugkit, code-review-graph, scad, site, api, admin, customer, deploy }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -34,6 +37,19 @@
 
         mcp-android = nix-mcp-debugkit.packages.${system}.mcp-android;
         mcp-browser = nix-mcp-debugkit.packages.${system}.mcp-browser;
+
+        crg = code-review-graph.packages.${system}.code-review-graph;
+        crgHook = code-review-graph.lib.${system}.mkShellHook {
+          projectName = "kanix";
+          buildOnEnter = true;
+          watch = true;
+          serveMcp = false;  # .mcp.json drives MCP config; don't double-spawn
+          excludeDirs = [
+            "node_modules" ".direnv" "result" "dist" ".venv" "__pycache__"
+            "build" ".dart_tool" ".next" ".gradle" ".pub-cache"
+            "stl" "test-logs" "logs" "validate" "attempts" "ci-debug"
+          ];
+        };
 
         # Android emulator SDK for E2E tests (Linux only)
         # Flutter 3.41.6 requires compileSdk=36, build-tools 35, NDK 28.2.13676358.
@@ -353,6 +369,12 @@
             # that bwrap sandboxes don't provide).
             mcp-android
             mcp-browser
+
+            # code-review-graph — persistent knowledge graph, pinned to
+            # v2.3.2 in the spec-kit skill.  Used throughout SDD workflow
+            # (interview/plan/tasks/implement/review) and kept fresh by
+            # the watcher started from shellHook.
+            crg
           ];
 
           inputsFrom = [ scadShell siteShell apiShell adminShell customerShell deployShell ];
@@ -365,7 +387,7 @@
           ANDROID_USER_HOME = ".dev/android-user-home";
           ANDROID_AVD_HOME = ".dev/android-user-home/avd";
 
-          shellHook = ''
+          shellHook = crgHook + ''
             # Do NOT prepend ${androidHome}/emulator to PATH here — it would
             # shadow the emulator-wrapper (listed in packages above) which sets
             # ANDROID_USER_HOME so that `emulator -list-avds` can find AVDs
