@@ -1,0 +1,17 @@
+{
+  "task_id": "T246",
+  "status": "complete",
+  "summary": "Hardened manual-evidence.integration.test.ts with HTTP-level admin evidence attach/remove, content-type rejection, actor tagging, audit trail, and edge cases (15 tests, all green)",
+  "commands_run": [
+    {"command": "npx vitest run src/manual-evidence.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T246.json"],
+  "files_modified": [
+    "api/src/manual-evidence.integration.test.ts",
+    "api/src/server.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 2
+}

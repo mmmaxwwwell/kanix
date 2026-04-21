@@ -256,3 +256,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `evidence_bundle.status` CHECK constraint (`ck_eb_status`) allows only `'generating'`, `'generated'`, `'submitted'`, `'failed'` — using "rejected" violates the constraint. Use `'failed'` for Stripe rejection scenarios.
 - `findDisputeById` in `db/queries/evidence.ts` didn't include `providerDisputeId` — needed to add it to submit evidence to Stripe (the adapter requires the provider-facing dispute ID, not the internal UUID).
 - POSTing with `Content-Type: application/json` and no body triggers Fastify `FST_ERR_CTP_EMPTY_JSON_BODY` (500) — for admin action endpoints that take no body (generate-bundle, submit-bundle), omit the Content-Type header (same pattern as T219).
+
+## T246 — Harden manual-evidence.integration.test.ts
+- `evidence_record` immutability triggers (`trg_evidence_record_no_delete`) must be disabled/re-enabled in a try/finally block for the admin DELETE endpoint — use `DISABLE TRIGGER trg_evidence_record_no_delete` (not `USER`) to scope to just the delete trigger.
+- Audit log query for removal must filter by `action = "evidence.manual_remove"` since the same `entityId` also has an `evidence.manual_attach` entry from creation.
+- No content-type validation existed on the `POST /api/admin/disputes/:id/evidence` endpoint — added `ALLOWED_EVIDENCE_CONTENT_TYPES` (same set as ticket attachments: jpeg, png, pdf) to reject executables and HTML.

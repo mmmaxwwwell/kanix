@@ -3587,6 +3587,15 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             });
           }
 
+          // Validate content type against whitelist
+          const ALLOWED_EVIDENCE_CONTENT_TYPES = ["image/jpeg", "image/png", "application/pdf"] as const;
+          if (!(ALLOWED_EVIDENCE_CONTENT_TYPES as readonly string[]).includes(body.contentType)) {
+            return reply.status(400).send({
+              error: "ERR_INVALID_CONTENT_TYPE",
+              message: `Invalid content type: ${body.contentType}. Allowed: ${ALLOWED_EVIDENCE_CONTENT_TYPES.join(", ")}`,
+            });
+          }
+
           const fileBuffer = Buffer.from(body.data, "base64");
           storageKey = `evidence/${disputeId}/${randomUUID()}/${body.fileName}`;
           await storageAdapter.put(storageKey, fileBuffer, body.contentType);
@@ -3718,6 +3727,92 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           .header("Content-Type", contentType)
           .header("Content-Disposition", `attachment; filename="${fileName}"`)
           .send(file.data);
+      },
+    );
+
+    // DELETE /api/admin/disputes/:id/evidence/:evidenceId — remove manual evidence
+    app.delete(
+      "/api/admin/disputes/:id/evidence/:evidenceId",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.DISPUTES_MANAGE)],
+      },
+      async (request, reply) => {
+        const { id: disputeId, evidenceId } = request.params as {
+          id: string;
+          evidenceId: string;
+        };
+
+        // Validate dispute exists
+        const disputeRow = await findDisputeById(database.db, disputeId);
+        if (!disputeRow) {
+          return reply.status(404).send({
+            error: "ERR_DISPUTE_NOT_FOUND",
+            message: `Dispute ${disputeId} not found`,
+          });
+        }
+
+        // Check if bundle has been submitted — lock further edits
+        const existingBundles = await database.db
+          .select()
+          .from(evidenceBundle)
+          .where(eq(evidenceBundle.disputeId, disputeId));
+        const hasSubmittedBundle = existingBundles.some((b) => b.status === "submitted");
+        if (hasSubmittedBundle) {
+          return reply.status(409).send({
+            error: "ERR_EVIDENCE_LOCKED",
+            message: "Evidence edits are locked after bundle submission to Stripe",
+          });
+        }
+
+        // Verify the evidence record exists and belongs to this dispute
+        const record = await findEvidenceById(database.db, evidenceId);
+        if (!record || record.disputeId !== disputeId) {
+          return reply.status(404).send({
+            error: "ERR_EVIDENCE_NOT_FOUND",
+            message: `Evidence record ${evidenceId} not found for dispute ${disputeId}`,
+          });
+        }
+
+        // Only manual evidence can be removed
+        const meta = record.metadataJson as { source?: string } | null;
+        if (meta?.source !== "manual") {
+          return reply.status(400).send({
+            error: "ERR_CANNOT_REMOVE_AUTO_EVIDENCE",
+            message: "Only manually-added evidence can be removed",
+          });
+        }
+
+        // Delete the stored file if it exists
+        if (record.storageKey) {
+          await storageAdapter.delete(record.storageKey);
+        }
+
+        // Bypass immutability trigger and delete
+        await database.db.execute(
+          sql`ALTER TABLE evidence_record DISABLE TRIGGER trg_evidence_record_no_delete`,
+        );
+        try {
+          await database.db.execute(
+            sql`DELETE FROM evidence_record WHERE id = ${evidenceId}`,
+          );
+        } finally {
+          await database.db.execute(
+            sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_delete`,
+          );
+        }
+
+        request.auditContext = {
+          action: "evidence.manual_remove",
+          entityType: "evidence_record",
+          entityId: evidenceId,
+          beforeJson: {
+            disputeId,
+            type: record.type,
+            storageKey: record.storageKey,
+          },
+        };
+
+        return reply.status(200).send({ removed: true, evidenceId });
       },
     );
 
