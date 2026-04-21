@@ -18,25 +18,17 @@ import { payment, dispute } from "./db/schema/payment.js";
 import { shipment } from "./db/schema/fulfillment.js";
 import { customer } from "./db/schema/customer.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -107,14 +99,10 @@ async function signInAndGetHeaders(
   return headers;
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("admin dashboard summary + alerts API (T071a)", () => {
+describe("admin dashboard summary + alerts API (T071a)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
   let adminHeaders: Record<string, string>;
   let adminUserId: string;
 
@@ -139,10 +127,9 @@ describeWithDeps("admin dashboard summary + alerts API (T071a)", () => {
   let testReservationId: string;
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const server = await createServer({
       config: testConfig(),
       processRef: createFakeProcess() as unknown as NodeJS.Process,
@@ -417,8 +404,6 @@ describeWithDeps("admin dashboard summary + alerts API (T071a)", () => {
   }, 15000);
 
   it("GET /api/admin/dashboard/summary returns correct counts", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/dashboard/summary`, {
       headers: adminHeaders,
     });
@@ -435,8 +420,6 @@ describeWithDeps("admin dashboard summary + alerts API (T071a)", () => {
   });
 
   it("GET /api/admin/dashboard/summary has all required fields", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/dashboard/summary`, {
       headers: adminHeaders,
     });
@@ -456,8 +439,6 @@ describeWithDeps("admin dashboard summary + alerts API (T071a)", () => {
   });
 
   it("GET /api/admin/dashboard/alerts returns alerts array", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/dashboard/alerts`, {
       headers: adminHeaders,
     });
@@ -477,8 +458,6 @@ describeWithDeps("admin dashboard summary + alerts API (T071a)", () => {
   });
 
   it("GET /api/admin/dashboard/alerts has correct alert structure", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/dashboard/alerts`, {
       headers: adminHeaders,
     });
@@ -496,8 +475,6 @@ describeWithDeps("admin dashboard summary + alerts API (T071a)", () => {
   });
 
   it("GET /api/admin/dashboard/summary requires authentication", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/dashboard/summary`, {
       headers: { origin: "http://localhost:3000" },
     });
@@ -505,8 +482,6 @@ describeWithDeps("admin dashboard summary + alerts API (T071a)", () => {
   });
 
   it("GET /api/admin/dashboard/alerts requires authentication", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/dashboard/alerts`, {
       headers: { origin: "http://localhost:3000" },
     });

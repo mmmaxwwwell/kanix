@@ -10,25 +10,17 @@ import { order } from "./db/schema/order.js";
 import { supportTicket } from "./db/schema/support.js";
 import { customer } from "./db/schema/customer.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -99,14 +91,10 @@ async function signInAndGetHeaders(
   return headers;
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("admin customer detail APIs (T071b)", () => {
+describe("admin customer detail APIs (T071b)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
   let adminHeaders: Record<string, string>;
   let adminUsrId: string;
 
@@ -123,10 +111,9 @@ describeWithDeps("admin customer detail APIs (T071b)", () => {
   let testTicket2Id: string;
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const server = await createServer({
       config: testConfig(),
       processRef: createFakeProcess() as unknown as NodeJS.Process,
@@ -275,8 +262,6 @@ describeWithDeps("admin customer detail APIs (T071b)", () => {
   // ---- GET /api/admin/customers ----
 
   it("lists customers", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/customers`, {
       headers: adminHeaders,
     });
@@ -290,8 +275,6 @@ describeWithDeps("admin customer detail APIs (T071b)", () => {
   });
 
   it("searches customers by name", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/customers?search=Alice`, {
       headers: adminHeaders,
     });
@@ -304,8 +287,6 @@ describeWithDeps("admin customer detail APIs (T071b)", () => {
   });
 
   it("searches customers by email", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/customers?search=bob-detail-${ts}`, {
       headers: adminHeaders,
     });
@@ -318,8 +299,6 @@ describeWithDeps("admin customer detail APIs (T071b)", () => {
   });
 
   it("filters customers by status", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/customers?status=active`, {
       headers: adminHeaders,
     });
@@ -333,8 +312,6 @@ describeWithDeps("admin customer detail APIs (T071b)", () => {
   });
 
   it("requires authentication for customer list", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/customers`, {
       headers: { origin: "http://localhost:3000" },
     });
@@ -344,8 +321,6 @@ describeWithDeps("admin customer detail APIs (T071b)", () => {
   // ---- GET /api/admin/customers/:id ----
 
   it("returns customer detail with stats", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/customers/${testCustomerId}`, {
       headers: adminHeaders,
     });
@@ -365,8 +340,6 @@ describeWithDeps("admin customer detail APIs (T071b)", () => {
   });
 
   it("returns 404 for non-existent customer", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/customers/00000000-0000-0000-0000-000000000000`, {
       headers: adminHeaders,
     });
@@ -376,8 +349,6 @@ describeWithDeps("admin customer detail APIs (T071b)", () => {
   // ---- GET /api/admin/customers/:id/orders ----
 
   it("returns customer orders", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/customers/${testCustomerId}/orders`, {
       headers: adminHeaders,
     });
@@ -394,8 +365,6 @@ describeWithDeps("admin customer detail APIs (T071b)", () => {
   });
 
   it("returns 404 for orders of non-existent customer", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(
       `${address}/api/admin/customers/00000000-0000-0000-0000-000000000000/orders`,
       { headers: adminHeaders },
@@ -406,8 +375,6 @@ describeWithDeps("admin customer detail APIs (T071b)", () => {
   // ---- GET /api/admin/customers/:id/tickets ----
 
   it("returns customer tickets", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/customers/${testCustomerId}/tickets`, {
       headers: adminHeaders,
     });
@@ -424,8 +391,6 @@ describeWithDeps("admin customer detail APIs (T071b)", () => {
   });
 
   it("returns 404 for tickets of non-existent customer", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(
       `${address}/api/admin/customers/00000000-0000-0000-0000-000000000000/tickets`,
       { headers: adminHeaders },

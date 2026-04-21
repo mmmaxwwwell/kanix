@@ -16,25 +16,17 @@ import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 import type { PaymentAdapter } from "./services/payment-adapter.js";
 import WebSocket from "ws";
 import { eq, sql } from "drizzle-orm";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -154,15 +146,11 @@ function waitForOpen(ws: WebSocket, timeoutMs = 5000): Promise<void> {
   });
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("Domain events pub/sub (T074)", () => {
+describe("Domain events pub/sub (T074)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
   let wsAddress: string;
-  let superTokensAvailable = false;
   let domainEvents: DomainEventPublisher;
 
   const ts = Date.now();
@@ -179,10 +167,9 @@ describeWithDeps("Domain events pub/sub (T074)", () => {
   let locationId: string;
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     const server = await createServer({
@@ -288,7 +275,6 @@ describeWithDeps("Domain events pub/sub (T074)", () => {
   }, 30000);
 
   afterAll(async () => {
-    if (!superTokensAvailable) return;
     markNotReady();
 
     try {
@@ -336,8 +322,6 @@ describeWithDeps("Domain events pub/sub (T074)", () => {
   // -------------------------------------------------------------------------
 
   it("admin receives order.placed event when checkout creates an order", async () => {
-    if (!superTokensAvailable) return;
-
     // 1. Connect admin to WebSocket
     const accessToken = await signInAndGetAccessToken(address, adminEmail, adminPassword);
     const ws = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
@@ -404,8 +388,6 @@ describeWithDeps("Domain events pub/sub (T074)", () => {
   // -------------------------------------------------------------------------
 
   it("customer receives domain events published to their channel", async () => {
-    if (!superTokensAvailable) return;
-
     // Connect as customer
     const accessToken = await signInAndGetAccessToken(address, customerEmail, customerPassword);
     const ws = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
@@ -435,8 +417,6 @@ describeWithDeps("Domain events pub/sub (T074)", () => {
   });
 
   it("customer does NOT receive events without their customerId", async () => {
-    if (!superTokensAvailable) return;
-
     const accessToken = await signInAndGetAccessToken(address, customerEmail, customerPassword);
     const ws = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
     await waitForOpen(ws);
@@ -461,8 +441,6 @@ describeWithDeps("Domain events pub/sub (T074)", () => {
   // -------------------------------------------------------------------------
 
   it("admin receives all 6 domain event types", async () => {
-    if (!superTokensAvailable) return;
-
     const accessToken = await signInAndGetAccessToken(address, adminEmail, adminPassword);
     const ws = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
     await waitForOpen(ws);

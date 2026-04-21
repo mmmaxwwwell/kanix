@@ -10,25 +10,17 @@ import { product } from "../db/schema/catalog.js";
 import { productVariant } from "../db/schema/catalog.js";
 import { productClass, productClassMembership } from "../db/schema/product-class.js";
 import { ROLE_CAPABILITIES } from "../auth/admin.js";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "../test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -99,14 +91,10 @@ async function signInAndGetHeaders(
   return headers;
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("product variant + classification API (T039)", () => {
+describe("product variant + classification API (T039)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
   let adminHeaders: Record<string, string>;
 
   const adminEmail = `test-admin-t039-${Date.now()}@kanix.dev`;
@@ -122,10 +110,9 @@ describeWithDeps("product variant + classification API (T039)", () => {
   let testAdminUserId: string;
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
 
     const server = await createServer({
       config: testConfig(),
@@ -211,8 +198,6 @@ describeWithDeps("product variant + classification API (T039)", () => {
   });
 
   it("create product → add TPU variant → add PA11 variant → assign to class", async function () {
-    if (!superTokensAvailable) return;
-
     // Step 1: Create a product
     const productRes = await fetch(`${address}/api/admin/products`, {
       method: "POST",
@@ -319,7 +304,6 @@ describeWithDeps("product variant + classification API (T039)", () => {
   });
 
   it("variant status transitions: draft → active → inactive → archived", async function () {
-    if (!superTokensAvailable) return;
     if (!testVariantTPUId || !testProductId) return;
 
     // draft → active
@@ -363,7 +347,6 @@ describeWithDeps("product variant + classification API (T039)", () => {
   });
 
   it("rejects invalid variant status transition (archived → active)", async function () {
-    if (!superTokensAvailable) return;
     if (!testVariantTPUId || !testProductId) return;
 
     // archived is terminal — cannot transition back
@@ -381,7 +364,6 @@ describeWithDeps("product variant + classification API (T039)", () => {
   });
 
   it("variant creation requires sku, title, price_minor", async function () {
-    if (!superTokensAvailable) return;
     if (!testProductId) return;
 
     const res = await fetch(`${address}/api/admin/products/${testProductId}/variants`, {
@@ -395,8 +377,6 @@ describeWithDeps("product variant + classification API (T039)", () => {
   });
 
   it("product class CRUD: create → get → update → delete", async function () {
-    if (!superTokensAvailable) return;
-
     // Create
     const createRes = await fetch(`${address}/api/admin/product-classes`, {
       method: "POST",
@@ -452,7 +432,6 @@ describeWithDeps("product variant + classification API (T039)", () => {
   });
 
   it("remove product from class", async function () {
-    if (!superTokensAvailable) return;
     if (!testProductId || !testClassId) return;
 
     // Remove
@@ -473,8 +452,6 @@ describeWithDeps("product variant + classification API (T039)", () => {
   });
 
   it("returns 404 for variant on non-existent product", async function () {
-    if (!superTokensAvailable) return;
-
     const fakeId = "00000000-0000-0000-0000-000000000000";
     const res = await fetch(`${address}/api/admin/products/${fakeId}/variants`, {
       method: "POST",

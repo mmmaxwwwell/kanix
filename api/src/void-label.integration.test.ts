@@ -16,12 +16,11 @@ import {
   findShipmentById,
 } from "./db/queries/shipment.js";
 import { createStubShippingAdapter } from "./services/shipping-adapter.js";
+import { requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
+const DATABASE_URL = requireDatabaseUrl();
 
-describeWithDeps("void-label integration (T059a)", () => {
+describe("void-label integration (T059a)", () => {
   let dbConn: DatabaseConnection;
   const ts = Date.now();
   let testOrderId = "";
@@ -29,7 +28,7 @@ describeWithDeps("void-label integration (T059a)", () => {
   const createdShipmentIds: string[] = [];
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     // Create a test order (confirmed, paid)

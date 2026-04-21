@@ -2,23 +2,22 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
 import { order, orderLine, orderStatusHistory } from "./db/schema/order.js";
 import { eq } from "drizzle-orm";
+import { requireDatabaseUrl } from "./test-helpers.js";
 import {
   transitionOrderStatus,
   findOrderById,
   findOrderStatusHistory,
 } from "./db/queries/order-state-machine.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
+const DATABASE_URL = requireDatabaseUrl();
 
-describeWithDeps("order state machine integration (T050)", () => {
+describe("order state machine integration (T050)", () => {
   let dbConn: DatabaseConnection;
   const ts = Date.now();
   let testOrderId = "";
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     // Create a test order directly in the DB (at pending_payment status, matching checkout output)

@@ -11,6 +11,7 @@ import {
 } from "./db/schema/contributor.js";
 import { product, productVariant } from "./db/schema/catalog.js";
 import { order, orderLine, orderStatusHistory } from "./db/schema/order.js";
+import { requireDatabaseUrl } from "./test-helpers.js";
 import {
   createContributor,
   linkContributorDesign,
@@ -27,12 +28,9 @@ import {
   STARTER_KIT_THRESHOLD,
 } from "./db/queries/contributor.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
+const DATABASE_URL = requireDatabaseUrl();
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("milestone tracking + tax documents (T070)", () => {
+describe("milestone tracking + tax documents (T070)", () => {
   let dbConn: DatabaseConnection;
 
   const ts = Date.now();
@@ -46,7 +44,7 @@ describeWithDeps("milestone tracking + tax documents (T070)", () => {
   const createdOrderLineIds: string[] = [];
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     // Create test product

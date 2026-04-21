@@ -9,25 +9,17 @@ import { adminUser, adminRole, adminUserRole, adminAuditLog } from "../db/schema
 import { product } from "../db/schema/catalog.js";
 import { ROLE_CAPABILITIES } from "./admin.js";
 import { findAuditLogsByEntityId } from "../db/queries/audit-log.js";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "../test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -107,15 +99,10 @@ async function signInAndGetHeaders(
   return headers;
 }
 
-// Skip when dependencies are unavailable
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("admin audit log middleware (T035)", () => {
+describe("admin audit log middleware (T035)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
 
   const adminEmail = `test-audit-admin-${Date.now()}@kanix.dev`;
   const adminPassword = "AuditAdmin123!";
@@ -126,10 +113,9 @@ describeWithDeps("admin audit log middleware (T035)", () => {
   const createdProductIds: string[] = [];
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
 
     const server = await createServer({
       config: testConfig(),
@@ -215,8 +201,6 @@ describeWithDeps("admin audit log middleware (T035)", () => {
   });
 
   it("admin creates a product → audit log entry exists with correct before (null) and after (product JSON)", async function () {
-    if (!superTokensAvailable) return;
-
     const headers = await signInAndGetHeaders(address, adminEmail, adminPassword);
 
     const slug = `audit-test-product-${Date.now()}`;
@@ -275,8 +259,6 @@ describeWithDeps("admin audit log middleware (T035)", () => {
   });
 
   it("failed requests do not create audit log entries", async function () {
-    if (!superTokensAvailable) return;
-
     const headers = await signInAndGetHeaders(address, adminEmail, adminPassword);
 
     // Send a request missing required fields — should fail with 400
@@ -309,8 +291,6 @@ describeWithDeps("admin audit log middleware (T035)", () => {
   });
 
   it("read-only admin endpoints do not create audit log entries (no auditContext set)", async function () {
-    if (!superTokensAvailable) return;
-
     const headers = await signInAndGetHeaders(address, adminEmail, adminPassword);
 
     // Count existing audit logs

@@ -24,12 +24,11 @@ import { createStubStorageAdapter, createLocalStorageAdapter } from "./services/
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
+const DATABASE_URL = requireDatabaseUrl();
 
-describeWithDeps("ticket attachment integration (T062)", () => {
+describe("ticket attachment integration (T062)", () => {
   let dbConn: DatabaseConnection;
   const ts = Date.now();
   const createdTicketIds: string[] = [];
@@ -41,7 +40,7 @@ describeWithDeps("ticket attachment integration (T062)", () => {
   let testMessageId: string;
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     // Create test customers

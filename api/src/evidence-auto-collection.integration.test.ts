@@ -11,13 +11,11 @@ import { storeShipmentEvent } from "./db/queries/shipment.js";
 import { createTicketMessage, createSupportTicket } from "./db/queries/support-ticket.js";
 import { storePaymentEvent } from "./db/queries/webhook.js";
 import { createPolicyAcknowledgment } from "./db/queries/policy.js";
+import { requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
+const DATABASE_URL = requireDatabaseUrl();
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("evidence auto-collection (T065)", () => {
+describe("evidence auto-collection (T065)", () => {
   let dbConn: DatabaseConnection;
 
   const ts = Date.now();
@@ -27,7 +25,7 @@ describeWithDeps("evidence auto-collection (T065)", () => {
   let ticketId = "";
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     // 1. Create product + variant

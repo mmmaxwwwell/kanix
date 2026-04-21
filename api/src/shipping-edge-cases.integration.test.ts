@@ -21,12 +21,11 @@ import {
 } from "./db/queries/shipment.js";
 import { createStubShippingAdapter, type ShippingAdapter } from "./services/shipping-adapter.js";
 import { createAdminAlertService } from "./services/admin-alert.js";
+import { requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
+const DATABASE_URL = requireDatabaseUrl();
 
-describeWithDeps("shipping edge cases (T066d)", () => {
+describe("shipping edge cases (T066d)", () => {
   let dbConn: DatabaseConnection;
   const ts = Date.now();
   let testOrderId = "";
@@ -34,7 +33,7 @@ describeWithDeps("shipping edge cases (T066d)", () => {
   const createdShipmentIds: string[] = [];
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     // Create a test order

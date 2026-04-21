@@ -19,26 +19,18 @@ import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 import type { PaymentAdapter } from "./services/payment-adapter.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
 import { createHmac } from "node:crypto";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 const WEBHOOK_SECRET = "whsec_test_cancel_secret";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -163,14 +155,10 @@ function generateWebhookPayload(
   return { body: payload, signature };
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("order cancellation API (T053)", () => {
+describe("order cancellation API (T053)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
   let adminHeaders: Record<string, string>;
 
   const ts = Date.now();
@@ -186,14 +174,8 @@ describeWithDeps("order cancellation API (T053)", () => {
   let shippedOrderId = "";
 
   beforeAll(async () => {
-    try {
-      superTokensAvailable = await isSuperTokensUp();
-    } catch {
-      superTokensAvailable = false;
-    }
-    if (!superTokensAvailable) return;
-
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    await assertSuperTokensUp();
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     const server = await createServer({
@@ -376,15 +358,12 @@ describeWithDeps("order cancellation API (T053)", () => {
   }
 
   afterAll(async () => {
-    if (!superTokensAvailable) return;
     markNotReady();
     await app?.close();
     await dbConn?.close();
   });
 
   it("should cancel an unpaid order and release reservations", async () => {
-    if (!superTokensAvailable) return;
-
     const db = dbConn.db;
 
     // Verify reservations exist before cancel
@@ -428,8 +407,6 @@ describeWithDeps("order cancellation API (T053)", () => {
   });
 
   it("should cancel a paid order with refund and release reservations", async () => {
-    if (!superTokensAvailable) return;
-
     const db = dbConn.db;
 
     // Clear refund adapter call log
@@ -468,8 +445,6 @@ describeWithDeps("order cancellation API (T053)", () => {
   });
 
   it("should reject cancellation of shipped order with ERR_ORDER_ALREADY_SHIPPED", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await app.inject({
       method: "POST",
       url: `/api/admin/orders/${shippedOrderId}/cancel`,
@@ -486,8 +461,6 @@ describeWithDeps("order cancellation API (T053)", () => {
   });
 
   it("should return 404 for non-existent order", async () => {
-    if (!superTokensAvailable) return;
-
     const fakeId = "00000000-0000-0000-0000-000000000000";
     const res = await app.inject({
       method: "POST",

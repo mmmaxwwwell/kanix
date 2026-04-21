@@ -11,18 +11,16 @@ import { storeShipmentEvent } from "./db/queries/shipment.js";
 import { createTicketMessage, createSupportTicket } from "./db/queries/support-ticket.js";
 import { storePaymentEvent } from "./db/queries/webhook.js";
 import { createPolicyAcknowledgment } from "./db/queries/policy.js";
+import { requireDatabaseUrl } from "./test-helpers.js";
 import {
   computeReadinessSummary,
   findEvidenceByOrderId,
   generateEvidenceBundle,
 } from "./db/queries/evidence.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
+const DATABASE_URL = requireDatabaseUrl();
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("evidence bundle generation (T066)", () => {
+describe("evidence bundle generation (T066)", () => {
   let dbConn: DatabaseConnection;
 
   const ts = Date.now();
@@ -37,7 +35,7 @@ describeWithDeps("evidence bundle generation (T066)", () => {
   let incompletePaymentId = "";
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     // --- Complete evidence order ---

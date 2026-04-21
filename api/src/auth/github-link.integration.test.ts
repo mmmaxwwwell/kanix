@@ -5,25 +5,17 @@ import { createDatabaseConnection, type DatabaseConnection } from "../db/connect
 import type { Config } from "../config.js";
 import type { FastifyInstance } from "fastify";
 import type { GitHubUserFetcher } from "./github.js";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "../test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -45,14 +37,10 @@ function createFakeProcess(): EventEmitter {
   return new EventEmitter();
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("GitHub OAuth: link GitHub account (T033)", () => {
+describe("GitHub OAuth: link GitHub account (T033)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
 
   // Mock GitHub user fetcher that returns a predictable user
   const mockGitHubUserId = 12345;
@@ -61,10 +49,9 @@ describeWithDeps("GitHub OAuth: link GitHub account (T033)", () => {
   };
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const server = await createServer({
       config: testConfig(),
       processRef: createFakeProcess() as unknown as NodeJS.Process,
@@ -143,8 +130,6 @@ describeWithDeps("GitHub OAuth: link GitHub account (T033)", () => {
   }
 
   it("create customer → link GitHub → verify github_user_id stored", async function () {
-    if (!superTokensAvailable) return;
-
     const { headers } = await signupAndVerify(testEmail, testPassword);
 
     // Link GitHub account
@@ -170,8 +155,6 @@ describeWithDeps("GitHub OAuth: link GitHub account (T033)", () => {
   });
 
   it("duplicate link prevented — same customer cannot re-link", async function () {
-    if (!superTokensAvailable) return;
-
     const { headers } = await signupAndVerify(testEmail, testPassword);
 
     // Try to link again — should get 409 (already linked)
@@ -187,8 +170,6 @@ describeWithDeps("GitHub OAuth: link GitHub account (T033)", () => {
   });
 
   it("duplicate link prevented — different customer cannot use same GitHub ID", async function () {
-    if (!superTokensAvailable) return;
-
     const secondEmail = `gh-test2-${Date.now()}@example.com`;
     const { headers } = await signupAndVerify(secondEmail, testPassword);
 
@@ -205,8 +186,6 @@ describeWithDeps("GitHub OAuth: link GitHub account (T033)", () => {
   });
 
   it("unauthenticated request gets 401", async function () {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/customer/link-github`, {
       method: "POST",
       headers: { "Content-Type": "application/json", origin: "http://localhost:3000" },
@@ -217,8 +196,6 @@ describeWithDeps("GitHub OAuth: link GitHub account (T033)", () => {
   });
 
   it("missing code field gets 400", async function () {
-    if (!superTokensAvailable) return;
-
     const { headers } = await signupAndVerify(`gh-test3-${Date.now()}@example.com`, testPassword);
 
     const res = await fetch(`${address}/api/customer/link-github`, {

@@ -15,12 +15,11 @@ import {
   mergeTicket,
 } from "./db/queries/support-ticket.js";
 import { customer } from "./db/schema/customer.js";
+import { requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
+const DATABASE_URL = requireDatabaseUrl();
 
-describeWithDeps("duplicate ticket detection (T061a)", () => {
+describe("duplicate ticket detection (T061a)", () => {
   let dbConn: DatabaseConnection;
   const ts = Date.now();
   const createdTicketIds: string[] = [];
@@ -29,7 +28,7 @@ describeWithDeps("duplicate ticket detection (T061a)", () => {
   let testOrderId: string;
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     // Create a test customer

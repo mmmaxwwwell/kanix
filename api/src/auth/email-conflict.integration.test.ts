@@ -6,25 +6,17 @@ import { createDatabaseConnection, type DatabaseConnection } from "../db/connect
 import type { Config } from "../config.js";
 import { customer } from "../db/schema/customer.js";
 import { createAdminAlertService, type AdminAlertService } from "../services/admin-alert.js";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "../test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -46,15 +38,11 @@ function createFakeProcess(): EventEmitter {
   return new EventEmitter();
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("duplicate email verification conflict detection (T054e)", () => {
+describe("duplicate email verification conflict detection (T054e)", () => {
   let server: ServerInstance;
   let dbConn: DatabaseConnection;
   let address: string;
   let adminAlertService: AdminAlertService;
-  let superTokensAvailable = false;
 
   // Unique email per test run
   const sharedEmail = `conflict-${Date.now()}@example.com`;
@@ -62,24 +50,19 @@ describeWithDeps("duplicate email verification conflict detection (T054e)", () =
   const fakeAuthSubject = `fake-auth-subject-${Date.now()}`;
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     adminAlertService = createAdminAlertService();
 
-    try {
-      server = await createServer({
-        config: testConfig(),
-        processRef: createFakeProcess() as unknown as NodeJS.Process,
-        database: dbConn,
-        adminAlertService,
-      });
-      address = await server.start();
-      markReady();
-    } catch {
-      superTokensAvailable = false;
-    }
+    server = await createServer({
+      config: testConfig(),
+      processRef: createFakeProcess() as unknown as NodeJS.Process,
+      database: dbConn,
+      adminAlertService,
+    });
+    address = await server.start();
+    markReady();
   });
 
   afterAll(async () => {
@@ -94,8 +77,6 @@ describeWithDeps("duplicate email verification conflict detection (T054e)", () =
   });
 
   it("account A verifies email → account B attempts same email → rejected with ERR_EMAIL_ALREADY_CLAIMED", async function () {
-    if (!superTokensAvailable) return;
-
     // Step 1: Seed customer A directly in DB with sharedEmail (simulates an
     // already-verified account owning this email via a different auth method)
     await dbConn.db.insert(customer).values({

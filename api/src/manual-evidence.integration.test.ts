@@ -5,18 +5,16 @@ import { product, productVariant } from "./db/schema/catalog.js";
 import { order } from "./db/schema/order.js";
 import { payment, dispute } from "./db/schema/payment.js";
 import { evidenceRecord } from "./db/schema/evidence.js";
+import { requireDatabaseUrl } from "./test-helpers.js";
 import {
   createEvidenceRecord,
   findEvidenceById,
   findEvidenceByOrderId,
 } from "./db/queries/evidence.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
+const DATABASE_URL = requireDatabaseUrl();
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("manual evidence attachment (T066a)", () => {
+describe("manual evidence attachment (T066a)", () => {
   let dbConn: DatabaseConnection;
 
   const ts = Date.now();
@@ -25,7 +23,7 @@ describeWithDeps("manual evidence attachment (T066a)", () => {
   let disputeId = "";
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     // 1. Product + variant

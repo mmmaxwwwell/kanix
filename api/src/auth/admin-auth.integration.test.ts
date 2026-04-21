@@ -7,28 +7,17 @@ import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { adminUser, adminRole, adminUserRole } from "../db/schema/admin.js";
 import { ROLE_CAPABILITIES, CAPABILITIES } from "./admin.js";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "../test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-/**
- * Check if SuperTokens is reachable before running integration tests.
- */
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -114,15 +103,10 @@ async function signInAndGetHeaders(
   return headers;
 }
 
-// Skip when dependencies are unavailable
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("admin auth + capability-based permissions (T034)", () => {
+describe("admin auth + capability-based permissions (T034)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
 
   // Test admin credentials
   const adminEmail = `test-admin-${Date.now()}@kanix.dev`;
@@ -139,10 +123,9 @@ describeWithDeps("admin auth + capability-based permissions (T034)", () => {
   const nonAdminPassword = "NonAdmin123!";
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
 
     // Create SuperTokens accounts via signup
     const server = await createServer({
@@ -265,8 +248,6 @@ describeWithDeps("admin auth + capability-based permissions (T034)", () => {
   });
 
   it("unauthenticated request to admin endpoint returns 401", async function () {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/me`, {
       headers: { origin: "http://localhost:3000" },
     });
@@ -277,8 +258,6 @@ describeWithDeps("admin auth + capability-based permissions (T034)", () => {
   });
 
   it("non-admin user accessing admin endpoint returns 403", async function () {
-    if (!superTokensAvailable) return;
-
     const headers = await signInAndGetHeaders(address, nonAdminEmail, nonAdminPassword);
     const res = await fetch(`${address}/api/admin/me`, { headers });
 
@@ -288,8 +267,6 @@ describeWithDeps("admin auth + capability-based permissions (T034)", () => {
   });
 
   it("admin login → has permission → allowed (super_admin)", async function () {
-    if (!superTokensAvailable) return;
-
     const headers = await signInAndGetHeaders(address, adminEmail, adminPassword);
 
     // Access admin profile
@@ -315,8 +292,6 @@ describeWithDeps("admin auth + capability-based permissions (T034)", () => {
   });
 
   it("admin without permission → 403 (support role cannot adjust inventory)", async function () {
-    if (!superTokensAvailable) return;
-
     const headers = await signInAndGetHeaders(address, limitedAdminEmail, limitedAdminPassword);
 
     // Support role CAN read orders

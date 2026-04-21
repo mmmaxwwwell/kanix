@@ -7,25 +7,17 @@ import type { Config } from "../config.js";
 import type { FastifyInstance } from "fastify";
 import { order } from "../db/schema/order.js";
 import { customer } from "../db/schema/customer.js";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "../test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -47,24 +39,19 @@ function createFakeProcess(): EventEmitter {
   return new EventEmitter();
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("guest order → account linking (T036)", () => {
+describe("guest order → account linking (T036)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
 
   const guestEmail = `guest-${Date.now()}@example.com`;
   const testPassword = "TestPassword123!";
   const guestOrderIds: string[] = [];
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const server = await createServer({
       config: testConfig(),
       processRef: createFakeProcess() as unknown as NodeJS.Process,
@@ -113,8 +100,6 @@ describeWithDeps("guest order → account linking (T036)", () => {
   });
 
   it("on email verification, guest orders are linked to the new customer", async function () {
-    if (!superTokensAvailable) return;
-
     // Step 1: Sign up with the same email as the guest orders
     const signupRes = await fetch(`${address}/auth/signup`, {
       method: "POST",

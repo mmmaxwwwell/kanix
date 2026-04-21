@@ -3,6 +3,7 @@ import { createDatabaseConnection, type DatabaseConnection } from "./db/connecti
 import { eq } from "drizzle-orm";
 import { contributor, contributorDesign } from "./db/schema/contributor.js";
 import { product } from "./db/schema/catalog.js";
+import { requireDatabaseUrl } from "./test-helpers.js";
 import {
   createContributor,
   findContributorById,
@@ -11,12 +12,9 @@ import {
   listDesignsByContributor,
 } from "./db/queries/contributor.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
+const DATABASE_URL = requireDatabaseUrl();
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("contributor registry + design linking (T067)", () => {
+describe("contributor registry + design linking (T067)", () => {
   let dbConn: DatabaseConnection;
 
   const ts = Date.now();
@@ -28,7 +26,7 @@ describeWithDeps("contributor registry + design linking (T067)", () => {
   const createdDesignIds: string[] = [];
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     // Create test products

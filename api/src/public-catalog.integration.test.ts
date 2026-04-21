@@ -10,25 +10,17 @@ import { product, productVariant, productMedia } from "./db/schema/catalog.js";
 import { inventoryBalance, inventoryLocation } from "./db/schema/inventory.js";
 import { productClass, productClassMembership } from "./db/schema/product-class.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -68,14 +60,10 @@ async function signUpUser(address: string, email: string, password: string): Pro
   return body.user.id;
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("public catalog API (T044)", () => {
+describe("public catalog API (T044)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
 
   const ts = Date.now();
   const adminEmail = `test-catalog-admin-${ts}@kanix.dev`;
@@ -100,10 +88,9 @@ describeWithDeps("public catalog API (T044)", () => {
   const archivedSlug = `test-archived-product-${ts}`;
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const server = await createServer({
       config: testConfig(),
       processRef: createFakeProcess() as unknown as NodeJS.Process,
@@ -312,17 +299,7 @@ describeWithDeps("public catalog API (T044)", () => {
     if (app) await app.close();
   });
 
-  it("should skip if SuperTokens is not available", () => {
-    if (!superTokensAvailable) {
-      console.log("Skipping: SuperTokens not available");
-      return;
-    }
-    expect(superTokensAvailable).toBe(true);
-  });
-
   it("GET /api/products returns only active products (no auth required)", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/products`);
     expect(res.status).toBe(200);
 
@@ -343,8 +320,6 @@ describeWithDeps("public catalog API (T044)", () => {
   });
 
   it("GET /api/products returns products with variants, media, and pricing", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/products`);
     const body = (await res.json()) as {
       products: Array<{
@@ -386,8 +361,6 @@ describeWithDeps("public catalog API (T044)", () => {
   });
 
   it("GET /api/products/:slug returns product detail with variant availability", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/products/${activeSlug}`);
     expect(res.status).toBe(200);
 
@@ -426,8 +399,6 @@ describeWithDeps("public catalog API (T044)", () => {
   });
 
   it("GET /api/products/:slug flags out-of-stock variant", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/products/${activeSlug}`);
     const body = (await res.json()) as {
       product: {
@@ -447,8 +418,6 @@ describeWithDeps("public catalog API (T044)", () => {
   });
 
   it("GET /api/products/:slug returns 404 for non-existent product", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/products/non-existent-slug-${ts}`);
     expect(res.status).toBe(404);
 
@@ -457,15 +426,11 @@ describeWithDeps("public catalog API (T044)", () => {
   });
 
   it("GET /api/products/:slug returns 404 for draft product", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/products/${draftSlug}`);
     expect(res.status).toBe(404);
   });
 
   it("GET /api/products/:slug returns 404 for archived product", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/products/${archivedSlug}`);
     expect(res.status).toBe(404);
   });

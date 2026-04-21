@@ -7,18 +7,17 @@ import {
   clearResendRateLimits,
 } from "./db/queries/order-resend-confirmation.js";
 import { createNotificationService } from "./services/notification.js";
+import { requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
+const DATABASE_URL = requireDatabaseUrl();
 
-describeWithDeps("resend-confirmation integration (T059d)", () => {
+describe("resend-confirmation integration (T059d)", () => {
   let dbConn: DatabaseConnection;
   const ts = Date.now();
   let testOrderId = "";
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     // Create a test order (confirmed, paid)

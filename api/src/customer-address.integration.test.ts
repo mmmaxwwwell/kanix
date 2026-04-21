@@ -4,25 +4,17 @@ import { createServer, markReady, markNotReady } from "./server.js";
 import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
 import type { Config } from "./config.js";
 import type { FastifyInstance } from "fastify";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -44,14 +36,10 @@ function createFakeProcess(): EventEmitter {
   return new EventEmitter();
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("customer address CRUD API (T045)", () => {
+describe("customer address CRUD API (T045)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
   let authHeaders: Record<string, string> = {};
 
   const ts = Date.now();
@@ -116,10 +104,9 @@ describeWithDeps("customer address CRUD API (T045)", () => {
   }
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const server = await createServer({
       config: testConfig(),
       processRef: createFakeProcess() as unknown as NodeJS.Process,
@@ -143,8 +130,6 @@ describeWithDeps("customer address CRUD API (T045)", () => {
   let createdAddressId = "";
 
   it("creates a shipping address", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/customer/addresses`, {
       method: "POST",
       headers: { ...authHeaders, "Content-Type": "application/json" },
@@ -172,8 +157,6 @@ describeWithDeps("customer address CRUD API (T045)", () => {
   });
 
   it("lists addresses for the customer", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/customer/addresses`, {
       headers: authHeaders,
     });
@@ -185,8 +168,6 @@ describeWithDeps("customer address CRUD API (T045)", () => {
   });
 
   it("sets address as default", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/customer/addresses/${createdAddressId}`, {
       method: "PATCH",
       headers: { ...authHeaders, "Content-Type": "application/json" },
@@ -199,8 +180,6 @@ describeWithDeps("customer address CRUD API (T045)", () => {
   });
 
   it("only-one-default constraint: new default unsets previous", async () => {
-    if (!superTokensAvailable) return;
-
     // Create a second shipping address and set it as default
     const createRes = await fetch(`${address}/api/customer/addresses`, {
       method: "POST",
@@ -240,8 +219,6 @@ describeWithDeps("customer address CRUD API (T045)", () => {
   });
 
   it("updates an address", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/customer/addresses/${createdAddressId}`, {
       method: "PATCH",
       headers: { ...authHeaders, "Content-Type": "application/json" },
@@ -262,8 +239,6 @@ describeWithDeps("customer address CRUD API (T045)", () => {
   });
 
   it("rejects non-US address on create", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/customer/addresses`, {
       method: "POST",
       headers: { ...authHeaders, "Content-Type": "application/json" },
@@ -285,8 +260,6 @@ describeWithDeps("customer address CRUD API (T045)", () => {
   });
 
   it("rejects invalid US state code", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/customer/addresses`, {
       method: "POST",
       headers: { ...authHeaders, "Content-Type": "application/json" },
@@ -307,8 +280,6 @@ describeWithDeps("customer address CRUD API (T045)", () => {
   });
 
   it("rejects invalid postal code format", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/customer/addresses`, {
       method: "POST",
       headers: { ...authHeaders, "Content-Type": "application/json" },
@@ -329,8 +300,6 @@ describeWithDeps("customer address CRUD API (T045)", () => {
   });
 
   it("rejects invalid type", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/customer/addresses`, {
       method: "POST",
       headers: { ...authHeaders, "Content-Type": "application/json" },
@@ -351,8 +320,6 @@ describeWithDeps("customer address CRUD API (T045)", () => {
   });
 
   it("deletes an address", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/customer/addresses/${createdAddressId}`, {
       method: "DELETE",
       headers: authHeaders,
@@ -369,8 +336,6 @@ describeWithDeps("customer address CRUD API (T045)", () => {
   });
 
   it("returns 404 when deleting non-existent address", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(
       `${address}/api/customer/addresses/00000000-0000-0000-0000-000000000000`,
       {
@@ -383,8 +348,6 @@ describeWithDeps("customer address CRUD API (T045)", () => {
   });
 
   it("returns 401 without authentication", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/customer/addresses`, {
       headers: { origin: "http://localhost:3000" },
     });

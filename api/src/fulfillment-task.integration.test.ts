@@ -3,6 +3,7 @@ import { createDatabaseConnection, type DatabaseConnection } from "./db/connecti
 import { order, orderStatusHistory } from "./db/schema/order.js";
 import { fulfillmentTask } from "./db/schema/fulfillment.js";
 import { eq } from "drizzle-orm";
+import { requireDatabaseUrl } from "./test-helpers.js";
 import {
   createFulfillmentTask,
   createFulfillmentTaskForPaidOrder,
@@ -15,18 +16,16 @@ import {
   calculateFulfillmentPriority,
 } from "./db/queries/fulfillment-task.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
+const DATABASE_URL = requireDatabaseUrl();
 
-describeWithDeps("fulfillment task integration (T056)", () => {
+describe("fulfillment task integration (T056)", () => {
   let dbConn: DatabaseConnection;
   const ts = Date.now();
   const createdOrderIds: string[] = [];
   const createdTaskIds: string[] = [];
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
   });
 
   afterAll(async () => {

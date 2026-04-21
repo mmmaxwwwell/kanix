@@ -4,28 +4,17 @@ import { createServer, markReady, markNotReady } from "../server.js";
 import { createDatabaseConnection, type DatabaseConnection } from "../db/connection.js";
 import type { Config } from "../config.js";
 import type { FastifyInstance } from "fastify";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "../test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-/**
- * Check if SuperTokens is reachable before running integration tests.
- */
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -47,21 +36,15 @@ function createFakeProcess(): EventEmitter {
   return new EventEmitter();
 }
 
-// Skip when dependencies are unavailable
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("customer auth: email/password + email verification (T032)", () => {
+describe("customer auth: email/password + email verification (T032)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const server = await createServer({
       config: testConfig(),
       processRef: createFakeProcess() as unknown as NodeJS.Process,
@@ -83,8 +66,6 @@ describeWithDeps("customer auth: email/password + email verification (T032)", ()
   const testPassword = "TestPassword123!";
 
   it("signup creates user and customer record", async function () {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/auth/signup`, {
       method: "POST",
       headers: {
@@ -107,8 +88,6 @@ describeWithDeps("customer auth: email/password + email verification (T032)", ()
   });
 
   it("unverified user gets 401 on protected endpoint (no session without login)", async function () {
-    if (!superTokensAvailable) return;
-
     // Access protected endpoint without session → 401
     const res = await fetch(`${address}/api/customer/me`, {
       headers: { origin: "http://localhost:3000" },
@@ -120,8 +99,6 @@ describeWithDeps("customer auth: email/password + email verification (T032)", ()
   });
 
   it("login returns session tokens", async function () {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/auth/signin`, {
       method: "POST",
       headers: {
@@ -149,8 +126,6 @@ describeWithDeps("customer auth: email/password + email verification (T032)", ()
   });
 
   it("logged-in but unverified user gets 403 on protected endpoint", async function () {
-    if (!superTokensAvailable) return;
-
     // First, sign in to get session tokens
     const signinRes = await fetch(`${address}/auth/signin`, {
       method: "POST",
@@ -192,8 +167,6 @@ describeWithDeps("customer auth: email/password + email verification (T032)", ()
   });
 
   it("verified user can access protected endpoint", async function () {
-    if (!superTokensAvailable) return;
-
     // Sign in
     const signinRes = await fetch(`${address}/auth/signin`, {
       method: "POST",

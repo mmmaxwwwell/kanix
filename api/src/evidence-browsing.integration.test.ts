@@ -8,13 +8,11 @@ import { shipment } from "./db/schema/fulfillment.js";
 import { supportTicket } from "./db/schema/support.js";
 import { evidenceRecord } from "./db/schema/evidence.js";
 import { createEvidenceRecord, findEvidenceById, listEvidence } from "./db/queries/evidence.js";
+import { requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
+const DATABASE_URL = requireDatabaseUrl();
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("evidence browsing API (T066b)", () => {
+describe("evidence browsing API (T066b)", () => {
   let dbConn: DatabaseConnection;
 
   const ts = Date.now();
@@ -29,7 +27,7 @@ describeWithDeps("evidence browsing API (T066b)", () => {
   const createdIds: string[] = [];
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     // 1. Product + variant

@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { contributor, contributorDesign, contributorRoyalty } from "./db/schema/contributor.js";
 import { product, productVariant } from "./db/schema/catalog.js";
 import { order, orderLine, orderStatusHistory } from "./db/schema/order.js";
+import { requireDatabaseUrl } from "./test-helpers.js";
 import {
   createContributor,
   linkContributorDesign,
@@ -11,12 +12,9 @@ import {
   processOrderCompletionSales,
 } from "./db/queries/contributor.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
+const DATABASE_URL = requireDatabaseUrl();
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("per-design sales tracking (T068)", () => {
+describe("per-design sales tracking (T068)", () => {
   let dbConn: DatabaseConnection;
 
   const ts = Date.now();
@@ -31,7 +29,7 @@ describeWithDeps("per-design sales tracking (T068)", () => {
   const createdRoyaltyIds: string[] = [];
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     // Create test product

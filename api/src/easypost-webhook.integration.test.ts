@@ -16,9 +16,7 @@ import {
 import { findOrderById } from "./db/queries/order-state-machine.js";
 import { createHmac } from "node:crypto";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
+const DATABASE_URL = requireDatabaseUrl();
 
 const EP_WEBHOOK_SECRET = "ep_test_webhook_secret_for_tests";
 
@@ -56,7 +54,7 @@ function generateEasyPostWebhookPayload(
   return { body: payload, signature };
 }
 
-describeWithDeps("EasyPost tracking webhook (T059)", () => {
+describe("EasyPost tracking webhook (T059)", () => {
   let dbConn: DatabaseConnection;
   const ts = Date.now();
   let testOrderId = "";
@@ -64,7 +62,7 @@ describeWithDeps("EasyPost tracking webhook (T059)", () => {
   let testShipmentId = "";
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     // Create a test order (confirmed, paid, shipped)
@@ -353,30 +351,20 @@ import type { FastifyInstance } from "fastify";
 import type { TaxAdapter } from "./services/tax-adapter.js";
 import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 import type { PaymentAdapter } from "./services/payment-adapter.js";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  const uri = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-  try {
-    const res = await fetch(`${uri}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_test_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
     STRIPE_TAX_ENABLED: false,
     SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI:
-      process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567",
+    SUPERTOKENS_CONNECTION_URI: getSuperTokensUri(),
     EASYPOST_API_KEY: "test-key",
     EASYPOST_WEBHOOK_SECRET: EP_WEBHOOK_SECRET,
     GITHUB_OAUTH_CLIENT_ID: "test-id",
@@ -411,10 +399,9 @@ function createStubPaymentAdapter(): PaymentAdapter {
   };
 }
 
-describeWithDeps("EasyPost webhook HTTP handler (T059)", () => {
+describe("EasyPost webhook HTTP handler (T059)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
-  let superTokensAvailable = false;
 
   const ts2 = Date.now() + 1;
   let testOrderId2 = "";
@@ -422,14 +409,8 @@ describeWithDeps("EasyPost webhook HTTP handler (T059)", () => {
   const trackingNumber2 = `EP-HTTP-TRACK-${ts2}`;
 
   beforeAll(async () => {
-    try {
-      superTokensAvailable = await isSuperTokensUp();
-    } catch {
-      superTokensAvailable = false;
-    }
-    if (!superTokensAvailable) return;
-
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    await assertSuperTokensUp();
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     const server = await createServer({
@@ -522,8 +503,6 @@ describeWithDeps("EasyPost webhook HTTP handler (T059)", () => {
   });
 
   it("rejects webhook with missing signature", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await app.inject({
       method: "POST",
       url: "/webhooks/easypost",
@@ -537,8 +516,6 @@ describeWithDeps("EasyPost webhook HTTP handler (T059)", () => {
   });
 
   it("rejects webhook with invalid signature", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await app.inject({
       method: "POST",
       url: "/webhooks/easypost",
@@ -560,8 +537,6 @@ describeWithDeps("EasyPost webhook HTTP handler (T059)", () => {
   });
 
   it("processes tracker.updated in_transit: shipment + order transitions", async () => {
-    if (!superTokensAvailable) return;
-
     const eventId = `evt_http_in_transit_${ts2}`;
     const { body, signature } = generateEasyPostWebhookPayload(
       eventId,
@@ -616,8 +591,6 @@ describeWithDeps("EasyPost webhook HTTP handler (T059)", () => {
   });
 
   it("returns duplicate for already-processed event", async () => {
-    if (!superTokensAvailable) return;
-
     const eventId = `evt_http_in_transit_${ts2}`; // Same as above
     const { body, signature } = generateEasyPostWebhookPayload(
       eventId,
@@ -648,8 +621,6 @@ describeWithDeps("EasyPost webhook HTTP handler (T059)", () => {
   });
 
   it("processes tracker.updated delivered: shipment + order", async () => {
-    if (!superTokensAvailable) return;
-
     const eventId = `evt_http_delivered_${ts2}`;
     const { body, signature } = generateEasyPostWebhookPayload(
       eventId,
@@ -693,8 +664,6 @@ describeWithDeps("EasyPost webhook HTTP handler (T059)", () => {
   });
 
   it("skips non-tracker events", async () => {
-    if (!superTokensAvailable) return;
-
     const { body, signature } = generateEasyPostWebhookPayload(
       `evt_http_other_${ts2}`,
       "batch.completed",
@@ -722,8 +691,6 @@ describeWithDeps("EasyPost webhook HTTP handler (T059)", () => {
   });
 
   it("skips tracker event with unknown tracking code", async () => {
-    if (!superTokensAvailable) return;
-
     const { body, signature } = generateEasyPostWebhookPayload(
       `evt_http_unknown_${ts2}`,
       "tracker.updated",

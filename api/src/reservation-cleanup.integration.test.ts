@@ -16,25 +16,17 @@ import {
 import { adminAuditLog } from "./db/schema/admin.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
 import { releaseExpiredReservations } from "./db/queries/reservation.js";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -105,14 +97,10 @@ async function signInAndGetHeaders(
   return headers;
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("reservation cleanup cron (T042)", () => {
+describe("reservation cleanup cron (T042)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
   let adminHeaders: Record<string, string>;
   let adminUserId: string;
 
@@ -126,10 +114,9 @@ describeWithDeps("reservation cleanup cron (T042)", () => {
   let testRoleId: string;
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     // Disable the built-in cron (interval 0) — we call releaseExpiredReservations manually
     const server = await createServer({
       config: testConfig(),
@@ -252,8 +239,6 @@ describeWithDeps("reservation cleanup cron (T042)", () => {
   }, 15000);
 
   it("should expire reservation with 1s TTL and restore balance", async () => {
-    if (!superTokensAvailable) return;
-
     // Reserve 5 units with 1s TTL
     const reserveRes = await fetch(`${address}/api/admin/inventory/reservations`, {
       method: "POST",

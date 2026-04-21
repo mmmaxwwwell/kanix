@@ -16,25 +16,17 @@ import {
 import { adminAuditLog } from "./db/schema/admin.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
 import { releaseExpiredReservations } from "./db/queries/reservation.js";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -105,14 +97,10 @@ async function signInAndGetHeaders(
   return headers;
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("inventory reservation system (T041)", () => {
+describe("inventory reservation system (T041)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
   let adminHeaders: Record<string, string>;
   let adminUserId: string;
 
@@ -126,10 +114,9 @@ describeWithDeps("inventory reservation system (T041)", () => {
   let testRoleId: string;
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const server = await createServer({
       config: testConfig(),
       processRef: createFakeProcess() as unknown as NodeJS.Process,
@@ -251,8 +238,6 @@ describeWithDeps("inventory reservation system (T041)", () => {
   }, 15000);
 
   it("should reserve → consume", async () => {
-    if (!superTokensAvailable) return;
-
     // Reserve 5 units with 60s TTL
     const reserveRes = await fetch(`${address}/api/admin/inventory/reservations`, {
       method: "POST",
@@ -318,8 +303,6 @@ describeWithDeps("inventory reservation system (T041)", () => {
   });
 
   it("should reserve → release", async () => {
-    if (!superTokensAvailable) return;
-
     // Reserve 10 units
     const reserveRes = await fetch(`${address}/api/admin/inventory/reservations`, {
       method: "POST",
@@ -380,8 +363,6 @@ describeWithDeps("inventory reservation system (T041)", () => {
   });
 
   it("should reserve → expire (TTL)", async () => {
-    if (!superTokensAvailable) return;
-
     // Reserve 3 units with very short TTL (100ms)
     const reserveRes = await fetch(`${address}/api/admin/inventory/reservations`, {
       method: "POST",
@@ -431,8 +412,6 @@ describeWithDeps("inventory reservation system (T041)", () => {
   });
 
   it("should fail concurrent reserve for last unit (one succeeds, one fails)", async () => {
-    if (!superTokensAvailable) return;
-
     // First, set available to exactly 1 by adjusting
     // Current state: on_hand=95, available=95
     // Shrink by 94 to leave just 1 available
@@ -496,8 +475,6 @@ describeWithDeps("inventory reservation system (T041)", () => {
   });
 
   it("should reject consuming an already consumed reservation", async () => {
-    if (!superTokensAvailable) return;
-
     // Reserve → consume → try consume again
     // Restock first to have some available
     await fetch(`${address}/api/admin/inventory/adjustments`, {
@@ -546,8 +523,6 @@ describeWithDeps("inventory reservation system (T041)", () => {
   });
 
   it("should reject releasing a consumed reservation", async () => {
-    if (!superTokensAvailable) return;
-
     // We already have a consumed reservation from the previous test
     // Let's create a fresh one and consume it, then try to release
     const reserveRes = await fetch(`${address}/api/admin/inventory/reservations`, {
@@ -581,8 +556,6 @@ describeWithDeps("inventory reservation system (T041)", () => {
   });
 
   it("should create inventory_movement entries for all reservation operations", async () => {
-    if (!superTokensAvailable) return;
-
     const movements = await dbConn.db
       .select()
       .from(inventoryMovement)
@@ -596,8 +569,6 @@ describeWithDeps("inventory reservation system (T041)", () => {
   });
 
   it("should validate required fields on reserve", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/inventory/reservations`, {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
@@ -607,8 +578,6 @@ describeWithDeps("inventory reservation system (T041)", () => {
   });
 
   it("should reject non-positive quantity", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/inventory/reservations`, {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
@@ -623,8 +592,6 @@ describeWithDeps("inventory reservation system (T041)", () => {
   });
 
   it("should return 404 for non-existent reservation", async () => {
-    if (!superTokensAvailable) return;
-
     const fakeId = "00000000-0000-0000-0000-000000000000";
     const res = await fetch(`${address}/api/admin/inventory/reservations/${fakeId}`, {
       headers: adminHeaders,

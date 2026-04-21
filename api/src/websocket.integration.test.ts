@@ -10,25 +10,17 @@ import { cart } from "./db/schema/cart.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
 import type { WsMessage, WsManager } from "./ws/manager.js";
 import WebSocket from "ws";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -134,15 +126,11 @@ function waitForClose(ws: WebSocket, timeoutMs = 5000): Promise<{ code: number; 
   });
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("WebSocket server with auth (T072)", () => {
+describe("WebSocket server with auth (T072)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
   let wsAddress: string;
-  let superTokensAvailable = false;
   let wsManager: WsManager;
 
   const ts = Date.now();
@@ -158,10 +146,9 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   let testCartToken: string;
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const server = await createServer({
       config: testConfig(),
       processRef: createFakeProcess() as unknown as NodeJS.Process,
@@ -225,8 +212,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   }, 30000);
 
   afterAll(async () => {
-    if (!superTokensAvailable) return;
-
     markNotReady();
 
     // Cleanup
@@ -257,8 +242,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   }, 15000);
 
   it("rejects unauthenticated WebSocket connections", async () => {
-    if (!superTokensAvailable) return;
-
     const ws = new WebSocket(`${wsAddress}/ws`);
     const { code, reason } = await waitForClose(ws);
     expect(code).toBe(4001);
@@ -266,8 +249,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   });
 
   it("rejects WebSocket with invalid token", async () => {
-    if (!superTokensAvailable) return;
-
     const ws = new WebSocket(`${wsAddress}/ws?token=invalid-token-xxx`);
     const { code, reason } = await waitForClose(ws);
     expect(code).toBe(4001);
@@ -275,8 +256,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   });
 
   it("rejects WebSocket with invalid cart token", async () => {
-    if (!superTokensAvailable) return;
-
     const ws = new WebSocket(`${wsAddress}/ws?cart_token=00000000-0000-0000-0000-000000000000`);
     const { code, reason } = await waitForClose(ws);
     expect(code).toBe(4001);
@@ -284,8 +263,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   });
 
   it("admin connects and receives welcome with wildcard channels", async () => {
-    if (!superTokensAvailable) return;
-
     const accessToken = await signInAndGetAccessToken(address, adminEmail, adminPassword);
     const ws = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
     await waitForOpen(ws);
@@ -312,8 +289,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   });
 
   it("admin receives published events", async () => {
-    if (!superTokensAvailable) return;
-
     const accessToken = await signInAndGetAccessToken(address, adminEmail, adminPassword);
     const ws = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
     await waitForOpen(ws);
@@ -338,8 +313,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   });
 
   it("customer connects and receives welcome with customer channel", async () => {
-    if (!superTokensAvailable) return;
-
     const accessToken = await signInAndGetAccessToken(address, customerEmail, customerPassword);
     const ws = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
     await waitForOpen(ws);
@@ -357,8 +330,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   });
 
   it("guest connects with valid cart token and receives cart events", async () => {
-    if (!superTokensAvailable) return;
-
     const ws = new WebSocket(`${wsAddress}/ws?cart_token=${testCartToken}`);
     await waitForOpen(ws);
 
@@ -383,8 +354,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   });
 
   it("guest does not receive events for other entities", async () => {
-    if (!superTokensAvailable) return;
-
     const ws = new WebSocket(`${wsAddress}/ws?cart_token=${testCartToken}`);
     await waitForOpen(ws);
 
@@ -406,8 +375,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   });
 
   it("message format matches IC-008 contract", async () => {
-    if (!superTokensAvailable) return;
-
     const accessToken = await signInAndGetAccessToken(address, adminEmail, adminPassword);
     const ws = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
     await waitForOpen(ws);
@@ -438,8 +405,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   });
 
   it("connection is removed from manager on close", async () => {
-    if (!superTokensAvailable) return;
-
     const accessToken = await signInAndGetAccessToken(address, adminEmail, adminPassword);
     const ws = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
     await waitForOpen(ws);
@@ -456,8 +421,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   });
 
   it("sequence IDs are monotonically increasing", async () => {
-    if (!superTokensAvailable) return;
-
     const accessToken = await signInAndGetAccessToken(address, adminEmail, adminPassword);
     const ws = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
     await waitForOpen(ws);
@@ -484,8 +447,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   // ---------------------------------------------------------------------------
 
   it("replays missed messages on reconnect with lastSequenceId", async () => {
-    if (!superTokensAvailable) return;
-
     const accessToken = await signInAndGetAccessToken(address, adminEmail, adminPassword);
 
     // First connection: connect and receive a message
@@ -527,8 +488,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   });
 
   it("does not replay messages already received (sequenceId <= lastSequenceId)", async () => {
-    if (!superTokensAvailable) return;
-
     const accessToken = await signInAndGetAccessToken(address, adminEmail, adminPassword);
 
     // Connect and receive some messages
@@ -569,8 +528,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   });
 
   it("buffers messages and they are available in the buffer", async () => {
-    if (!superTokensAvailable) return;
-
     const bufferLengthBefore = wsManager.messageBuffer.length;
 
     // Publish a message — it should be buffered
@@ -585,8 +542,6 @@ describeWithDeps("WebSocket server with auth (T072)", () => {
   });
 
   it("guest reconnects and receives missed cart events", async () => {
-    if (!superTokensAvailable) return;
-
     // Connect as guest
     const ws1 = new WebSocket(`${wsAddress}/ws?cart_token=${testCartToken}`);
     await waitForOpen(ws1);

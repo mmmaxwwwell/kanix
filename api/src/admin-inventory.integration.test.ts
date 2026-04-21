@@ -15,25 +15,17 @@ import {
 } from "./db/schema/inventory.js";
 import { adminAuditLog } from "./db/schema/admin.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -104,14 +96,10 @@ async function signInAndGetHeaders(
   return headers;
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
+describe("admin inventory balance + adjustment API (T040)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
   let adminHeaders: Record<string, string>;
   let adminUserId: string;
 
@@ -126,10 +114,9 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   let testRoleId: string;
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const server = await createServer({
       config: testConfig(),
       processRef: createFakeProcess() as unknown as NodeJS.Process,
@@ -239,8 +226,6 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   }, 15000);
 
   it("should list balances (initially empty)", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/inventory/balances`, {
       headers: adminHeaders,
     });
@@ -251,8 +236,6 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   });
 
   it("should restock +100 and verify balance", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/inventory/adjustments`, {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
@@ -279,8 +262,6 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   });
 
   it("should shrinkage -5 and verify balance", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/inventory/adjustments`, {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
@@ -302,8 +283,6 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   });
 
   it("should filter balances by variant_id", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/inventory/balances?variant_id=${testVariantId}`, {
       headers: adminHeaders,
     });
@@ -314,8 +293,6 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   });
 
   it("should filter balances by location_id", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(
       `${address}/api/admin/inventory/balances?location_id=${testLocationId}`,
       { headers: adminHeaders },
@@ -327,8 +304,6 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   });
 
   it("should detect low stock when available < safety_stock", async () => {
-    if (!superTokensAvailable) return;
-
     // Set safety_stock to 100 — current available is 95, so it's already low
     await dbConn.db
       .update(inventoryBalance)
@@ -359,8 +334,6 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   });
 
   it("should return low_stock_only balances via filter", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/inventory/balances?low_stock_only=true`, {
       headers: adminHeaders,
     });
@@ -376,8 +349,6 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   });
 
   it("should prevent negative available (CHECK constraint)", async () => {
-    if (!superTokensAvailable) return;
-
     // Try to remove more than available (94 units)
     const res = await fetch(`${address}/api/admin/inventory/adjustments`, {
       method: "POST",
@@ -396,8 +367,6 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   });
 
   it("should create audit log entry for adjustment", async () => {
-    if (!superTokensAvailable) return;
-
     // The previous successful adjustments should have audit log entries
     const logs = await dbConn.db
       .select()
@@ -412,8 +381,6 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   });
 
   it("should create inventory_movement ledger entries", async () => {
-    if (!superTokensAvailable) return;
-
     const movements = await dbConn.db
       .select()
       .from(inventoryMovement)
@@ -427,8 +394,6 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   });
 
   it("should reject invalid adjustment_type", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/inventory/adjustments`, {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
@@ -444,8 +409,6 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   });
 
   it("should reject zero quantity_delta", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/inventory/adjustments`, {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
@@ -461,8 +424,6 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   });
 
   it("should reject missing required fields", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/inventory/adjustments`, {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
@@ -472,8 +433,6 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   });
 
   it("should return original result for duplicate idempotency_key header (T054c)", async () => {
-    if (!superTokensAvailable) return;
-
     const idempotencyKey = `idem-test-${Date.now()}`;
     const adjustmentBody = {
       variant_id: testVariantId,
@@ -529,8 +488,6 @@ describeWithDeps("admin inventory balance + adjustment API (T040)", () => {
   });
 
   it("should allow different idempotency keys to create separate adjustments", async () => {
-    if (!superTokensAvailable) return;
-
     const key1 = `idem-diff-a-${Date.now()}`;
     const key2 = `idem-diff-b-${Date.now()}`;
     const adjustmentBody = {

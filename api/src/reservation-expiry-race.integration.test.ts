@@ -18,26 +18,18 @@ import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 import type { PaymentAdapter } from "./services/payment-adapter.js";
 import { createAdminAlertService, type AdminAlertService } from "./services/admin-alert.js";
 import { createHmac } from "node:crypto";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 const WEBHOOK_SECRET = "whsec_test_race_handler_secret";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -107,17 +99,13 @@ function generateWebhookPayload(
   return { body: payload, signature };
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
 // ---------------------------------------------------------------------------
 // Test 1: Expired reservations + out of stock → order flagged for review
 // ---------------------------------------------------------------------------
-describeWithDeps("Reservation expiry race — flagged for review (T054b)", () => {
+describe("Reservation expiry race — flagged for review (T054b)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let adminAlertService: AdminAlertService;
-  let superTokensAvailable = false;
 
   const ts = Date.now() + 100;
 
@@ -125,14 +113,8 @@ describeWithDeps("Reservation expiry race — flagged for review (T054b)", () =>
   let paymentIntentId = "";
 
   beforeAll(async () => {
-    try {
-      superTokensAvailable = await isSuperTokensUp();
-    } catch {
-      superTokensAvailable = false;
-    }
-    if (!superTokensAvailable) return;
-
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    await assertSuperTokensUp();
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
     adminAlertService = createAdminAlertService();
 
@@ -277,15 +259,12 @@ describeWithDeps("Reservation expiry race — flagged for review (T054b)", () =>
   });
 
   afterAll(async () => {
-    if (!superTokensAvailable) return;
     markNotReady();
     await app?.close();
     await dbConn?.close();
   });
 
   it("should flag order for review when reservations expired and stock unavailable", async () => {
-    if (!superTokensAvailable) return;
-
     const db = dbConn.db;
     const eventId = `evt_test_race_review_${ts}`;
 
@@ -333,11 +312,10 @@ describeWithDeps("Reservation expiry race — flagged for review (T054b)", () =>
 // ---------------------------------------------------------------------------
 // Test 2: Expired reservations + stock available → re-reserved and confirmed
 // ---------------------------------------------------------------------------
-describeWithDeps("Reservation expiry race — re-reserved (T054b)", () => {
+describe("Reservation expiry race — re-reserved (T054b)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let adminAlertService: AdminAlertService;
-  let superTokensAvailable = false;
 
   const ts = Date.now() + 200;
 
@@ -345,14 +323,8 @@ describeWithDeps("Reservation expiry race — re-reserved (T054b)", () => {
   let paymentIntentId = "";
 
   beforeAll(async () => {
-    try {
-      superTokensAvailable = await isSuperTokensUp();
-    } catch {
-      superTokensAvailable = false;
-    }
-    if (!superTokensAvailable) return;
-
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    await assertSuperTokensUp();
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
     adminAlertService = createAdminAlertService();
 
@@ -486,15 +458,12 @@ describeWithDeps("Reservation expiry race — re-reserved (T054b)", () => {
   });
 
   afterAll(async () => {
-    if (!superTokensAvailable) return;
     markNotReady();
     await app?.close();
     await dbConn?.close();
   });
 
   it("should re-reserve and confirm order when stock is available", async () => {
-    if (!superTokensAvailable) return;
-
     const db = dbConn.db;
     const eventId = `evt_test_race_rereserve_${ts}`;
 

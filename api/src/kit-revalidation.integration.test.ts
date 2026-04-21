@@ -14,25 +14,17 @@ import {
 } from "./db/schema/product-class.js";
 import { inventoryBalance, inventoryLocation } from "./db/schema/inventory.js";
 import { cart, cartLine, cartKitSelection } from "./db/schema/cart.js";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -53,14 +45,10 @@ function createFakeProcess(): EventEmitter {
   return new EventEmitter();
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("kit cart re-validation on definition change (T054a)", () => {
+describe("kit cart re-validation on definition change (T054a)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
 
   const ts = Date.now();
 
@@ -82,199 +70,193 @@ describeWithDeps("kit cart re-validation on definition change (T054a)", () => {
   let cartId = "";
 
   beforeAll(async () => {
-    try {
-      superTokensAvailable = await isSuperTokensUp();
-      if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-      dbConn = createDatabaseConnection(DATABASE_URL ?? "");
-      const server = await createServer({
-        config: testConfig(),
-        processRef: createFakeProcess() as unknown as NodeJS.Process,
-        database: dbConn,
-        reservationCleanupIntervalMs: 0,
+    dbConn = createDatabaseConnection(DATABASE_URL);
+    const server = await createServer({
+      config: testConfig(),
+      processRef: createFakeProcess() as unknown as NodeJS.Process,
+      database: dbConn,
+      reservationCleanupIntervalMs: 0,
+    });
+    address = await server.start();
+    markReady();
+    app = server.app;
+
+    // --- Seed product classes ---
+    const [platesClass] = await dbConn.db
+      .insert(productClass)
+      .values({ name: "Plates", slug: `reval-plates-${ts}`, sortOrder: 0 })
+      .returning();
+    platesClassId = platesClass.id;
+
+    const [bowlsClass] = await dbConn.db
+      .insert(productClass)
+      .values({ name: "Bowls", slug: `reval-bowls-${ts}`, sortOrder: 1 })
+      .returning();
+    bowlsClassId = bowlsClass.id;
+
+    const [cupsClass] = await dbConn.db
+      .insert(productClass)
+      .values({ name: "Cups", slug: `reval-cups-${ts}`, sortOrder: 2 })
+      .returning();
+    cupsClassId = cupsClass.id;
+
+    // --- Seed products ---
+    const [prodA] = await dbConn.db
+      .insert(product)
+      .values({ slug: `reval-prod-a-${ts}`, title: "Plate A", status: "active" })
+      .returning();
+    productAId = prodA.id;
+
+    const [prodB] = await dbConn.db
+      .insert(product)
+      .values({ slug: `reval-prod-b-${ts}`, title: "Plate B", status: "active" })
+      .returning();
+    productBId = prodB.id;
+
+    const [prodC] = await dbConn.db
+      .insert(product)
+      .values({ slug: `reval-prod-c-${ts}`, title: "Bowl C", status: "active" })
+      .returning();
+    productCId = prodC.id;
+
+    const [prodD] = await dbConn.db
+      .insert(product)
+      .values({ slug: `reval-prod-d-${ts}`, title: "Cup D", status: "active" })
+      .returning();
+    productDId = prodD.id;
+
+    // --- Product class memberships ---
+    await dbConn.db
+      .insert(productClassMembership)
+      .values({ productId: productAId, productClassId: platesClassId });
+    await dbConn.db
+      .insert(productClassMembership)
+      .values({ productId: productBId, productClassId: platesClassId });
+    await dbConn.db
+      .insert(productClassMembership)
+      .values({ productId: productCId, productClassId: bowlsClassId });
+    await dbConn.db
+      .insert(productClassMembership)
+      .values({ productId: productDId, productClassId: cupsClassId });
+
+    // --- Seed variants ---
+    const [vA1] = await dbConn.db
+      .insert(productVariant)
+      .values({
+        productId: productAId,
+        sku: `REVAL-A1-${ts}`,
+        title: "Plate A - TPU",
+        optionValuesJson: { material: "TPU" },
+        priceMinor: 2000,
+        status: "active",
+      })
+      .returning();
+    variantA1Id = vA1.id;
+
+    const [vB1] = await dbConn.db
+      .insert(productVariant)
+      .values({
+        productId: productBId,
+        sku: `REVAL-B1-${ts}`,
+        title: "Plate B - TPU",
+        optionValuesJson: { material: "TPU" },
+        priceMinor: 1800,
+        status: "active",
+      })
+      .returning();
+    variantB1Id = vB1.id;
+
+    const [vC1] = await dbConn.db
+      .insert(productVariant)
+      .values({
+        productId: productCId,
+        sku: `REVAL-C1-${ts}`,
+        title: "Bowl C - TPU",
+        optionValuesJson: { material: "TPU" },
+        priceMinor: 1500,
+        status: "active",
+      })
+      .returning();
+    variantC1Id = vC1.id;
+
+    const [vD1] = await dbConn.db
+      .insert(productVariant)
+      .values({
+        productId: productDId,
+        sku: `REVAL-D1-${ts}`,
+        title: "Cup D - TPU",
+        optionValuesJson: { material: "TPU" },
+        priceMinor: 1000,
+        status: "active",
+      })
+      .returning();
+    variantD1Id = vD1.id;
+
+    // --- Inventory ---
+    const [loc] = await dbConn.db
+      .insert(inventoryLocation)
+      .values({ name: `Reval Test WH ${ts}`, code: `reval-wh-${ts}`, type: "warehouse" })
+      .returning();
+    locationId = loc.id;
+
+    for (const vid of [variantA1Id, variantB1Id, variantC1Id, variantD1Id]) {
+      await dbConn.db.insert(inventoryBalance).values({
+        variantId: vid,
+        locationId,
+        onHand: 50,
+        reserved: 0,
+        available: 50,
+        safetyStock: 5,
       });
-      address = await server.start();
-      markReady();
-      app = server.app;
-
-      // --- Seed product classes ---
-      const [platesClass] = await dbConn.db
-        .insert(productClass)
-        .values({ name: "Plates", slug: `reval-plates-${ts}`, sortOrder: 0 })
-        .returning();
-      platesClassId = platesClass.id;
-
-      const [bowlsClass] = await dbConn.db
-        .insert(productClass)
-        .values({ name: "Bowls", slug: `reval-bowls-${ts}`, sortOrder: 1 })
-        .returning();
-      bowlsClassId = bowlsClass.id;
-
-      const [cupsClass] = await dbConn.db
-        .insert(productClass)
-        .values({ name: "Cups", slug: `reval-cups-${ts}`, sortOrder: 2 })
-        .returning();
-      cupsClassId = cupsClass.id;
-
-      // --- Seed products ---
-      const [prodA] = await dbConn.db
-        .insert(product)
-        .values({ slug: `reval-prod-a-${ts}`, title: "Plate A", status: "active" })
-        .returning();
-      productAId = prodA.id;
-
-      const [prodB] = await dbConn.db
-        .insert(product)
-        .values({ slug: `reval-prod-b-${ts}`, title: "Plate B", status: "active" })
-        .returning();
-      productBId = prodB.id;
-
-      const [prodC] = await dbConn.db
-        .insert(product)
-        .values({ slug: `reval-prod-c-${ts}`, title: "Bowl C", status: "active" })
-        .returning();
-      productCId = prodC.id;
-
-      const [prodD] = await dbConn.db
-        .insert(product)
-        .values({ slug: `reval-prod-d-${ts}`, title: "Cup D", status: "active" })
-        .returning();
-      productDId = prodD.id;
-
-      // --- Product class memberships ---
-      await dbConn.db
-        .insert(productClassMembership)
-        .values({ productId: productAId, productClassId: platesClassId });
-      await dbConn.db
-        .insert(productClassMembership)
-        .values({ productId: productBId, productClassId: platesClassId });
-      await dbConn.db
-        .insert(productClassMembership)
-        .values({ productId: productCId, productClassId: bowlsClassId });
-      await dbConn.db
-        .insert(productClassMembership)
-        .values({ productId: productDId, productClassId: cupsClassId });
-
-      // --- Seed variants ---
-      const [vA1] = await dbConn.db
-        .insert(productVariant)
-        .values({
-          productId: productAId,
-          sku: `REVAL-A1-${ts}`,
-          title: "Plate A - TPU",
-          optionValuesJson: { material: "TPU" },
-          priceMinor: 2000,
-          status: "active",
-        })
-        .returning();
-      variantA1Id = vA1.id;
-
-      const [vB1] = await dbConn.db
-        .insert(productVariant)
-        .values({
-          productId: productBId,
-          sku: `REVAL-B1-${ts}`,
-          title: "Plate B - TPU",
-          optionValuesJson: { material: "TPU" },
-          priceMinor: 1800,
-          status: "active",
-        })
-        .returning();
-      variantB1Id = vB1.id;
-
-      const [vC1] = await dbConn.db
-        .insert(productVariant)
-        .values({
-          productId: productCId,
-          sku: `REVAL-C1-${ts}`,
-          title: "Bowl C - TPU",
-          optionValuesJson: { material: "TPU" },
-          priceMinor: 1500,
-          status: "active",
-        })
-        .returning();
-      variantC1Id = vC1.id;
-
-      const [vD1] = await dbConn.db
-        .insert(productVariant)
-        .values({
-          productId: productDId,
-          sku: `REVAL-D1-${ts}`,
-          title: "Cup D - TPU",
-          optionValuesJson: { material: "TPU" },
-          priceMinor: 1000,
-          status: "active",
-        })
-        .returning();
-      variantD1Id = vD1.id;
-
-      // --- Inventory ---
-      const [loc] = await dbConn.db
-        .insert(inventoryLocation)
-        .values({ name: `Reval Test WH ${ts}`, code: `reval-wh-${ts}`, type: "warehouse" })
-        .returning();
-      locationId = loc.id;
-
-      for (const vid of [variantA1Id, variantB1Id, variantC1Id, variantD1Id]) {
-        await dbConn.db.insert(inventoryBalance).values({
-          variantId: vid,
-          locationId,
-          onHand: 50,
-          reserved: 0,
-          available: 50,
-          safetyStock: 5,
-        });
-      }
-
-      // --- Kit definition: 2 Plates + 1 Bowl at 4500 ---
-      const [kit] = await dbConn.db
-        .insert(kitDefinition)
-        .values({
-          slug: `reval-kit-${ts}`,
-          title: "Revalidation Test Kit",
-          description: "Kit for testing re-validation",
-          priceMinor: 4500,
-          status: "active",
-        })
-        .returning();
-      kitDefId = kit.id;
-
-      await dbConn.db.insert(kitClassRequirement).values([
-        { kitDefinitionId: kitDefId, productClassId: platesClassId, quantity: 2 },
-        { kitDefinitionId: kitDefId, productClassId: bowlsClassId, quantity: 1 },
-      ]);
-
-      // --- Create a cart and add the kit ---
-      const cartRes = await fetch(`${address}/api/cart`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const cartBody = (await cartRes.json()) as { cart: { id: string; token: string } };
-      cartToken = cartBody.cart.token;
-      cartId = cartBody.cart.id;
-
-      // Add kit to cart
-      const kitRes = await fetch(`${address}/api/cart/kits`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Cart-Token": cartToken,
-        },
-        body: JSON.stringify({
-          kit_definition_id: kitDefId,
-          selections: [
-            { product_class_id: platesClassId, variant_id: variantA1Id },
-            { product_class_id: platesClassId, variant_id: variantB1Id },
-            { product_class_id: bowlsClassId, variant_id: variantC1Id },
-          ],
-        }),
-      });
-      expect(kitRes.status).toBe(201);
-    } catch (err) {
-      superTokensAvailable = false;
-      console.log("Setup failed:", err);
     }
+
+    // --- Kit definition: 2 Plates + 1 Bowl at 4500 ---
+    const [kit] = await dbConn.db
+      .insert(kitDefinition)
+      .values({
+        slug: `reval-kit-${ts}`,
+        title: "Revalidation Test Kit",
+        description: "Kit for testing re-validation",
+        priceMinor: 4500,
+        status: "active",
+      })
+      .returning();
+    kitDefId = kit.id;
+
+    await dbConn.db.insert(kitClassRequirement).values([
+      { kitDefinitionId: kitDefId, productClassId: platesClassId, quantity: 2 },
+      { kitDefinitionId: kitDefId, productClassId: bowlsClassId, quantity: 1 },
+    ]);
+
+    // --- Create a cart and add the kit ---
+    const cartRes = await fetch(`${address}/api/cart`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const cartBody = (await cartRes.json()) as { cart: { id: string; token: string } };
+    cartToken = cartBody.cart.token;
+    cartId = cartBody.cart.id;
+
+    // Add kit to cart
+    const kitRes = await fetch(`${address}/api/cart/kits`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Cart-Token": cartToken,
+      },
+      body: JSON.stringify({
+        kit_definition_id: kitDefId,
+        selections: [
+          { product_class_id: platesClassId, variant_id: variantA1Id },
+          { product_class_id: platesClassId, variant_id: variantB1Id },
+          { product_class_id: bowlsClassId, variant_id: variantC1Id },
+        ],
+      }),
+    });
+    expect(kitRes.status).toBe(201);
   }, 30000);
 
   afterAll(async () => {
@@ -328,17 +310,7 @@ describeWithDeps("kit cart re-validation on definition change (T054a)", () => {
     if (app) await app.close();
   }, 15000);
 
-  it("should skip if SuperTokens is not available", () => {
-    if (!superTokensAvailable) {
-      console.log("Skipping: SuperTokens not available");
-      return;
-    }
-    expect(superTokensAvailable).toBe(true);
-  });
-
   it("cart read shows no warnings when kit is unchanged", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/cart`, {
       headers: { "X-Cart-Token": cartToken },
     });
@@ -351,8 +323,6 @@ describeWithDeps("kit cart re-validation on definition change (T054a)", () => {
   });
 
   it("admin changes class requirement → cart read shows validation warning", async () => {
-    if (!superTokensAvailable) return;
-
     // Change requirements: now require 1 Plate + 1 Bowl + 1 Cup (was 2 Plates + 1 Bowl)
     // This makes the current selections invalid (2 plates but now only 1 needed, and missing cup)
     await dbConn.db
@@ -398,8 +368,6 @@ describeWithDeps("kit cart re-validation on definition change (T054a)", () => {
   });
 
   it("price change reflected in cart read and at checkout", async () => {
-    if (!superTokensAvailable) return;
-
     // Change kit price from 4500 to 5000
     await dbConn.db
       .update(kitDefinition)
@@ -451,8 +419,6 @@ describeWithDeps("kit cart re-validation on definition change (T054a)", () => {
   });
 
   it("checkout rejects cart with kit validation warnings", async () => {
-    if (!superTokensAvailable) return;
-
     // Change requirements to make current selections invalid
     await dbConn.db
       .delete(kitClassRequirement)
@@ -496,8 +462,6 @@ describeWithDeps("kit cart re-validation on definition change (T054a)", () => {
   });
 
   it("admin updates kit via API → carts flagged and warnings appear", async () => {
-    if (!superTokensAvailable) return;
-
     // First verify cart is clean
     const cleanRes = await fetch(`${address}/api/cart`, {
       headers: { "X-Cart-Token": cartToken },

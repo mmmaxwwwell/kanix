@@ -17,26 +17,18 @@ import type { TaxAdapter } from "./services/tax-adapter.js";
 import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 import type { PaymentAdapter } from "./services/payment-adapter.js";
 import { createHmac } from "node:crypto";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 const WEBHOOK_SECRET = "whsec_test_webhook_secret_for_tests";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -112,13 +104,9 @@ function generateWebhookPayload(
   return { body: payload, signature };
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("Stripe webhook handler (T051)", () => {
+describe("Stripe webhook handler (T051)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
-  let superTokensAvailable = false;
 
   const ts = Date.now();
 
@@ -132,14 +120,8 @@ describeWithDeps("Stripe webhook handler (T051)", () => {
   let paymentRecordId = "";
 
   beforeAll(async () => {
-    try {
-      superTokensAvailable = await isSuperTokensUp();
-    } catch {
-      superTokensAvailable = false;
-    }
-    if (!superTokensAvailable) return;
-
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    await assertSuperTokensUp();
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     const server = await createServer({
@@ -258,15 +240,12 @@ describeWithDeps("Stripe webhook handler (T051)", () => {
   });
 
   afterAll(async () => {
-    if (!superTokensAvailable) return;
     markNotReady();
     await app?.close();
     await dbConn?.close();
   });
 
   it("should return 401 for missing stripe-signature header", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await app.inject({
       method: "POST",
       url: "/webhooks/stripe",
@@ -280,8 +259,6 @@ describeWithDeps("Stripe webhook handler (T051)", () => {
   });
 
   it("should return 401 for invalid signature", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await app.inject({
       method: "POST",
       url: "/webhooks/stripe",
@@ -298,8 +275,6 @@ describeWithDeps("Stripe webhook handler (T051)", () => {
   });
 
   it("should handle payment_intent.succeeded and confirm order", async () => {
-    if (!superTokensAvailable) return;
-
     const db = dbConn.db;
     const eventId = `evt_test_succeeded_${ts}`;
 
@@ -360,8 +335,6 @@ describeWithDeps("Stripe webhook handler (T051)", () => {
   });
 
   it("should handle duplicate webhook as no-op", async () => {
-    if (!superTokensAvailable) return;
-
     const eventId = `evt_test_succeeded_${ts}`; // Same event ID as above
 
     const { body, signature } = generateWebhookPayload(
@@ -395,8 +368,6 @@ describeWithDeps("Stripe webhook handler (T051)", () => {
   });
 
   it("should handle charge.dispute.created and create dispute record", async () => {
-    if (!superTokensAvailable) return;
-
     const db = dbConn.db;
     const eventId = `evt_test_dispute_${ts}`;
     const disputeId = `dp_test_${ts}`;
@@ -452,8 +423,6 @@ describeWithDeps("Stripe webhook handler (T051)", () => {
   });
 
   it("should handle charge.dispute.closed (won) and update dispute + payment_status", async () => {
-    if (!superTokensAvailable) return;
-
     const db = dbConn.db;
     const disputeId = `dp_test_${ts}`;
     const chargeId = `ch_test_${ts}`;
@@ -505,10 +474,9 @@ describeWithDeps("Stripe webhook handler (T051)", () => {
 });
 
 // Separate describe for dispute close (lost) scenario
-describeWithDeps("Stripe webhook — dispute close lost (T064)", () => {
+describe("Stripe webhook — dispute close lost (T064)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
-  let superTokensAvailable = false;
 
   const ts = Date.now() + 3; // Differentiate from above
 
@@ -517,14 +485,8 @@ describeWithDeps("Stripe webhook — dispute close lost (T064)", () => {
   let locationId = "";
 
   beforeAll(async () => {
-    try {
-      superTokensAvailable = await isSuperTokensUp();
-    } catch {
-      superTokensAvailable = false;
-    }
-    if (!superTokensAvailable) return;
-
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    await assertSuperTokensUp();
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     const server = await createServer({
@@ -694,8 +656,6 @@ describeWithDeps("Stripe webhook — dispute close lost (T064)", () => {
   });
 
   it("should handle charge.dispute.closed (lost) and set payment_status to refunded", async () => {
-    if (!superTokensAvailable) return;
-
     const db = dbConn.db;
     const disputeId = `dp_dlost_${ts}`;
     const closeEventId = `evt_dispute_close_lost_${ts}`;
@@ -746,10 +706,9 @@ describeWithDeps("Stripe webhook — dispute close lost (T064)", () => {
 });
 
 // Separate describe for payment_failed scenario (needs its own checkout)
-describeWithDeps("Stripe webhook — payment_failed (T051)", () => {
+describe("Stripe webhook — payment_failed (T051)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
-  let superTokensAvailable = false;
 
   const ts = Date.now() + 1; // Differentiate from above
 
@@ -758,14 +717,8 @@ describeWithDeps("Stripe webhook — payment_failed (T051)", () => {
   let locationId = "";
 
   beforeAll(async () => {
-    try {
-      superTokensAvailable = await isSuperTokensUp();
-    } catch {
-      superTokensAvailable = false;
-    }
-    if (!superTokensAvailable) return;
-
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    await assertSuperTokensUp();
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const db = dbConn.db;
 
     const server = await createServer({
@@ -873,15 +826,12 @@ describeWithDeps("Stripe webhook — payment_failed (T051)", () => {
   });
 
   afterAll(async () => {
-    if (!superTokensAvailable) return;
     markNotReady();
     await app?.close();
     await dbConn?.close();
   });
 
   it("should handle payment_intent.payment_failed and release reservations", async () => {
-    if (!superTokensAvailable) return;
-
     const db = dbConn.db;
     const eventId = `evt_test_failed_${ts}`;
 

@@ -5,6 +5,7 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["src/**/*.test.ts"],
+    exclude: ["**/node_modules/**", "**/dist/**", "src/**/*.external.test.ts"],
     passWithNoTests: true,
     reporters: ["default", "./src/test-reporter.ts"],
     coverage: {

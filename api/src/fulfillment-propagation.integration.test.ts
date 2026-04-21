@@ -21,19 +21,18 @@ import {
 } from "./db/queries/shipment.js";
 import { findOrderById } from "./db/queries/order-state-machine.js";
 import { createStubShippingAdapter } from "./services/shipping-adapter.js";
+import { requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
+const DATABASE_URL = requireDatabaseUrl();
 
-describeWithDeps("fulfillment → shipping status propagation (T060)", () => {
+describe("fulfillment → shipping status propagation (T060)", () => {
   let dbConn: DatabaseConnection;
   const ts = Date.now();
   const createdOrderIds: string[] = [];
   const createdShipmentIds: string[] = [];
 
   beforeAll(async () => {
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
   });
 
   afterAll(async () => {

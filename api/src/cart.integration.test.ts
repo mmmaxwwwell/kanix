@@ -8,25 +8,17 @@ import { eq } from "drizzle-orm";
 import { product, productVariant } from "./db/schema/catalog.js";
 import { inventoryBalance, inventoryLocation } from "./db/schema/inventory.js";
 import { cart, cartLine } from "./db/schema/cart.js";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -48,14 +40,10 @@ function createFakeProcess(): EventEmitter {
   return new EventEmitter();
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("cart API (T046)", () => {
+describe("cart API (T046)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
 
   const ts = Date.now();
 
@@ -70,10 +58,9 @@ describeWithDeps("cart API (T046)", () => {
   const cartIds: string[] = [];
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const server = await createServer({
       config: testConfig(),
       processRef: createFakeProcess() as unknown as NodeJS.Process,
@@ -200,17 +187,7 @@ describeWithDeps("cart API (T046)", () => {
     if (app) await app.close();
   }, 15000);
 
-  it("should skip if SuperTokens is not available", () => {
-    if (!superTokensAvailable) {
-      console.log("Skipping: SuperTokens not available");
-      return;
-    }
-    expect(superTokensAvailable).toBe(true);
-  });
-
   it("POST /api/cart creates a guest cart with token", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/cart`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -241,8 +218,6 @@ describeWithDeps("cart API (T046)", () => {
   });
 
   it("POST /api/cart/items adds item to cart and validates availability", async () => {
-    if (!superTokensAvailable) return;
-
     // Create cart first
     const cartRes = await fetch(`${address}/api/cart`, {
       method: "POST",
@@ -292,8 +267,6 @@ describeWithDeps("cart API (T046)", () => {
   });
 
   it("POST /api/cart/items rejects out-of-stock variant", async () => {
-    if (!superTokensAvailable) return;
-
     // Create cart
     const cartRes = await fetch(`${address}/api/cart`, {
       method: "POST",
@@ -320,8 +293,6 @@ describeWithDeps("cart API (T046)", () => {
   });
 
   it("create guest cart → add items → verify totals", async () => {
-    if (!superTokensAvailable) return;
-
     // Create cart
     const cartRes = await fetch(`${address}/api/cart`, {
       method: "POST",
@@ -376,8 +347,6 @@ describeWithDeps("cart API (T046)", () => {
   });
 
   it("DELETE /api/cart/items/:id removes item from cart", async () => {
-    if (!superTokensAvailable) return;
-
     // Create cart + add item
     const cartRes = await fetch(`${address}/api/cart`, {
       method: "POST",
@@ -417,8 +386,6 @@ describeWithDeps("cart API (T046)", () => {
   });
 
   it("GET /api/cart returns 404 without X-Cart-Token", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/cart`);
     expect(res.status).toBe(404);
 
@@ -427,8 +394,6 @@ describeWithDeps("cart API (T046)", () => {
   });
 
   it("GET /api/cart validates inventory on read (flags stale items)", async () => {
-    if (!superTokensAvailable) return;
-
     // Create cart + add an in-stock item
     const cartRes = await fetch(`${address}/api/cart`, {
       method: "POST",
@@ -484,8 +449,6 @@ describeWithDeps("cart API (T046)", () => {
   });
 
   it("POST /api/cart/items merges quantity for duplicate variant", async () => {
-    if (!superTokensAvailable) return;
-
     // Create cart
     const cartRes = await fetch(`${address}/api/cart`, {
       method: "POST",

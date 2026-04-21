@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:external": "vitest run src/**/*.external.test.ts",
     "lint": "eslint src/ && prettier --check src/",
     "lint:fix": "eslint src/ --fix && prettier --write src/",
     "format": "prettier --write src/",

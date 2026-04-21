@@ -8,25 +8,17 @@ import { eq } from "drizzle-orm";
 import { adminUser, adminRole, adminUserRole } from "./db/schema/admin.js";
 import { product, productMedia, collection, collectionProduct } from "./db/schema/catalog.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
+import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = process.env["DATABASE_URL"];
-const SUPERTOKENS_URI = process.env["SUPERTOKENS_CONNECTION_URI"] ?? "http://localhost:3567";
-
-async function isSuperTokensUp(): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPERTOKENS_URI}/hello`, { signal: AbortSignal.timeout(2000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+const DATABASE_URL = requireDatabaseUrl();
+const SUPERTOKENS_URI = getSuperTokensUri();
 
 function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     PORT: 0,
     LOG_LEVEL: "ERROR",
     NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL ?? "postgres://localhost/test",
+    DATABASE_URL: DATABASE_URL,
     STRIPE_SECRET_KEY: "sk_test_xxx",
     STRIPE_WEBHOOK_SECRET: "whsec_xxx",
     PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
@@ -97,14 +89,10 @@ async function signInAndGetHeaders(
   return headers;
 }
 
-const canRun = DATABASE_URL !== undefined;
-const describeWithDeps = canRun ? describe : describe.skip;
-
-describeWithDeps("admin product CRUD API (T038)", () => {
+describe("admin product CRUD API (T038)", () => {
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
-  let superTokensAvailable = false;
   let adminHeaders: Record<string, string>;
 
   const ts = Date.now();
@@ -117,10 +105,9 @@ describeWithDeps("admin product CRUD API (T038)", () => {
   const createdCollectionIds: string[] = [];
 
   beforeAll(async () => {
-    superTokensAvailable = await isSuperTokensUp();
-    if (!superTokensAvailable) return;
+    await assertSuperTokensUp();
 
-    dbConn = createDatabaseConnection(DATABASE_URL ?? "");
+    dbConn = createDatabaseConnection(DATABASE_URL);
     const server = await createServer({
       config: testConfig(),
       processRef: createFakeProcess() as unknown as NodeJS.Process,
@@ -209,8 +196,6 @@ describeWithDeps("admin product CRUD API (T038)", () => {
   // -------------------------------------------------------------------------
 
   it("create draft product → activate → archive (full lifecycle)", async () => {
-    if (!superTokensAvailable) return;
-
     // Create draft product
     const createRes = await fetch(`${address}/api/admin/products`, {
       method: "POST",
@@ -261,8 +246,6 @@ describeWithDeps("admin product CRUD API (T038)", () => {
   });
 
   it("GET /admin/products lists products", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/products`, { headers: adminHeaders });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { products: unknown[] };
@@ -270,8 +253,6 @@ describeWithDeps("admin product CRUD API (T038)", () => {
   });
 
   it("GET /admin/products/:id returns product with media", async () => {
-    if (!superTokensAvailable) return;
-
     // Create a product
     const createRes = await fetch(`${address}/api/admin/products`, {
       method: "POST",
@@ -289,8 +270,6 @@ describeWithDeps("admin product CRUD API (T038)", () => {
   });
 
   it("GET /admin/products/:id returns 404 for non-existent product", async () => {
-    if (!superTokensAvailable) return;
-
     const res = await fetch(`${address}/api/admin/products/00000000-0000-0000-0000-000000000000`, {
       headers: adminHeaders,
     });
@@ -302,8 +281,6 @@ describeWithDeps("admin product CRUD API (T038)", () => {
   // -------------------------------------------------------------------------
 
   it("add media with sort_order and alt_text, then reorder", async () => {
-    if (!superTokensAvailable) return;
-
     // Create a product
     const createRes = await fetch(`${address}/api/admin/products`, {
       method: "POST",
@@ -389,8 +366,6 @@ describeWithDeps("admin product CRUD API (T038)", () => {
   });
 
   it("update and delete media", async () => {
-    if (!superTokensAvailable) return;
-
     // Create product + media
     const createRes = await fetch(`${address}/api/admin/products`, {
       method: "POST",
@@ -438,8 +413,6 @@ describeWithDeps("admin product CRUD API (T038)", () => {
   // -------------------------------------------------------------------------
 
   it("collection CRUD with product associations", async () => {
-    if (!superTokensAvailable) return;
-
     // Create a product
     const prodRes = await fetch(`${address}/api/admin/products`, {
       method: "POST",
@@ -523,8 +496,6 @@ describeWithDeps("admin product CRUD API (T038)", () => {
   // -------------------------------------------------------------------------
 
   it("products.read required for GET endpoints", async () => {
-    if (!superTokensAvailable) return;
-
     // Unauthenticated request
     const res = await fetch(`${address}/api/admin/products`, {
       headers: { origin: "http://localhost:3000" },
