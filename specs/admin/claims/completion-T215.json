@@ -1,0 +1,12 @@
+{
+  "task_id": "T215",
+  "status": "complete",
+  "summary": "Hardened checkout.integration.test.ts with 17 tests: validation (missing fields, per-field address errors, non-US), cart errors (empty, invalid token), stale cart (price changed, insufficient stock), happy-path with full DB verification, repeated checkout, non-zero tax adapter path, and shipping rate persistence.",
+  "commands_run": [
+    {"command": "npx vitest run src/checkout.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T215.json"],
+  "files_modified": ["api/src/checkout.integration.test.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 2
+}

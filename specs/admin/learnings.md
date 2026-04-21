@@ -122,3 +122,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - OOS add-to-cart returns 400 (not 409 as task description suggests) with `ERR_INVENTORY_INSUFFICIENT` — the route handler in `server.ts` maps the query-layer error to 400, not 409.
 - Kit-to-cart test requires full product class + membership + kit definition + kit class requirement setup — `productClass.name` has a unique constraint so use `Date.now()` suffix.
 - `findCartByToken` filters by `status = 'active'` only — setting cart status to `"expired"` in DB makes it invisible to the API, which is the mechanism for expired cart cleanup even without a dedicated cleanup endpoint.
+
+## T215 — Harden checkout.integration.test.ts
+- The checkout handler picks `findInventoryBalances(db,{})[0].locationId` as the default location for ALL reservations — tests must insert inventory at the same location as existing balance rows, not at a freshly created location, or `reserveInventory` will fail with `ERR_INVENTORY_NOT_FOUND`.
+- Stale-cart detection returns 400 `ERR_CART_STALE` (not 409 as the task description says) — the handler returns `stale_items[]` with `variant_id`, `price_changed`, and `insufficient_stock` booleans for each stale item.
+- `order.shippingAddressSnapshotJson` is a Postgres `jsonb` column ��� Drizzle returns it as an object, not a string. Don't `JSON.parse()` it; use it directly or guard with `typeof` check.

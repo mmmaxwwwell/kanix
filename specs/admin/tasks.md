@@ -462,7 +462,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T214 Harden `cart.integration.test.ts` — cart lifecycle [T046, FR-007..012]
   Done when: guest cart created with cart_token; add/remove/update items with exact quantity + price assertions; kit-to-cart flow verified; out-of-stock item blocks add-to-cart with 409; cart handoff on signup (guest → authenticated) preserves items; expired cart cleanup tested.
 
-- [ ] T215 Harden `checkout.integration.test.ts` — checkout → payment intent + tax + shipping [FR-012..018]
+- [x] T215 Harden `checkout.integration.test.ts` — checkout → payment intent + tax + shipping [FR-012..018]
   Done when: happy-path checkout produces client_secret + correct totals; invalid shipping address returns 400 with field errors; Stripe Tax calculation path verified (TX address → non-zero tax); shipping rate selection persists; checkout against stale cart (items changed) returns 409 with the conflict detail; repeated checkout on same cart returns consistent totals.
 
 - [ ] T216 Harden `policy-acknowledgment.integration.test.ts` — customer policy acknowledgment
