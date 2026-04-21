@@ -246,3 +246,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The DELETE immutability test (`trg_evidence_record_no_delete`) failed because other test files' `afterAll` cleanup disables the trigger and may not re-enable it if the process crashes. Fix: re-enable both triggers in `beforeAll` before any tests run.
 - `DISABLE TRIGGER USER` is safer than disabling individual trigger names for cleanup — it disables all user triggers in one statement, avoiding issues with mismatched trigger names.
 - `generateEvidenceBundle` attaches a `_content` property (the full bundle JSON) to the return value but it's not in the TypeScript interface — cast to `any` to access it for bundle size assertions.
+
+## T244 — Harden evidence-browsing.integration.test.ts
+- No `GET /api/admin/disputes` endpoint existed — had to create one with a `listDisputes` query that LEFT JOINs `evidence_record` on `disputeId` and groups by all dispute columns to get per-dispute `evidenceCount`.
+- The `listDisputes` evidence count only includes records directly linked via `disputeId` FK, NOT all evidence for the order. So dispute 1 gets count=2 (r4+r7 linked by disputeId), not count=6 (all order evidence).
+- `DISABLE TRIGGER USER` is the safest cleanup approach for `evidence_record` (same as T243) — always re-enable in `beforeAll` in case prior runs crashed.

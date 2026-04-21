@@ -1,4 +1,4 @@
-import { eq, and, type SQL } from "drizzle-orm";
+import { eq, and, count, type SQL } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { evidenceRecord, evidenceBundle } from "../schema/evidence.js";
 import { dispute } from "../schema/payment.js";
@@ -314,4 +314,70 @@ export async function generateEvidenceBundle(
     storageKey,
     _content: bundleContent,
   } as GenerateBundleResult & { _content: unknown };
+}
+
+// ---------------------------------------------------------------------------
+// List disputes with optional status filter + evidence counts
+// ---------------------------------------------------------------------------
+
+export interface DisputeWithEvidenceStatus {
+  id: string;
+  paymentId: string;
+  orderId: string;
+  providerDisputeId: string;
+  reason: string | null;
+  amountMinor: number;
+  currency: string;
+  status: string;
+  openedAt: Date;
+  closedAt: Date | null;
+  dueBy: Date | null;
+  evidenceCount: number;
+}
+
+export async function listDisputes(
+  db: PostgresJsDatabase,
+  filters: { status?: string } = {},
+): Promise<DisputeWithEvidenceStatus[]> {
+  const conditions: SQL[] = [];
+  if (filters.status) {
+    conditions.push(eq(dispute.status, filters.status));
+  }
+
+  const rows = await db
+    .select({
+      id: dispute.id,
+      paymentId: dispute.paymentId,
+      orderId: dispute.orderId,
+      providerDisputeId: dispute.providerDisputeId,
+      reason: dispute.reason,
+      amountMinor: dispute.amountMinor,
+      currency: dispute.currency,
+      status: dispute.status,
+      openedAt: dispute.openedAt,
+      closedAt: dispute.closedAt,
+      dueBy: dispute.dueBy,
+      evidenceCount: count(evidenceRecord.id),
+    })
+    .from(dispute)
+    .leftJoin(evidenceRecord, eq(evidenceRecord.disputeId, dispute.id))
+    .where(conditions.length === 1 ? conditions[0] : conditions.length > 1 ? and(...conditions) : undefined)
+    .groupBy(
+      dispute.id,
+      dispute.paymentId,
+      dispute.orderId,
+      dispute.providerDisputeId,
+      dispute.reason,
+      dispute.amountMinor,
+      dispute.currency,
+      dispute.status,
+      dispute.openedAt,
+      dispute.closedAt,
+      dispute.dueBy,
+    );
+
+  return rows.map((r) => ({
+    ...r,
+    evidenceCount: Number(r.evidenceCount),
+  }));
 }

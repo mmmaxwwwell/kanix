@@ -1,0 +1,19 @@
+{
+  "task_id": "T244",
+  "status": "complete",
+  "summary": "Hardened evidence-browsing.integration.test.ts with HTTP-level admin evidence browser tests: added GET /api/admin/disputes endpoint with status filtering and evidence counts, rewrote all tests to use createTestServer with admin auth, covering dispute listing, evidence drill-down with source metadata, status filtering, and auth rejection (19 tests pass)",
+  "commands_run": [
+    {"command": "npx tsc --noEmit", "exit_code": 0},
+    {"command": "npx vitest run src/evidence-browsing.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T244.json"],
+  "files_modified": [
+    "api/src/db/queries/evidence.ts",
+    "api/src/server.ts",
+    "api/src/evidence-browsing.integration.test.ts",
+    "specs/admin/learnings.md",
+    "specs/admin/tasks.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 2
+}

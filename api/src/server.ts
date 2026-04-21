@@ -201,6 +201,7 @@ import {
   generateEvidenceBundle,
   createEvidenceRecord,
   listEvidence,
+  listDisputes,
 } from "./db/queries/evidence.js";
 import {
   createContributor,
@@ -3271,6 +3272,25 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           }
           throw err;
         }
+      },
+    );
+
+    // -----------------------------------------------------------------------
+    // Dispute Browsing (T066b — admin evidence browser)
+    // -----------------------------------------------------------------------
+
+    // GET /api/admin/disputes — list disputes with evidence counts
+    app.get(
+      "/api/admin/disputes",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.DISPUTES_READ)],
+      },
+      async (request) => {
+        const query = request.query as { status?: string };
+        const disputes = await listDisputes(database.db, {
+          status: query.status,
+        });
+        return { disputes, total: disputes.length };
       },
     );
 

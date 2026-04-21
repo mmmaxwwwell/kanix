@@ -563,7 +563,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T243 Harden `evidence-auto-collection.integration.test.ts` — auto-collection of dispute evidence [T065]
   Done when: charge.dispute.created triggers evidence collection job; collected evidence includes order + shipping + customer + policy acknowledgments; evidence bundle size within Stripe limit; collection is idempotent (same dispute twice = same bundle).
 
-- [ ] T244 Harden `evidence-browsing.integration.test.ts` — admin evidence browser [T066b]
+- [x] T244 Harden `evidence-browsing.integration.test.ts` — admin evidence browser [T066b]
   Done when: admin can list open disputes with evidence status; drill-down shows each piece of evidence with source; filter by status (pending, submitted, won, lost) returns correct counts.
 
 - [ ] T245 Harden `evidence-bundle.integration.test.ts` — submitting evidence bundle to Stripe [T066]
