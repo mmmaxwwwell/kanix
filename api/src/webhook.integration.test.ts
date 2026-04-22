@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "node:events";
-import { createServer, markReady, markNotReady } from "./server.js";
-import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
-import type { Config } from "./config.js";
+import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
+import type { DatabaseConnection } from "./db/connection.js";
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { product, productVariant } from "./db/schema/catalog.js";
@@ -17,38 +15,8 @@ import type { TaxAdapter } from "./services/tax-adapter.js";
 import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 import type { PaymentAdapter } from "./services/payment-adapter.js";
 import { createHmac } from "node:crypto";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
 
-const DATABASE_URL = requireDatabaseUrl();
-const SUPERTOKENS_URI = getSuperTokensUri();
 const WEBHOOK_SECRET = "whsec_test_webhook_secret_for_tests";
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
 
 function createStubTaxAdapter(): TaxAdapter {
   return {
@@ -70,6 +38,9 @@ function createStubPaymentAdapter(): PaymentAdapter {
     },
     async createRefund() {
       return { id: `re_test_webhook_${Date.now()}`, status: "succeeded" };
+    },
+    async submitDisputeEvidence() {
+      return { id: "de_test_stub", status: "under_review" };
     },
   };
 }
@@ -104,146 +75,162 @@ function generateWebhookPayload(
   return { body: payload, signature };
 }
 
-describe("Stripe webhook handler (T051)", () => {
+/**
+ * Helper: seed a product + variant + inventory + cart + checkout to get an
+ * order with a payment record. Returns the IDs needed for webhook tests.
+ */
+async function seedOrderWithPayment(
+  app: FastifyInstance,
+  db: DatabaseConnection["db"],
+  ts: number,
+  label: string,
+  opts: { quantity?: number; priceMinor?: number } = {},
+): Promise<{
+  orderId: string;
+  paymentIntentId: string;
+  paymentRecordId: string;
+  variantId: string;
+}> {
+  const quantity = opts.quantity ?? 2;
+  const priceMinor = opts.priceMinor ?? 1500;
+
+  const [prod] = await db
+    .insert(product)
+    .values({
+      slug: `whk-${label}-prod-${ts}`,
+      title: `WHK ${label} Product ${ts}`,
+      status: "active",
+    })
+    .returning();
+
+  const [variant] = await db
+    .insert(productVariant)
+    .values({
+      productId: prod.id,
+      sku: `WHK-${label.toUpperCase()}-${ts}`,
+      title: `WHK ${label} Variant ${ts}`,
+      priceMinor,
+      status: "active",
+      weight: "16",
+    })
+    .returning();
+
+  // Use existing location or create one
+  const existingBalances = await db.select().from(inventoryBalance).limit(1);
+  let locationId: string;
+  if (existingBalances.length > 0) {
+    locationId = existingBalances[0].locationId;
+  } else {
+    const [loc] = await db
+      .insert(inventoryLocation)
+      .values({
+        name: `WHK ${label} WH ${ts}`,
+        code: `WHK-${label.toUpperCase()}-WH-${ts}`,
+        type: "warehouse",
+      })
+      .returning();
+    locationId = loc.id;
+  }
+
+  await db.insert(inventoryBalance).values({
+    variantId: variant.id,
+    locationId,
+    onHand: 50,
+    reserved: 0,
+    available: 50,
+  });
+
+  // Cart → add items → checkout
+  const cartRes = await app.inject({
+    method: "POST",
+    url: "/api/cart",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  const cartToken = JSON.parse(cartRes.body).cart.token;
+
+  await app.inject({
+    method: "POST",
+    url: "/api/cart/items",
+    headers: {
+      "content-type": "application/json",
+      "x-cart-token": cartToken,
+    },
+    body: JSON.stringify({ variant_id: variant.id, quantity }),
+  });
+
+  const checkoutRes = await app.inject({
+    method: "POST",
+    url: "/api/checkout",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      cart_token: cartToken,
+      email: `whk-${label}-${ts}@example.com`,
+      shipping_address: {
+        full_name: `WHK ${label} Tester`,
+        line1: "123 Test St",
+        city: "Austin",
+        state: "TX",
+        postal_code: "78701",
+        country: "US",
+      },
+    }),
+  });
+
+  expect(checkoutRes.statusCode).toBe(201);
+  const checkoutData = JSON.parse(checkoutRes.body);
+  const orderId = checkoutData.order.id;
+
+  const [paymentRow] = await db
+    .select()
+    .from(payment)
+    .where(eq(payment.orderId, orderId));
+
+  return {
+    orderId,
+    paymentIntentId: paymentRow.providerPaymentIntentId,
+    paymentRecordId: paymentRow.id,
+    variantId: variant.id,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Main webhook handler tests (T236)
+// ---------------------------------------------------------------------------
+describe("Stripe webhook handler (T236)", () => {
+  let ts_: TestServer;
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
 
   const ts = Date.now();
 
-  // Test data
-  let activeProductId = "";
-  let activeVariantId = "";
-  let locationId = "";
-  let cartToken = "";
   let orderId = "";
   let paymentIntentId = "";
   let paymentRecordId = "";
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const db = dbConn.db;
-
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-      reservationCleanupIntervalMs: 0,
-      taxAdapter: createStubTaxAdapter(),
-      shippingAdapter: createStubShippingAdapter(),
-      paymentAdapter: createStubPaymentAdapter(),
-    });
-    app = server.app;
-
-    await server.start();
-    markReady();
-
-    // Seed test data
-    const [prod] = await db
-      .insert(product)
-      .values({
-        slug: `webhook-test-prod-${ts}`,
-        title: `Webhook Test Product ${ts}`,
-        status: "active",
-      })
-      .returning();
-    activeProductId = prod.id;
-
-    const [variant1] = await db
-      .insert(productVariant)
-      .values({
-        productId: activeProductId,
-        sku: `WHK-VAR1-${ts}`,
-        title: `Webhook Variant 1 ${ts}`,
-        priceMinor: 1500,
-        status: "active",
-        weight: "16",
-      })
-      .returning();
-    activeVariantId = variant1.id;
-
-    // Use the first existing location (matches checkout's findInventoryBalances behavior)
-    // or create one if none exists
-    const existingBalances = await db.select().from(inventoryBalance).limit(1);
-    if (existingBalances.length > 0) {
-      locationId = existingBalances[0].locationId;
-    } else {
-      const [loc] = await db
-        .insert(inventoryLocation)
-        .values({
-          name: `Webhook Warehouse ${ts}`,
-          code: `WHK-WH-${ts}`,
-          type: "warehouse",
-        })
-        .returning();
-      locationId = loc.id;
-    }
-
-    await db.insert(inventoryBalance).values({
-      variantId: activeVariantId,
-      locationId,
-      onHand: 50,
-      reserved: 0,
-      available: 50,
-    });
-
-    // Create cart, add items, checkout
-    const cartRes = await app.inject({
-      method: "POST",
-      url: "/api/cart",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    const cartData = JSON.parse(cartRes.body);
-    cartToken = cartData.cart.token;
-
-    await app.inject({
-      method: "POST",
-      url: "/api/cart/items",
-      headers: {
-        "content-type": "application/json",
-        "x-cart-token": cartToken,
+    ts_ = await createTestServer({
+      configOverrides: { STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET },
+      serverOverrides: {
+        taxAdapter: createStubTaxAdapter(),
+        shippingAdapter: createStubShippingAdapter(),
+        paymentAdapter: createStubPaymentAdapter(),
       },
-      body: JSON.stringify({
-        variant_id: activeVariantId,
-        quantity: 2,
-      }),
     });
+    app = ts_.app;
+    dbConn = ts_.dbConn;
 
-    // Perform checkout
-    const checkoutRes = await app.inject({
-      method: "POST",
-      url: "/api/checkout",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        cart_token: cartToken,
-        email: `webhook-test-${ts}@example.com`,
-        shipping_address: {
-          full_name: "Webhook Tester",
-          line1: "123 Test St",
-          city: "Austin",
-          state: "TX",
-          postal_code: "78701",
-          country: "US",
-        },
-      }),
-    });
-
-    expect(checkoutRes.statusCode).toBe(201);
-    const checkoutData = JSON.parse(checkoutRes.body);
-    orderId = checkoutData.order.id;
-
-    // Find the payment record and intent ID
-    const [paymentRow] = await db.select().from(payment).where(eq(payment.orderId, orderId));
-    paymentRecordId = paymentRow.id;
-    paymentIntentId = paymentRow.providerPaymentIntentId;
+    const result = await seedOrderWithPayment(app, dbConn.db, ts, "main");
+    orderId = result.orderId;
+    paymentIntentId = result.paymentIntentId;
+    paymentRecordId = result.paymentRecordId;
   });
 
   afterAll(async () => {
-    markNotReady();
-    await app?.close();
-    await dbConn?.close();
+    await stopTestServer(ts_);
   });
+
+  // ---- Signature verification ----
 
   it("should return 401 for missing stripe-signature header", async () => {
     const res = await app.inject({
@@ -256,6 +243,7 @@ describe("Stripe webhook handler (T051)", () => {
     expect(res.statusCode).toBe(401);
     const body = JSON.parse(res.body);
     expect(body.error).toBe("ERR_MISSING_SIGNATURE");
+    expect(body.message).toMatch(/missing/i);
   });
 
   it("should return 401 for invalid signature", async () => {
@@ -272,11 +260,38 @@ describe("Stripe webhook handler (T051)", () => {
     expect(res.statusCode).toBe(401);
     const body = JSON.parse(res.body);
     expect(body.error).toBe("ERR_INVALID_SIGNATURE");
+    expect(typeof body.message).toBe("string");
+    expect(body.message.length).toBeGreaterThan(0);
   });
+
+  it("should return 401 for signature signed with wrong secret", async () => {
+    const { body, signature } = generateWebhookPayload(
+      `evt_wrong_secret_${ts}`,
+      "payment_intent.succeeded",
+      { id: paymentIntentId, object: "payment_intent", status: "succeeded" },
+      "whsec_WRONG_SECRET",
+    );
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhooks/stripe",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": signature,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(JSON.parse(res.body).error).toBe("ERR_INVALID_SIGNATURE");
+  });
+
+  // ---- payment_intent.succeeded ----
 
   it("should handle payment_intent.succeeded and confirm order", async () => {
     const db = dbConn.db;
     const eventId = `evt_test_succeeded_${ts}`;
+    const chargeId = `ch_test_${ts}`;
 
     const { body, signature } = generateWebhookPayload(
       eventId,
@@ -287,7 +302,7 @@ describe("Stripe webhook handler (T051)", () => {
         amount: 3599,
         currency: "usd",
         status: "succeeded",
-        latest_charge: `ch_test_${ts}`,
+        latest_charge: chargeId,
       },
       WEBHOOK_SECRET,
     );
@@ -314,27 +329,37 @@ describe("Stripe webhook handler (T051)", () => {
     // Verify payment record updated
     const [paymentRow] = await db.select().from(payment).where(eq(payment.id, paymentRecordId));
     expect(paymentRow.status).toBe("succeeded");
-    expect(paymentRow.providerChargeId).toBe(`ch_test_${ts}`);
+    expect(paymentRow.providerChargeId).toBe(chargeId);
 
-    // Verify payment_event record created
+    // Verify payment_event record created with concrete fields
     const [eventRow] = await db
       .select()
       .from(paymentEvent)
       .where(eq(paymentEvent.providerEventId, eventId));
-    expect(eventRow).toBeDefined();
     expect(eventRow.eventType).toBe("payment_intent.succeeded");
+    expect(eventRow.paymentId).toBe(paymentRecordId);
+    expect(eventRow.providerEventId).toBe(eventId);
+    expect(eventRow.payloadJson).toMatchObject({
+      id: paymentIntentId,
+      object: "payment_intent",
+      status: "succeeded",
+    });
+    expect(eventRow.createdAt).toBeInstanceOf(Date);
 
     // Verify reservations consumed
     const reservations = await db
       .select()
       .from(inventoryReservation)
       .where(eq(inventoryReservation.orderId, orderId));
-    for (const res of reservations) {
-      expect(res.status).toBe("consumed");
+    expect(reservations.length).toBeGreaterThan(0);
+    for (const r of reservations) {
+      expect(r.status).toBe("consumed");
     }
   });
 
-  it("should handle duplicate webhook as no-op", async () => {
+  // ---- Idempotency ----
+
+  it("should handle duplicate webhook as no-op (idempotency)", async () => {
     const eventId = `evt_test_succeeded_${ts}`; // Same event ID as above
 
     const { body, signature } = generateWebhookPayload(
@@ -365,7 +390,14 @@ describe("Stripe webhook handler (T051)", () => {
     const resBody = JSON.parse(res.body);
     expect(resBody.received).toBe(true);
     expect(resBody.duplicate).toBe(true);
+
+    // Verify order state unchanged (still confirmed, not double-processed)
+    const [orderRow] = await dbConn.db.select().from(order).where(eq(order.id, orderId));
+    expect(orderRow.status).toBe("confirmed");
+    expect(orderRow.paymentStatus).toBe("paid");
   });
+
+  // ---- charge.dispute.created ----
 
   it("should handle charge.dispute.created and create dispute record", async () => {
     const db = dbConn.db;
@@ -373,7 +405,7 @@ describe("Stripe webhook handler (T051)", () => {
     const disputeId = `dp_test_${ts}`;
     const chargeId = `ch_test_${ts}`;
     const createdTime = Math.floor(Date.now() / 1000);
-    const dueByTime = createdTime + 7 * 24 * 60 * 60; // 7 days
+    const dueByTime = createdTime + 7 * 24 * 60 * 60;
 
     const { body, signature } = generateWebhookPayload(
       eventId,
@@ -388,9 +420,7 @@ describe("Stripe webhook handler (T051)", () => {
         reason: "fraudulent",
         status: "needs_response",
         created: createdTime,
-        evidence_details: {
-          due_by: dueByTime,
-        },
+        evidence_details: { due_by: dueByTime },
       },
       WEBHOOK_SECRET,
     );
@@ -406,23 +436,38 @@ describe("Stripe webhook handler (T051)", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).received).toBe(true);
 
-    // Verify dispute record created
+    // Verify dispute record created with concrete fields
     const [disputeRow] = await db
       .select()
       .from(dispute)
       .where(eq(dispute.providerDisputeId, disputeId));
-    expect(disputeRow).toBeDefined();
     expect(disputeRow.reason).toBe("fraudulent");
     expect(disputeRow.amountMinor).toBe(3599);
+    expect(disputeRow.currency).toBe("USD");
     expect(disputeRow.orderId).toBe(orderId);
+    expect(disputeRow.paymentId).toBe(paymentRecordId);
+    expect(disputeRow.status).toBe("opened");
+    expect(disputeRow.openedAt).toBeInstanceOf(Date);
+    expect(disputeRow.dueBy).toBeInstanceOf(Date);
 
-    // Verify order payment status changed to disputed
+    // Verify payment_event stored for the dispute event
+    const [eventRow] = await db
+      .select()
+      .from(paymentEvent)
+      .where(eq(paymentEvent.providerEventId, eventId));
+    expect(eventRow.eventType).toBe("charge.dispute.created");
+    expect(eventRow.paymentId).toBe(paymentRecordId);
+
+    // Verify order payment_status changed to disputed
     const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
     expect(orderRow.paymentStatus).toBe("disputed");
   });
 
-  it("should handle charge.dispute.closed (won) and update dispute + payment_status", async () => {
+  // ---- charge.dispute.closed (won) ----
+
+  it("should handle charge.dispute.closed (won) and revert payment_status to paid", async () => {
     const db = dbConn.db;
     const disputeId = `dp_test_${ts}`;
     const chargeId = `ch_test_${ts}`;
@@ -463,134 +508,122 @@ describe("Stripe webhook handler (T051)", () => {
       .select()
       .from(dispute)
       .where(eq(dispute.providerDisputeId, disputeId));
-    expect(disputeRow).toBeDefined();
     expect(disputeRow.status).toBe("closed");
-    expect(disputeRow.closedAt).not.toBeNull();
+    expect(disputeRow.closedAt).toBeInstanceOf(Date);
+    expect(disputeRow.closedAt!.getTime()).toBeGreaterThan(0);
+
+    // Verify payment_event stored for close event
+    const [eventRow] = await db
+      .select()
+      .from(paymentEvent)
+      .where(eq(paymentEvent.providerEventId, closeEventId));
+    expect(eventRow.eventType).toBe("charge.dispute.closed");
+    expect(eventRow.paymentId).toBe(paymentRecordId);
 
     // Verify order payment_status reverted to paid (dispute won)
     const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
     expect(orderRow.paymentStatus).toBe("paid");
   });
+
+  // ---- Unhandled event type ----
+
+  it("should return 200 for unhandled event types (acknowledge without processing)", async () => {
+    const eventId = `evt_test_unhandled_${ts}`;
+
+    const { body, signature } = generateWebhookPayload(
+      eventId,
+      "customer.subscription.created",
+      { id: "sub_test_123", object: "subscription", status: "active" },
+      WEBHOOK_SECRET,
+    );
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhooks/stripe",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": signature,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).received).toBe(true);
+
+    // Verify NO payment_event record stored for unhandled types
+    const events = await dbConn.db
+      .select()
+      .from(paymentEvent)
+      .where(eq(paymentEvent.providerEventId, eventId));
+    expect(events.length).toBe(0);
+  });
+
+  // ---- Unknown payment intent ----
+
+  it("should return 200 with skipped=true for unknown payment intent", async () => {
+    const eventId = `evt_test_unknown_pi_${ts}`;
+
+    const { body, signature } = generateWebhookPayload(
+      eventId,
+      "payment_intent.succeeded",
+      {
+        id: "pi_DOES_NOT_EXIST",
+        object: "payment_intent",
+        amount: 999,
+        currency: "usd",
+        status: "succeeded",
+        latest_charge: "ch_unknown",
+      },
+      WEBHOOK_SECRET,
+    );
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhooks/stripe",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": signature,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const resBody = JSON.parse(res.body);
+    expect(resBody.received).toBe(true);
+    expect(resBody.skipped).toBe(true);
+  });
 });
 
-// Separate describe for dispute close (lost) scenario
-describe("Stripe webhook — dispute close lost (T064)", () => {
+// ---------------------------------------------------------------------------
+// Dispute close (lost) — needs its own order lifecycle
+// ---------------------------------------------------------------------------
+describe("Stripe webhook — dispute close lost (T236)", () => {
+  let ts_: TestServer;
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
 
-  const ts = Date.now() + 3; // Differentiate from above
+  const ts = Date.now() + 3;
 
   let orderId = "";
   let paymentIntentId = "";
-  let locationId = "";
+  let paymentRecordId = "";
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const db = dbConn.db;
-
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-      reservationCleanupIntervalMs: 0,
-      taxAdapter: createStubTaxAdapter(),
-      shippingAdapter: createStubShippingAdapter(),
-      paymentAdapter: createStubPaymentAdapter(),
-    });
-    app = server.app;
-    await server.start();
-    markReady();
-
-    // Seed product + variant + location + inventory
-    const [prod] = await db
-      .insert(product)
-      .values({
-        slug: `whk-dispute-lost-prod-${ts}`,
-        title: `WHK Dispute Lost Product ${ts}`,
-        status: "active",
-      })
-      .returning();
-
-    const [variant] = await db
-      .insert(productVariant)
-      .values({
-        productId: prod.id,
-        sku: `WHK-DLOST-VAR-${ts}`,
-        title: `Dispute Lost Variant ${ts}`,
-        priceMinor: 2500,
-        status: "active",
-        weight: "16",
-      })
-      .returning();
-
-    // Use existing location or create one
-    const existingBalances = await db.select().from(inventoryBalance).limit(1);
-    if (existingBalances.length > 0) {
-      locationId = existingBalances[0].locationId;
-    } else {
-      const [loc] = await db
-        .insert(inventoryLocation)
-        .values({ name: `Dispute Lost Loc ${ts}`, code: `DL-WH-${ts}`, type: "warehouse" })
-        .returning();
-      locationId = loc.id;
-    }
-
-    await db.insert(inventoryBalance).values({
-      variantId: variant.id,
-      locationId,
-      onHand: 10,
-      reserved: 0,
-      available: 10,
-    });
-
-    // Create cart, add items, checkout (matching existing webhook test pattern)
-    const cartRes = await app.inject({
-      method: "POST",
-      url: "/api/cart",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    const cartData = JSON.parse(cartRes.body);
-    const cartToken = cartData.cart.token;
-
-    await app.inject({
-      method: "POST",
-      url: "/api/cart/items",
-      headers: {
-        "content-type": "application/json",
-        "x-cart-token": cartToken,
+    ts_ = await createTestServer({
+      configOverrides: { STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET },
+      serverOverrides: {
+        taxAdapter: createStubTaxAdapter(),
+        shippingAdapter: createStubShippingAdapter(),
+        paymentAdapter: createStubPaymentAdapter(),
       },
-      body: JSON.stringify({
-        variant_id: variant.id,
-        quantity: 1,
-      }),
     });
+    app = ts_.app;
+    dbConn = ts_.dbConn;
 
-    const checkoutRes = await app.inject({
-      method: "POST",
-      url: "/api/checkout",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        cart_token: cartToken,
-        email: `dispute-lost-${ts}@example.com`,
-        shipping_address: {
-          full_name: "Dispute Lost Tester",
-          line1: "123 Test St",
-          city: "Austin",
-          state: "TX",
-          postal_code: "78701",
-          country: "US",
-        },
-      }),
-    });
-
-    const checkoutData = JSON.parse(checkoutRes.body);
-    orderId = checkoutData.order.id;
-
-    // Find the payment record and intent ID
-    const [paymentRow] = await db.select().from(payment).where(eq(payment.orderId, orderId));
-    paymentIntentId = paymentRow.providerPaymentIntentId;
+    const result = await seedOrderWithPayment(app, dbConn.db, ts, "dlost");
+    orderId = result.orderId;
+    paymentIntentId = result.paymentIntentId;
+    paymentRecordId = result.paymentRecordId;
 
     // Simulate payment_intent.succeeded
     const { body: piBody, signature: piSig } = generateWebhookPayload(
@@ -650,9 +683,7 @@ describe("Stripe webhook — dispute close lost (T064)", () => {
   });
 
   afterAll(async () => {
-    markNotReady();
-    await app?.close();
-    await dbConn?.close();
+    await stopTestServer(ts_);
   });
 
   it("should handle charge.dispute.closed (lost) and set payment_status to refunded", async () => {
@@ -690,14 +721,23 @@ describe("Stripe webhook — dispute close lost (T064)", () => {
 
     expect(res.statusCode).toBe(200);
 
-    // Verify dispute is now closed
+    // Verify dispute is now closed with concrete assertions
     const [disputeRow] = await db
       .select()
       .from(dispute)
       .where(eq(dispute.providerDisputeId, disputeId));
-    expect(disputeRow).toBeDefined();
     expect(disputeRow.status).toBe("closed");
-    expect(disputeRow.closedAt).not.toBeNull();
+    expect(disputeRow.closedAt).toBeInstanceOf(Date);
+    expect(disputeRow.reason).toBe("product_not_received");
+    expect(disputeRow.amountMinor).toBe(2500);
+
+    // Verify payment_event stored
+    const [eventRow] = await db
+      .select()
+      .from(paymentEvent)
+      .where(eq(paymentEvent.providerEventId, closeEventId));
+    expect(eventRow.eventType).toBe("charge.dispute.closed");
+    expect(eventRow.paymentId).toBe(paymentRecordId);
 
     // Verify order payment_status changed to refunded (dispute lost)
     const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
@@ -705,130 +745,43 @@ describe("Stripe webhook — dispute close lost (T064)", () => {
   });
 });
 
-// Separate describe for payment_failed scenario (needs its own checkout)
-describe("Stripe webhook — payment_failed (T051)", () => {
+// ---------------------------------------------------------------------------
+// payment_intent.payment_failed — needs own order (before payment)
+// ---------------------------------------------------------------------------
+describe("Stripe webhook — payment_failed (T236)", () => {
+  let ts_: TestServer;
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
 
-  const ts = Date.now() + 1; // Differentiate from above
+  const ts = Date.now() + 1;
 
   let orderId = "";
   let paymentIntentId = "";
-  let locationId = "";
+  let paymentRecordId = "";
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const db = dbConn.db;
-
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-      reservationCleanupIntervalMs: 0,
-      taxAdapter: createStubTaxAdapter(),
-      shippingAdapter: createStubShippingAdapter(),
-      paymentAdapter: createStubPaymentAdapter(),
-    });
-    app = server.app;
-    await server.start();
-    markReady();
-
-    // Seed product + variant + location + inventory
-    const [prod] = await db
-      .insert(product)
-      .values({
-        slug: `whk-fail-prod-${ts}`,
-        title: `WHK Fail Product ${ts}`,
-        status: "active",
-      })
-      .returning();
-
-    const [variant] = await db
-      .insert(productVariant)
-      .values({
-        productId: prod.id,
-        sku: `WHK-FAIL-${ts}`,
-        title: `WHK Fail Variant ${ts}`,
-        priceMinor: 1000,
-        status: "active",
-        weight: "16",
-      })
-      .returning();
-
-    // Use the first existing location (matches checkout's findInventoryBalances behavior)
-    const existingBalances = await db.select().from(inventoryBalance).limit(1);
-    if (existingBalances.length > 0) {
-      locationId = existingBalances[0].locationId;
-    } else {
-      const [loc] = await db
-        .insert(inventoryLocation)
-        .values({
-          name: `WHK Fail WH ${ts}`,
-          code: `WHK-FW-${ts}`,
-          type: "warehouse",
-        })
-        .returning();
-      locationId = loc.id;
-    }
-
-    await db.insert(inventoryBalance).values({
-      variantId: variant.id,
-      locationId,
-      onHand: 20,
-      reserved: 0,
-      available: 20,
-    });
-
-    // Cart + checkout
-    const cartRes = await app.inject({
-      method: "POST",
-      url: "/api/cart",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    const cartToken = JSON.parse(cartRes.body).cart.token;
-
-    await app.inject({
-      method: "POST",
-      url: "/api/cart/items",
-      headers: {
-        "content-type": "application/json",
-        "x-cart-token": cartToken,
+    ts_ = await createTestServer({
+      configOverrides: { STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET },
+      serverOverrides: {
+        taxAdapter: createStubTaxAdapter(),
+        shippingAdapter: createStubShippingAdapter(),
+        paymentAdapter: createStubPaymentAdapter(),
       },
-      body: JSON.stringify({ variant_id: variant.id, quantity: 3 }),
     });
+    app = ts_.app;
+    dbConn = ts_.dbConn;
 
-    const checkoutRes = await app.inject({
-      method: "POST",
-      url: "/api/checkout",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        cart_token: cartToken,
-        email: `whk-fail-${ts}@example.com`,
-        shipping_address: {
-          full_name: "Fail Tester",
-          line1: "456 Fail St",
-          city: "Houston",
-          state: "TX",
-          postal_code: "77001",
-          country: "US",
-        },
-      }),
+    const result = await seedOrderWithPayment(app, dbConn.db, ts, "fail", {
+      quantity: 3,
+      priceMinor: 1000,
     });
-
-    expect(checkoutRes.statusCode).toBe(201);
-    const checkoutData = JSON.parse(checkoutRes.body);
-    orderId = checkoutData.order.id;
-
-    const [paymentRow] = await db.select().from(payment).where(eq(payment.orderId, orderId));
-    paymentIntentId = paymentRow.providerPaymentIntentId;
+    orderId = result.orderId;
+    paymentIntentId = result.paymentIntentId;
+    paymentRecordId = result.paymentRecordId;
   });
 
   afterAll(async () => {
-    markNotReady();
-    await app?.close();
-    await dbConn?.close();
+    await stopTestServer(ts_);
   });
 
   it("should handle payment_intent.payment_failed and release reservations", async () => {
@@ -863,26 +816,397 @@ describe("Stripe webhook — payment_failed (T051)", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).received).toBe(true);
 
     // Verify order payment_status is failed
     const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
     expect(orderRow.paymentStatus).toBe("failed");
+
+    // Verify payment record status
+    const [paymentRow] = await db
+      .select()
+      .from(payment)
+      .where(eq(payment.id, paymentRecordId));
+    expect(paymentRow.status).toBe("failed");
 
     // Verify reservations released
     const reservations = await db
       .select()
       .from(inventoryReservation)
       .where(eq(inventoryReservation.orderId, orderId));
-    for (const res of reservations) {
-      expect(res.status).toBe("released");
+    expect(reservations.length).toBeGreaterThan(0);
+    for (const r of reservations) {
+      expect(r.status).toBe("released");
     }
+
+    // Verify payment_event stored with concrete fields
+    const [eventRow] = await db
+      .select()
+      .from(paymentEvent)
+      .where(eq(paymentEvent.providerEventId, eventId));
+    expect(eventRow.eventType).toBe("payment_intent.payment_failed");
+    expect(eventRow.paymentId).toBe(paymentRecordId);
+    expect(eventRow.payloadJson).toMatchObject({
+      id: paymentIntentId,
+      status: "requires_payment_method",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// charge.refunded — full and partial refund via webhook
+// ---------------------------------------------------------------------------
+describe("Stripe webhook — charge.refunded (T236)", () => {
+  let ts_: TestServer;
+  let app: FastifyInstance;
+  let dbConn: DatabaseConnection;
+
+  const ts = Date.now() + 4;
+
+  let orderId = "";
+  let paymentIntentId = "";
+  let paymentRecordId = "";
+
+  beforeAll(async () => {
+    ts_ = await createTestServer({
+      configOverrides: { STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET },
+      serverOverrides: {
+        taxAdapter: createStubTaxAdapter(),
+        shippingAdapter: createStubShippingAdapter(),
+        paymentAdapter: createStubPaymentAdapter(),
+      },
+    });
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+
+    const result = await seedOrderWithPayment(app, dbConn.db, ts, "refund", {
+      quantity: 2,
+      priceMinor: 2000,
+    });
+    orderId = result.orderId;
+    paymentIntentId = result.paymentIntentId;
+    paymentRecordId = result.paymentRecordId;
+
+    // Simulate payment_intent.succeeded first (order must be paid before refund)
+    const { body: piBody, signature: piSig } = generateWebhookPayload(
+      `evt_pi_succeeded_refund_${ts}`,
+      "payment_intent.succeeded",
+      {
+        id: paymentIntentId,
+        object: "payment_intent",
+        amount: 4599,
+        currency: "usd",
+        status: "succeeded",
+        latest_charge: `ch_refund_${ts}`,
+      },
+      WEBHOOK_SECRET,
+    );
+
+    const piRes = await app.inject({
+      method: "POST",
+      url: "/webhooks/stripe",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": piSig,
+      },
+      body: piBody,
+    });
+    expect(piRes.statusCode).toBe(200);
+  });
+
+  afterAll(async () => {
+    await stopTestServer(ts_);
+  });
+
+  it("should handle charge.refunded (full refund) and update payment_status", async () => {
+    const db = dbConn.db;
+    const eventId = `evt_test_refund_full_${ts}`;
+    const chargeId = `ch_refund_${ts}`;
+
+    // Get the actual payment amount so we can do a "full" refund
+    const [paymentRow] = await db
+      .select()
+      .from(payment)
+      .where(eq(payment.id, paymentRecordId));
+    const fullAmount = paymentRow.amountMinor;
+
+    const { body, signature } = generateWebhookPayload(
+      eventId,
+      "charge.refunded",
+      {
+        id: chargeId,
+        object: "charge",
+        payment_intent: paymentIntentId,
+        amount: fullAmount,
+        amount_refunded: fullAmount,
+        currency: "usd",
+        refunded: true,
+      },
+      WEBHOOK_SECRET,
+    );
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhooks/stripe",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": signature,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).received).toBe(true);
+
+    // Verify order payment_status is refunded
+    const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
+    expect(orderRow.paymentStatus).toBe("refunded");
 
     // Verify payment_event stored
     const [eventRow] = await db
       .select()
       .from(paymentEvent)
       .where(eq(paymentEvent.providerEventId, eventId));
-    expect(eventRow).toBeDefined();
-    expect(eventRow.eventType).toBe("payment_intent.payment_failed");
+    expect(eventRow.eventType).toBe("charge.refunded");
+    expect(eventRow.paymentId).toBe(paymentRecordId);
+    expect(eventRow.payloadJson).toMatchObject({
+      id: chargeId,
+      object: "charge",
+      amount_refunded: fullAmount,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// charge.refunded — partial refund (separate order to avoid state collision)
+// ---------------------------------------------------------------------------
+describe("Stripe webhook — partial refund (T236)", () => {
+  let ts_: TestServer;
+  let app: FastifyInstance;
+  let dbConn: DatabaseConnection;
+
+  const ts = Date.now() + 5;
+
+  let orderId = "";
+  let paymentIntentId = "";
+  let paymentRecordId = "";
+
+  beforeAll(async () => {
+    ts_ = await createTestServer({
+      configOverrides: { STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET },
+      serverOverrides: {
+        taxAdapter: createStubTaxAdapter(),
+        shippingAdapter: createStubShippingAdapter(),
+        paymentAdapter: createStubPaymentAdapter(),
+      },
+    });
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+
+    const result = await seedOrderWithPayment(app, dbConn.db, ts, "partial-refund", {
+      quantity: 2,
+      priceMinor: 3000,
+    });
+    orderId = result.orderId;
+    paymentIntentId = result.paymentIntentId;
+    paymentRecordId = result.paymentRecordId;
+
+    // Payment succeeded
+    const { body: piBody, signature: piSig } = generateWebhookPayload(
+      `evt_pi_succeeded_partial_${ts}`,
+      "payment_intent.succeeded",
+      {
+        id: paymentIntentId,
+        object: "payment_intent",
+        amount: 6599,
+        currency: "usd",
+        status: "succeeded",
+        latest_charge: `ch_partial_${ts}`,
+      },
+      WEBHOOK_SECRET,
+    );
+
+    await app.inject({
+      method: "POST",
+      url: "/webhooks/stripe",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": piSig,
+      },
+      body: piBody,
+    });
+  });
+
+  afterAll(async () => {
+    await stopTestServer(ts_);
+  });
+
+  it("should handle charge.refunded (partial) and set payment_status to partially_refunded", async () => {
+    const db = dbConn.db;
+    const eventId = `evt_test_refund_partial_${ts}`;
+    const chargeId = `ch_partial_${ts}`;
+
+    // Get the actual payment amount
+    const [paymentRow] = await db
+      .select()
+      .from(payment)
+      .where(eq(payment.id, paymentRecordId));
+    const partialAmount = Math.floor(paymentRow.amountMinor / 2); // Refund half
+
+    const { body, signature } = generateWebhookPayload(
+      eventId,
+      "charge.refunded",
+      {
+        id: chargeId,
+        object: "charge",
+        payment_intent: paymentIntentId,
+        amount: paymentRow.amountMinor,
+        amount_refunded: partialAmount,
+        currency: "usd",
+        refunded: false, // partial refund -> not fully refunded
+      },
+      WEBHOOK_SECRET,
+    );
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhooks/stripe",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": signature,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).received).toBe(true);
+
+    // Verify order payment_status is partially_refunded
+    const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
+    expect(orderRow.paymentStatus).toBe("partially_refunded");
+
+    // Verify payment_event stored
+    const [eventRow] = await db
+      .select()
+      .from(paymentEvent)
+      .where(eq(paymentEvent.providerEventId, eventId));
+    expect(eventRow.eventType).toBe("charge.refunded");
+    expect(eventRow.paymentId).toBe(paymentRecordId);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Event ordering: dispute-before-succeeded (out-of-order delivery)
+// ---------------------------------------------------------------------------
+describe("Stripe webhook — event ordering: dispute-before-succeeded (T236)", () => {
+  let ts_: TestServer;
+  let app: FastifyInstance;
+  let dbConn: DatabaseConnection;
+
+  const ts = Date.now() + 6;
+
+  let orderId = "";
+  let paymentIntentId = "";
+  let paymentRecordId = "";
+
+  beforeAll(async () => {
+    ts_ = await createTestServer({
+      configOverrides: { STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET },
+      serverOverrides: {
+        taxAdapter: createStubTaxAdapter(),
+        shippingAdapter: createStubShippingAdapter(),
+        paymentAdapter: createStubPaymentAdapter(),
+      },
+    });
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+
+    const result = await seedOrderWithPayment(app, dbConn.db, ts, "ordering");
+    orderId = result.orderId;
+    paymentIntentId = result.paymentIntentId;
+    paymentRecordId = result.paymentRecordId;
+  });
+
+  afterAll(async () => {
+    await stopTestServer(ts_);
+  });
+
+  it("should handle succeeded-then-dispute ordering correctly", async () => {
+    const db = dbConn.db;
+
+    // Step 1: payment_intent.succeeded
+    const { body: succBody, signature: succSig } = generateWebhookPayload(
+      `evt_ordering_succ_${ts}`,
+      "payment_intent.succeeded",
+      {
+        id: paymentIntentId,
+        object: "payment_intent",
+        amount: 3599,
+        currency: "usd",
+        status: "succeeded",
+        latest_charge: `ch_ordering_${ts}`,
+      },
+      WEBHOOK_SECRET,
+    );
+
+    const succRes = await app.inject({
+      method: "POST",
+      url: "/webhooks/stripe",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": succSig,
+      },
+      body: succBody,
+    });
+    expect(succRes.statusCode).toBe(200);
+
+    // Verify order confirmed + paid
+    const [afterSucc] = await db.select().from(order).where(eq(order.id, orderId));
+    expect(afterSucc.status).toBe("confirmed");
+    expect(afterSucc.paymentStatus).toBe("paid");
+
+    // Step 2: charge.dispute.created (while already paid)
+    const { body: dispBody, signature: dispSig } = generateWebhookPayload(
+      `evt_ordering_disp_${ts}`,
+      "charge.dispute.created",
+      {
+        id: `dp_ordering_${ts}`,
+        object: "dispute",
+        charge: `ch_ordering_${ts}`,
+        payment_intent: paymentIntentId,
+        amount: 3599,
+        currency: "usd",
+        reason: "general",
+        status: "needs_response",
+        created: Math.floor(Date.now() / 1000),
+        evidence_details: { due_by: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60 },
+      },
+      WEBHOOK_SECRET,
+    );
+
+    const dispRes = await app.inject({
+      method: "POST",
+      url: "/webhooks/stripe",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": dispSig,
+      },
+      body: dispBody,
+    });
+    expect(dispRes.statusCode).toBe(200);
+
+    // Verify order payment_status is now disputed (overrides paid)
+    const [afterDisp] = await db.select().from(order).where(eq(order.id, orderId));
+    expect(afterDisp.paymentStatus).toBe("disputed");
+    // Order status should still be confirmed (dispute doesn't change fulfillment status)
+    expect(afterDisp.status).toBe("confirmed");
+
+    // Verify dispute record exists with correct order linkage
+    const [disputeRow] = await db
+      .select()
+      .from(dispute)
+      .where(eq(dispute.providerDisputeId, `dp_ordering_${ts}`));
+    expect(disputeRow.orderId).toBe(orderId);
+    expect(disputeRow.reason).toBe("general");
   });
 });

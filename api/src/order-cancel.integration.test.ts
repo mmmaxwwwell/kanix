@@ -49,6 +49,9 @@ function createStubPaymentAdapter(): PaymentAdapter {
         status: "succeeded",
       };
     },
+    async submitDisputeEvidence() {
+      return { id: "de_test_stub", status: "under_review" };
+    },
   };
 }
 

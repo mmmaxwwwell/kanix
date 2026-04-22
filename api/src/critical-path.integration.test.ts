@@ -1,17 +1,10 @@
 import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import { createHmac } from "node:crypto";
-import {
-  createServer,
-  markReady,
-  markNotReady,
-  type HealthResponse,
-  type ReadyResponse,
-} from "./server.js";
-import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
+import { type HealthResponse, type ReadyResponse } from "./server.js";
+import type { DatabaseConnection } from "./db/connection.js";
 import { findProductBySlug } from "./db/queries/product.js";
 import { isShuttingDown } from "./shutdown.js";
-import type { Config } from "./config.js";
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { adminUser, adminRole, adminUserRole } from "./db/schema/admin.js";
@@ -30,38 +23,7 @@ import { ROLE_CAPABILITIES } from "./auth/admin.js";
 import type { TaxAdapter } from "./services/tax-adapter.js";
 import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 import type { PaymentAdapter } from "./services/payment-adapter.js";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
-
-const DATABASE_URL = requireDatabaseUrl();
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: "whsec_xxx",
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: "http://localhost:3567",
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 100,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
-}
-
-const SUPERTOKENS_URI = getSuperTokensUri();
+import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
 
 async function signUpUser(address: string, email: string, password: string): Promise<string> {
   const res = await fetch(`${address}/auth/signup`, {
@@ -113,6 +75,7 @@ async function signInAndGetHeaders(
 }
 
 describe("critical path checkpoint (Phase 5)", () => {
+  let ts_: TestServer;
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
@@ -131,21 +94,12 @@ describe("critical path checkpoint (Phase 5)", () => {
   const testSlug = `cp5-product-${ts}`;
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const server = await createServer({
-      config: testConfig({
-        SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-        RATE_LIMIT_MAX: 1000,
-      }),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-      reservationCleanupIntervalMs: 0,
+    ts_ = await createTestServer({
+      configOverrides: { RATE_LIMIT_MAX: 1000 },
     });
-    address = await server.start();
-    markReady();
-    app = server.app;
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+    address = ts_.address;
 
     // Create admin user with super_admin role
     const authSubject = await signUpUser(address, adminEmail, adminPassword);
@@ -234,7 +188,6 @@ describe("critical path checkpoint (Phase 5)", () => {
   }, 30000);
 
   afterAll(async () => {
-    markNotReady();
     if (dbConn) {
       try {
         await dbConn.db
@@ -258,9 +211,8 @@ describe("critical path checkpoint (Phase 5)", () => {
       } catch {
         // best-effort cleanup
       }
-      await dbConn.close();
     }
-    if (app) await app.close();
+    await stopTestServer(ts_);
   }, 15000);
 
   it("seed data → list products via public API → check inventory → reserve → release → verify balance restored", async () => {
@@ -397,6 +349,9 @@ function createStubPaymentAdapter(): PaymentAdapter {
     async createRefund() {
       return { id: `re_cp6_${Date.now()}`, status: "succeeded" };
     },
+    async submitDisputeEvidence() {
+      return { id: "de_test_stub", status: "under_review" };
+    },
   };
 }
 
@@ -423,6 +378,7 @@ function generateWebhookPayload(
 }
 
 describe("critical path checkpoint (Phase 6)", () => {
+  let ts_: TestServer;
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
 
@@ -434,27 +390,21 @@ describe("critical path checkpoint (Phase 6)", () => {
   let locationId = "";
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const db = dbConn.db;
-
-    const server = await createServer({
-      config: testConfig({
-        SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
+    ts_ = await createTestServer({
+      skipListen: true,
+      configOverrides: {
         STRIPE_WEBHOOK_SECRET: CP6_WEBHOOK_SECRET,
         RATE_LIMIT_MAX: 1000,
-      }),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-      reservationCleanupIntervalMs: 0,
-      taxAdapter: createStubTaxAdapter(),
-      shippingAdapter: createStubShippingAdapter(),
-      paymentAdapter: createStubPaymentAdapter(),
+      },
+      serverOverrides: {
+        taxAdapter: createStubTaxAdapter(),
+        shippingAdapter: createStubShippingAdapter(),
+        paymentAdapter: createStubPaymentAdapter(),
+      },
     });
-    app = server.app;
-    await server.start();
-    markReady();
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+    const db = dbConn.db;
 
     // Seed products
     const [prod] = await db
@@ -543,7 +493,6 @@ describe("critical path checkpoint (Phase 6)", () => {
   }, 30000);
 
   afterAll(async () => {
-    markNotReady();
     if (dbConn) {
       const db = dbConn.db;
       try {
@@ -592,16 +541,7 @@ describe("critical path checkpoint (Phase 6)", () => {
         // best-effort cleanup
       }
     }
-    try {
-      await app?.close();
-    } catch {
-      // ignore
-    }
-    try {
-      await dbConn?.close();
-    } catch {
-      // ignore
-    }
+    await stopTestServer(ts_);
   }, 15000);
 
   it("full checkout: seed → cart → checkout → payment webhook → order confirmed → inventory consumed → snapshots → policy acknowledged", async () => {
@@ -849,38 +789,31 @@ describe("critical path checkpoint (Phase 6)", () => {
 // SuperTokens singleton, which would break Phase 5/6 if they ran after.
 
 describe("critical path checkpoint (Phase 3)", () => {
-  let serverClose: (() => Promise<void>) | undefined;
+  let ts_: TestServer | undefined;
   let dbConn: DatabaseConnection | undefined;
-  const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
+  const exitSpy = vi.fn<(code?: number) => never>((() => {}) as never);
 
   afterEach(async () => {
-    if (serverClose) {
-      await serverClose();
-      serverClose = undefined;
-    }
-    if (dbConn) {
-      await dbConn.close();
-      dbConn = undefined;
-    }
-    markNotReady();
+    await stopTestServer(ts_);
+    ts_ = undefined;
+    dbConn = undefined;
     exitSpy.mockClear();
   });
 
   it("server boots → /health 200 → /ready 200 (DB connected) → seed data queryable → shuts down cleanly", async () => {
-    // 1. Create database connection and server
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const fakeProcess = createFakeProcess();
-    const server = await createServer({
-      config: testConfig(),
-      processRef: fakeProcess as unknown as NodeJS.Process,
-      database: dbConn,
+    // 1. Create server — pass exit spy + capture the EventEmitter so we can emit SIGTERM
+    const fakeProcess = new EventEmitter();
+    ts_ = await createTestServer({
+      configOverrides: { RATE_LIMIT_MAX: 100 },
+      serverOverrides: {
+        processRef: fakeProcess as unknown as NodeJS.Process,
+        exitFn: exitSpy,
+      },
     });
+    dbConn = ts_.dbConn;
+    const address = ts_.address;
 
-    // 2. Server boots
-    const address = await server.start();
-    serverClose = async () => {
-      await server.app.close();
-    };
+    // 2. Server booted
     expect(address).toMatch(/^http:\/\//);
 
     // 3. /health returns 200 with DB connected
@@ -891,7 +824,6 @@ describe("critical path checkpoint (Phase 3)", () => {
     expect(healthBody.dependencies.database).toBe("connected");
 
     // 4. /ready returns 200 (DB connected, server marked ready)
-    markReady();
     const readyRes = await fetch(`${address}/ready`);
     expect(readyRes.status).toBe(200);
     const readyBody = (await readyRes.json()) as ReadyResponse;
@@ -922,9 +854,6 @@ describe("critical path checkpoint (Phase 3)", () => {
     expect(isShuttingDown()).toBe(true);
     expect(exitSpy).toHaveBeenCalledWith(0);
 
-    // Server was closed by shutdown hooks — no manual close needed
-    serverClose = undefined;
-    // DB was closed by shutdown hooks — no manual close needed
-    dbConn = undefined;
+    // Shutdown hooks ran; stopTestServer in afterEach is a no-op wrt those
   });
 });

@@ -584,6 +584,7 @@ describe("manual evidence attachment (T066a)", () => {
     const auditEntry = auditEntries.find((e) => e.action === "evidence.manual_remove");
 
     expect(auditEntry).toBeTruthy();
+    if (!auditEntry) throw new Error("auditEntry not found");
     expect(auditEntry.action).toBe("evidence.manual_remove");
     expect(auditEntry.entityType).toBe("evidence_record");
     expect(auditEntry.actorAdminUserId).toBe(testAdminUserId);

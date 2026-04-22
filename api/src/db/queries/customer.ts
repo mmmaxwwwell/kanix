@@ -281,7 +281,7 @@ export async function unbanCustomer(
 // PII redaction for non-super_admin roles
 // ---------------------------------------------------------------------------
 
-export function redactCustomerPII<T extends Record<string, unknown>>(detail: T): T {
+export function redactCustomerPII<T extends { email: string; phone: string | null; firstName: string | null; lastName: string | null }>(detail: T): T {
   return {
     ...detail,
     email: "***@redacted",

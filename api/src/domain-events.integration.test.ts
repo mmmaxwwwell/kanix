@@ -49,6 +49,9 @@ function createStubPaymentAdapter(): PaymentAdapter {
     async createRefund() {
       return { id: `re_test_${Date.now()}`, status: "succeeded" };
     },
+    async submitDisputeEvidence() {
+      return { id: "de_test_stub", status: "under_review" };
+    },
   };
 }
 

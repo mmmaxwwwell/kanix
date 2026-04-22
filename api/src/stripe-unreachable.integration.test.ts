@@ -34,6 +34,9 @@ function createFailingPaymentAdapter(): PaymentAdapter {
     async createRefund() {
       return { id: `re_stub_${Date.now()}`, status: "succeeded" };
     },
+    async submitDisputeEvidence() {
+      return { id: "de_test_stub", status: "under_review" };
+    },
   };
 }
 
@@ -48,6 +51,9 @@ function createSucceedingPaymentAdapter(): PaymentAdapter {
     },
     async createRefund() {
       return { id: `re_ok_${Date.now()}`, status: "succeeded" };
+    },
+    async submitDisputeEvidence() {
+      return { id: "de_test_stub", status: "under_review" };
     },
   };
 }

@@ -342,9 +342,9 @@ describe("flow: low-stock alert → notification delivery (T273, FR-038, FR-085)
     expect(lowStockEvents[0].wildcardChannel).toBe("inventory:*");
 
     // Verify the event was published within 2 seconds of now (latency budget)
-    const eventTimestamp = event.timestamp ?? event.createdAt;
+    const eventTimestamp = lowStockEvents[0].timestamp;
     if (eventTimestamp) {
-      const latencyMs = Date.now() - new Date(eventTimestamp).getTime();
+      const latencyMs = Date.now() - eventTimestamp;
       expect(latencyMs).toBeLessThan(2000);
     }
   });
