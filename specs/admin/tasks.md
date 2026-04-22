@@ -637,7 +637,7 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T270 Flow test: warranty claim submission [mirrors T104b, FR-055]
   Done when: new `api/src/flows/warranty-claim.integration.test.ts` walks: customer submits warranty claim for their order → verify ticket created with category=warranty → admin reviews → resolution path (approve/deny) → notifications delivered; also tests out-of-window claim rejection.
 
-- [ ] T271 Flow test: admin refund (full + partial) through Stripe [mirrors T104c, FR-030]
+- [x] T271 Flow test: admin refund (full + partial) through Stripe [mirrors T104c, FR-030]
   Done when: new `api/src/flows/admin-refund.integration.test.ts` walks: paid order → admin initiates full refund → Stripe test-mode refund succeeds → verify refund row + order state + customer notification; second walkthrough for partial refund verifying balance math; third walkthrough for double-refund attempt returning 409.
 
 - [ ] T272 Flow test: reservation expiry → late payment race [mirrors T104d, FR-E008]

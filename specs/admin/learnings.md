@@ -344,3 +344,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T270 — Flow test: warranty claim submission
 - `TPU_HEAT_KEYWORDS` in `createWarrantyClaim` includes the literal string `"tpu"` — any claim description mentioning TPU (even "TPU phone case has a crack") triggers `material_limitation_flagged: true`. Tests for non-flagged claims must avoid "TPU" in the description text.
 - The warranty flow test exercises the full admin resolution path via ticket status transitions (`open → waiting_on_internal → open → resolved`), not a dedicated "approve/deny" endpoint — there is no separate warranty-specific resolution endpoint.
+
+## T271 — Flow test: admin refund (full + partial) through Stripe
+- The refund flow test doesn't need real HTTP (`skipListen: false`) for refund operations since the refund endpoint uses `app.inject()` with admin auth headers — only the initial signup/signin needs real HTTP for SuperTokens cookie exchange.
+- No domain event or notification is published on refund creation — the only side effects are the DB refund record, payment_status transition (with order_status_history), and async audit log entry. The task description mentions "customer notification" but the current implementation has none.
+- Partial refund balance math: `processRefund` uses `getTotalRefundedForOrder` (SUM of all refund amounts) to compute remaining. Multiple partial refunds work correctly — each subtracts from the cumulative total, not from the original amount.
