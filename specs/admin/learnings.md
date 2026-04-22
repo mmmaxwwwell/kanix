@@ -276,3 +276,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The `contributor_milestone` table has a CHECK constraint (`ck_cm_milestone_type`) that must be extended via a Liquibase migration (015) when adding new milestone types like `"veteran"`. The Drizzle schema uses plain `text`, so the error surfaces at runtime as a postgres check violation, not a TypeScript compile error.
 - `processOrderCompletionSales` was changed from returning `SalesTrackingResult[]` to `OrderCompletionResult { sales, newMilestones }` — all callers in other test files (royalty-engine, contributor-sales, contributor-dashboard) need updating to destructure `{ sales: results }`.
 - Other contributor test files (royalty-engine, contributor-sales) lacked `contributor_milestone` cleanup in `afterAll` — once `detectMilestones` creates milestones, deleting the contributor fails with FK violation on `fk_cm_contributor`. Always include `contributorMilestone` cleanup before `contributor` deletion.
+
+## T251 — Harden royalty-engine.integration.test.ts
+- `getRoyaltyRate` checks donation status first (charityName + charityEin → 20%), then veteran threshold (500+ → 20%), then default (10%) — donation always wins over veteran rate. Test both paths independently with separate `describe` blocks.
+- Zero-price promo lines (unitPriceMinor=0) produce royalty entries with `amountMinor=0` — the engine doesn't skip them, which is correct for tracking/audit purposes.
+- The veteran rate tier test benefits from seeding 499 units in `beforeAll` via a single large order, then testing the 500th crossing and post-veteran sales separately — avoids the 500-iteration loop that would be needed with single-unit orders.

@@ -1,0 +1,16 @@
+{
+  "task_id": "T251",
+  "status": "complete",
+  "summary": "Hardened royalty-engine.integration.test.ts: added zero-price promo, refunded-line clawback, veteran rate tier (500+ units), monthly rollup dashboard aggregation, and clawback idempotency tests — 14 tests all green",
+  "commands_run": [
+    {"command": "pnpm vitest run --reporter=verbose src/royalty-engine.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T251.json"],
+  "files_modified": [
+    "api/src/royalty-engine.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

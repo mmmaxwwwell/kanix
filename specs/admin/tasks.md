@@ -583,10 +583,10 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T249 Harden `contributor-milestones.integration.test.ts` — milestone transitions [T070, FR-071..075]
   Done when: 25-unit threshold triggers retroactive 10% royalty on first 25 units; 50-unit starter kit milestone awarded; 500-unit milestone switches to 20% rate; milestone events fire WebSocket notifications; milestone state visible in contributor profile.
 
-- [ ] T250 Harden `contributor-sales.integration.test.ts` — sales attribution [T068]
+- [x] T250 Harden `contributor-sales.integration.test.ts` — sales attribution [T068]
   Done when: order with a contributor-authored product credits the contributor with correct share; multi-product orders split attribution correctly; refunds reverse attribution; kits with mixed-contributor products split per product line.
 
-- [ ] T251 Harden `royalty-engine.integration.test.ts` — royalty calculation engine [T069]
+- [x] T251 Harden `royalty-engine.integration.test.ts` — royalty calculation engine [T069]
   Done when: engine computes royalty per order-line with correct rate tier; edge cases (zero-price promo, refunded line) produce correct zero/negative; monthly rollup aggregates match per-order sum; donation-option path (501(c)(3)) routes amount correctly.
 
 ### Notifications + realtime (delivery layer)
