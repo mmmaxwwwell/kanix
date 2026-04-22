@@ -297,6 +297,11 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `createDomainEventPublisher` now accepts `{ wsManager, db }` options to persist events to `domain_event` table. The fire-and-forget DB insert uses `.catch()` so persistence failure doesn't block event flow. The old single-arg `(wsManager)` signature is auto-detected via `"publish" in arg`.
 - Subscriber isolation: each subscriber is called in a try/catch so sync/async failures in one don't block others. The `subscribe()` method returns an unsubscribe function that removes the callback from the Set.
 
+## T261 — Flow test: authenticated checkout
+- The checkout handler at `/api/checkout` has code to resolve `customerId` from `request.session`, but the route lacks a `verifySession` preHandler — `request.session` is always null. Fixed by adding optional session detection using `Session.getSession` with `sessionRequired: false` and SuperTokens Fastify wrappers.
+- Authenticated flow tests need `skipListen: false` (real HTTP) because SuperTokens auth requires cookie exchange via `fetch()`. Only the webhook can use `app.inject()` (no auth needed, just signature).
+- Order status history records transitions, not initial states — `payment_status` history contains `processing` and `paid` but NOT the initial `unpaid` value.
+
 ## T260 — Flow test: guest checkout on Astro
 - `POST /api/cart/items` returns 201 (not 200) — use `toBeLessThan(300)` or check for 201 explicitly when asserting add-to-cart success.
 - `productClass` and `productClassMembership` schemas are in `db/schema/product-class.ts` (not `catalog.ts`) — import from the correct file when setting up class membership for catalog visibility.

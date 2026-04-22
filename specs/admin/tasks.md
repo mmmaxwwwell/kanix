@@ -607,7 +607,7 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T260 Flow test: guest checkout on Astro [mirrors T096, SC-001]
   Done when: new `api/src/flows/guest-checkout.integration.test.ts` walks: fetch catalog → add to cart → set shipping address → compute totals → create payment intent → simulate Stripe confirm via webhook → verify order.status=paid → verify snapshots (price, tax, shipping) are frozen on the order. Runs green against live services with zero skips.
 
-- [ ] T261 Flow test: authenticated checkout [mirrors T097, SC-001]
+- [x] T261 Flow test: authenticated checkout [mirrors T097, SC-001]
   Done when: new `api/src/flows/authenticated-checkout.integration.test.ts` walks: signup → verify email → login → add to cart → use saved address → checkout → Stripe webhook → order confirmed → order appears in customer order history with correct status transitions.
 
 - [ ] T262 Flow test: kit purchase [mirrors T098, SC-010]

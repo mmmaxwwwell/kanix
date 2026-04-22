@@ -6135,14 +6135,31 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         });
       }
 
-      // Resolve customer if authenticated
+      // Resolve customer if authenticated (optional — checkout works for guests too)
       let customerId: string | undefined;
-      const session = request.session;
+      let session = request.session;
+      if (!session) {
+        // The checkout route doesn't have verifySession preHandler, so try
+        // to resolve the session from cookies/headers without requiring it.
+        try {
+          const { FastifyRequest: STFastifyRequest, FastifyResponse: STFastifyResponse } =
+            await import("supertokens-node/lib/build/framework/fastify/framework.js");
+          const wrappedReq = new STFastifyRequest(request as never);
+          const wrappedRes = new STFastifyResponse(reply as never);
+          const { default: SessionRecipe } = await import("supertokens-node/recipe/session/index.js");
+          session = await SessionRecipe.getSession(wrappedReq as never, wrappedRes as never, {
+            sessionRequired: false,
+            overrideGlobalClaimValidators: () => [],
+          });
+        } catch {
+          // No valid session — proceed as guest
+        }
+      }
       if (session) {
         try {
           const authSubject = session.getUserId();
-          const customer = await getCustomerByAuthSubject(db, authSubject);
-          if (customer) customerId = customer.id;
+          const cust = await getCustomerByAuthSubject(db, authSubject);
+          if (cust) customerId = cust.id;
         } catch {
           // Guest checkout
         }

@@ -1,0 +1,12 @@
+{
+  "task_id": "T261",
+  "status": "complete",
+  "summary": "Created authenticated checkout flow integration test with 8 steps (signup → verify → login → save address → cart → checkout → Stripe webhook → order history) and fixed checkout handler to optionally detect session for authenticated users",
+  "commands_run": [
+    {"command": "pnpm --dir api test -- --reporter=verbose --testPathPattern='flows/authenticated-checkout'", "exit_code": 0}
+  ],
+  "files_created": ["api/src/flows/authenticated-checkout.integration.test.ts", "specs/admin/claims/completion-T261.json"],
+  "files_modified": ["api/src/server.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 1
+}
