@@ -649,7 +649,7 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T274 Flow test: Stripe Tax calculation [mirrors T104f, FR-117, FR-118]
   Done when: new `api/src/flows/stripe-tax.integration.test.ts` walks: checkout with TX shipping → Stripe Tax API called → non-zero tax line on the order + PaymentIntent metadata includes tax breakdown; tax-exempt state → zero tax; missing-state returns 400. Preconditions: `STRIPE_TAX_ENABLED=true`, real `sk_test_...` key — if missing, setup fails loudly (no skip). This task may be deferred if test keys aren't provisioned.
 
-- [ ] T275 Flow test: out-of-stock cart + kit rejection [mirrors T104h, FR-010]
+- [x] T275 Flow test: out-of-stock cart + kit rejection [mirrors T104h, FR-010]
   Done when: new `api/src/flows/out-of-stock-flow.integration.test.ts` walks: drive variant `available→0` via `POST /api/admin/inventory/adjustments` → assert public catalog returns `inStock: false` → `POST /api/cart/:id/items` returns 409 with `ERR_OUT_OF_STOCK` → kit containing the variant rejected at checkout → after `+N` restock, variant orderable again.
 
 - [ ] T276 Phase 14 validation

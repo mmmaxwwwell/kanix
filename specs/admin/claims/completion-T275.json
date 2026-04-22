@@ -1,0 +1,13 @@
+{
+  "task_id": "T275",
+  "status": "complete",
+  "summary": "Created out-of-stock flow integration test covering inventory depletion, catalog inStock flag, cart rejection, kit checkout rejection, and restock recovery",
+  "commands_run": [
+    {"command": "bash test/e2e/setup.sh", "exit_code": 0},
+    {"command": "DATABASE_URL=postgresql://kanix:kanix@127.0.0.1:5432/kanix npx vitest run --reporter=verbose src/flows/out-of-stock-flow.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": ["api/src/flows/out-of-stock-flow.integration.test.ts"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

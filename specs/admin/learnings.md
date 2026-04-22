@@ -364,3 +364,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - To assert PaymentIntent metadata (e.g. `tax_calculation_id`), use a capturing payment adapter stub that stores `input.metadata` — the default stub discards it. The checkout handler conditionally spreads `tax_calculation_id` into metadata only when `calculationId` is non-null.
 - The checkout handler validates `shipping_address.state` before reaching the tax adapter — missing state returns 400 `ERR_VALIDATION` at the address validation stage, not a tax calculation error. This means the "missing state → 400" scenario doesn't need a cart with items since it fails before inventory reservation.
 - Tax-exempt flow: when the tax adapter returns `calculationId: null`, the checkout handler's conditional spread `...(taxCalculationId ? { tax_calculation_id: taxCalculationId } : {})` omits the key entirely from PaymentIntent metadata — assert `undefined`, not `null`.
+
+## T275 — Flow test: out-of-stock cart + kit rejection
+- The checkout endpoint (`POST /api/checkout`) expects `cart_token` and `email` in the request body, not via `X-Cart-Token` header — using the header results in `ERR_VALIDATION` for missing `cart_token`.
+- OOS add-to-cart returns 400 `ERR_INVENTORY_INSUFFICIENT` (not 409 `ERR_OUT_OF_STOCK` as task description suggests) — same code as T214/T266 learnings.
+- Kit checkout with an OOS variant (stock depleted after add-to-cart) returns 400 `ERR_CART_STALE` with `stale_items[]` including `insufficient_stock: true` — the stale-items check runs before kit validation.
