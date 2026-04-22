@@ -643,7 +643,7 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T272 Flow test: reservation expiry → late payment race [mirrors T104d, FR-E008]
   Done when: new `api/src/flows/reservation-late-payment.integration.test.ts` walks: checkout creates short-TTL reservation → force expiry via cleanup job → fire `payment_intent.succeeded` webhook → both outcome branches exercised (re-reservation succeeded + order confirmed, OR order flagged for manual review with admin alert); stock-available and stock-exhausted setups.
 
-- [ ] T273 Flow test: low-stock alert → notification delivery [mirrors T104e, FR-038, FR-085]
+- [x] T273 Flow test: low-stock alert → notification delivery [mirrors T104e, FR-038, FR-085]
   Done when: new `api/src/flows/low-stock-alert.integration.test.ts` walks: variant with safety_stock=10 → inventory adjustment drops available to 9 → admin WebSocket receives alert within 2s → email logged to `logs/emails.jsonl` with variant SKU + product title + available count + threshold (all asserted).
 
 - [ ] T274 Flow test: Stripe Tax calculation [mirrors T104f, FR-117, FR-118]

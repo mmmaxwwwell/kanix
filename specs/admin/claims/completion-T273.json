@@ -1,0 +1,12 @@
+{
+  "task_id": "T273",
+  "status": "complete",
+  "summary": "Created flow test for low-stock alert → notification delivery: variant with safety_stock=10, shrinkage drops available to 9, verifies alert service queuing, admin WebSocket domain event, email log with all required fields (SKU, product title, available count, threshold)",
+  "commands_run": [
+    {"command": "npx vitest run --reporter=verbose src/flows/low-stock-alert.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": ["api/src/flows/low-stock-alert.integration.test.ts"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 2
+}

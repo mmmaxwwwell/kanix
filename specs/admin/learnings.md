@@ -354,3 +354,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `releaseExpiredReservations` from `db/queries/reservation.ts` is the actual cleanup job — force-expire by setting `expiresAt` to the past, then call the function to simulate the cron. This is more realistic than manually updating balance + reservation status.
 - The webhook handler's re-reservation logic uses `reservationReason: "payment_race_recovery"` — the consumed re-reservations can be distinguished from originals by this reason field.
 - Flow tests for this race condition don't need real HTTP (no auth required) — `app.inject()` works for cart/checkout/webhook since none require SuperTokens session cookies.
+
+## T273 — Flow test: low-stock alert → notification delivery
+- The adjustment endpoint (`POST /api/admin/inventory/adjustments`) returns `low_stock: true` and `balance: { available, safetyStock }` in the response body when the adjustment drops inventory below safety_stock — no need to query balance separately.
+- The `wsManager.messageBuffer` accumulates ALL messages from the test run, including those from other admin targets on the shared DB. Filter by `message.entityId` matching the test variant to isolate flow-specific events.
+- Flow tests that only need the adjustment API can seed `inventoryBalance` directly in `beforeAll` (with `safetyStock` set) instead of making an initial restock adjustment — simpler and avoids cooldown timing issues on the first alert.
