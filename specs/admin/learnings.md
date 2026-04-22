@@ -271,3 +271,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The dashboard endpoint (`GET /api/contributors/dashboard`) uses session → customer → contributor lookup, so each authenticated user only ever sees their own dashboard — no contributor ID in the URL means no cross-user access path exists.
 - `getContributorDashboard` had no date range filtering — added optional `from`/`to` parameters that scope the royalty aggregation query via `gte`/`lte` on `contributorRoyalty.createdAt`. Designs, milestones, and payouts are unaffected by the date filter (lifetime values).
 - The old test used direct DB connections only; migrated to `createTestServer` with full auth (signUp + verifyEmail + signIn) since the endpoint requires `verifySession + requireVerifiedEmail`.
+
+## T249 — Harden contributor-milestones.integration.test.ts
+- The `contributor_milestone` table has a CHECK constraint (`ck_cm_milestone_type`) that must be extended via a Liquibase migration (015) when adding new milestone types like `"veteran"`. The Drizzle schema uses plain `text`, so the error surfaces at runtime as a postgres check violation, not a TypeScript compile error.
+- `processOrderCompletionSales` was changed from returning `SalesTrackingResult[]` to `OrderCompletionResult { sales, newMilestones }` — all callers in other test files (royalty-engine, contributor-sales, contributor-dashboard) need updating to destructure `{ sales: results }`.
+- Other contributor test files (royalty-engine, contributor-sales) lacked `contributor_milestone` cleanup in `afterAll` — once `detectMilestones` creates milestones, deleting the contributor fails with FK violation on `fk_cm_contributor`. Always include `contributorMilestone` cleanup before `contributor` deletion.

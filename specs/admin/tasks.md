@@ -580,7 +580,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T248 Harden `contributor-dashboard.integration.test.ts` — contributor dashboard data [T071]
   Done when: dashboard shows units-sold, earned royalties, milestone progress with exact number assertions; date range filter works; timezone handling verified; non-owner can't see another contributor's dashboard.
 
-- [ ] T249 Harden `contributor-milestones.integration.test.ts` — milestone transitions [T070, FR-071..075]
+- [x] T249 Harden `contributor-milestones.integration.test.ts` — milestone transitions [T070, FR-071..075]
   Done when: 25-unit threshold triggers retroactive 10% royalty on first 25 units; 50-unit starter kit milestone awarded; 500-unit milestone switches to 20% rate; milestone events fire WebSocket notifications; milestone state visible in contributor profile.
 
 - [ ] T250 Harden `contributor-sales.integration.test.ts` — sales attribution [T068]

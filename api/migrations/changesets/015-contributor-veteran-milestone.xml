@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="015-contributor-veteran-milestone" author="kanix">
+        <comment>Add 'veteran' to contributor_milestone.milestone_type CHECK constraint for 500-unit milestone</comment>
+        <sql splitStatements="true" stripComments="true">
+ALTER TABLE contributor_milestone DROP CONSTRAINT ck_cm_milestone_type;
+ALTER TABLE contributor_milestone ADD CONSTRAINT ck_cm_milestone_type CHECK (milestone_type IN ('accepted_pr', 'royalty_activation', 'starter_kit', 'veteran'));
+        </sql>
+        <rollback>
+            <sql splitStatements="true" stripComments="true">
+ALTER TABLE contributor_milestone DROP CONSTRAINT ck_cm_milestone_type;
+ALTER TABLE contributor_milestone ADD CONSTRAINT ck_cm_milestone_type CHECK (milestone_type IN ('accepted_pr', 'royalty_activation', 'starter_kit'));
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

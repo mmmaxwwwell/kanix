@@ -18,10 +18,12 @@ import { order, orderLine } from "../schema/order.js";
 
 export const ROYALTY_ACTIVATION_THRESHOLD = 25;
 export const STARTER_KIT_THRESHOLD = 50;
+export const VETERAN_THRESHOLD = 500;
 export const ROYALTY_RATE = 0.1; // 10% of unit_price_minor
+export const VETERAN_RATE = 0.2; // 20% of unit_price_minor (500+ units)
 export const DONATION_RATE = 0.2; // 20% of unit_price_minor (2x for 501(c)(3) donation)
 
-export const MILESTONE_TYPES = ["accepted_pr", "royalty_activation", "starter_kit"] as const;
+export const MILESTONE_TYPES = ["accepted_pr", "royalty_activation", "starter_kit", "veteran"] as const;
 export type MilestoneType = (typeof MILESTONE_TYPES)[number];
 
 export const TAX_DOCUMENT_TYPES = ["w9", "w8ben"] as const;
@@ -238,6 +240,11 @@ export interface SalesTrackingResult {
   royaltyCreated: boolean;
 }
 
+export interface OrderCompletionResult {
+  sales: SalesTrackingResult[];
+  newMilestones: MilestoneRow[];
+}
+
 // ---------------------------------------------------------------------------
 // Get sales count for a contributor design
 // ---------------------------------------------------------------------------
@@ -259,14 +266,17 @@ export async function getDesignSalesCount(
 
 /**
  * Determine the royalty rate for a contributor.
- * If the contributor has both charity_name and charity_ein set (501(c)(3) donation),
- * the rate is 20%. Otherwise, it's 10%.
+ * - 501(c)(3) donation path always uses DONATION_RATE (20%).
+ * - 500+ total units sold uses VETERAN_RATE (20%).
+ * - Otherwise uses ROYALTY_RATE (10%).
  */
-function getRoyaltyRate(contrib: {
-  charityName: string | null;
-  charityEin: string | null;
-}): number {
-  return contrib.charityName && contrib.charityEin ? DONATION_RATE : ROYALTY_RATE;
+function getRoyaltyRate(
+  contrib: { charityName: string | null; charityEin: string | null },
+  totalSales?: number,
+): number {
+  if (contrib.charityName && contrib.charityEin) return DONATION_RATE;
+  if (totalSales !== undefined && totalSales >= VETERAN_THRESHOLD) return VETERAN_RATE;
+  return ROYALTY_RATE;
 }
 
 /**
@@ -283,8 +293,9 @@ function getRoyaltyRate(contrib: {
 export async function processOrderCompletionSales(
   db: PostgresJsDatabase,
   orderId: string,
-): Promise<SalesTrackingResult[]> {
+): Promise<OrderCompletionResult> {
   const results: SalesTrackingResult[] = [];
+  const allNewMilestones: MilestoneRow[] = [];
 
   // 1. Get all order lines for this order
   const lines = await db
@@ -297,7 +308,7 @@ export async function processOrderCompletionSales(
     .from(orderLine)
     .where(eq(orderLine.orderId, orderId));
 
-  if (lines.length === 0) return results;
+  if (lines.length === 0) return { sales: results, newMilestones: allNewMilestones };
 
   // 2. Get product IDs for all variants in one query
   const variantIds = lines.map((l) => l.variantId);
@@ -313,7 +324,7 @@ export async function processOrderCompletionSales(
 
   // 3. Get all unique product IDs and find contributor designs
   const productIds = [...new Set(variants.map((v) => v.productId))];
-  if (productIds.length === 0) return results;
+  if (productIds.length === 0) return { sales: results, newMilestones: allNewMilestones };
 
   const designs = await db
     .select({
@@ -325,7 +336,7 @@ export async function processOrderCompletionSales(
     .from(contributorDesign)
     .where(inArray(contributorDesign.productId, productIds));
 
-  if (designs.length === 0) return results;
+  if (designs.length === 0) return { sales: results, newMilestones: allNewMilestones };
 
   const productToDesign = new Map(designs.map((d) => [d.productId, d]));
 
@@ -362,7 +373,7 @@ export async function processOrderCompletionSales(
     design.salesCount = newSalesCount;
 
     const contrib = contributorMap.get(design.contributorId);
-    const rate = contrib ? getRoyaltyRate(contrib) : ROYALTY_RATE;
+    const rate = contrib ? getRoyaltyRate(contrib, newSalesCount) : ROYALTY_RATE;
 
     let royaltyCreated = false;
 
@@ -424,14 +435,15 @@ export async function processOrderCompletionSales(
     if (!processedContributors.has(result.contributorId)) {
       processedContributors.add(result.contributorId);
       try {
-        await detectMilestones(db, result.contributorId);
+        const newMilestones = await detectMilestones(db, result.contributorId);
+        allNewMilestones.push(...newMilestones);
       } catch {
         // Non-fatal: milestone detection should not block order processing
       }
     }
   }
 
-  return results;
+  return { sales: results, newMilestones: allNewMilestones };
 }
 
 // ---------------------------------------------------------------------------
@@ -696,6 +708,7 @@ export async function listMilestonesByContributor(
 /**
  * Auto-detect milestones based on total sales count for a contributor.
  * Called after processOrderCompletionSales updates sales counts.
+ * Returns only *newly created* milestones (not pre-existing ones).
  */
 export async function detectMilestones(
   db: PostgresJsDatabase,
@@ -708,29 +721,47 @@ export async function detectMilestones(
     .where(eq(contributorDesign.contributorId, contributorId));
 
   const totalSales = designs.reduce((sum, d) => sum + d.salesCount, 0);
-  const created: MilestoneRow[] = [];
+
+  // Get existing milestones to know which are new
+  const existing = await listMilestonesByContributor(db, contributorId);
+  const existingTypes = new Set(existing.map((m) => m.milestoneType));
+
+  const newlyCreated: MilestoneRow[] = [];
 
   if (totalSales >= ROYALTY_ACTIVATION_THRESHOLD) {
+    const isNew = !existingTypes.has("royalty_activation");
     const milestone = await recordMilestone(
       db,
       contributorId,
       "royalty_activation",
       `Reached ${ROYALTY_ACTIVATION_THRESHOLD} units sold`,
     );
-    created.push(milestone);
+    if (isNew) newlyCreated.push(milestone);
   }
 
   if (totalSales >= STARTER_KIT_THRESHOLD) {
+    const isNew = !existingTypes.has("starter_kit");
     const milestone = await recordMilestone(
       db,
       contributorId,
       "starter_kit",
       `Reached ${STARTER_KIT_THRESHOLD} units sold`,
     );
-    created.push(milestone);
+    if (isNew) newlyCreated.push(milestone);
   }
 
-  return created;
+  if (totalSales >= VETERAN_THRESHOLD) {
+    const isNew = !existingTypes.has("veteran");
+    const milestone = await recordMilestone(
+      db,
+      contributorId,
+      "veteran",
+      `Reached ${VETERAN_THRESHOLD} units sold — royalty rate upgraded to ${VETERAN_RATE * 100}%`,
+    );
+    if (isNew) newlyCreated.push(milestone);
+  }
+
+  return newlyCreated;
 }
 
 // ---------------------------------------------------------------------------

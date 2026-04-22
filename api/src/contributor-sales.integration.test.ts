@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
 import { eq } from "drizzle-orm";
-import { contributor, contributorDesign, contributorRoyalty } from "./db/schema/contributor.js";
+import { contributor, contributorDesign, contributorRoyalty, contributorMilestone } from "./db/schema/contributor.js";
 import { product, productVariant } from "./db/schema/catalog.js";
 import { order, orderLine, orderStatusHistory } from "./db/schema/order.js";
 import { requireDatabaseUrl } from "./test-helpers.js";
@@ -92,7 +92,8 @@ describe("per-design sales tracking (T068)", () => {
         await db.delete(order).where(eq(order.id, id));
       }
 
-      // Delete design, contributor, variant, product
+      // Delete milestones, design, contributor, variant, product
+      await db.delete(contributorMilestone).where(eq(contributorMilestone.contributorId, contributorId));
       await db.delete(contributorDesign).where(eq(contributorDesign.id, designId));
       await db.delete(contributor).where(eq(contributor.id, contributorId));
       await db.delete(productVariant).where(eq(productVariant.id, variantId));
@@ -153,7 +154,7 @@ describe("per-design sales tracking (T068)", () => {
     const { orderId } = await createCompletedOrder(3);
 
     // Process sales tracking
-    const results = await processOrderCompletionSales(db, orderId);
+    const { sales: results } = await processOrderCompletionSales(db, orderId);
 
     expect(results.length).toBe(1);
     expect(results[0].designId).toBe(designId);
@@ -172,7 +173,7 @@ describe("per-design sales tracking (T068)", () => {
 
     // Create another order with quantity 5
     const { orderId } = await createCompletedOrder(5);
-    const results = await processOrderCompletionSales(db, orderId);
+    const { sales: results } = await processOrderCompletionSales(db, orderId);
 
     expect(results.length).toBe(1);
     expect(results[0].previousSalesCount).toBe(3);
@@ -188,7 +189,7 @@ describe("per-design sales tracking (T068)", () => {
 
     // Current count is 8, add 20 to cross threshold (8 + 20 = 28)
     const { orderId, orderLineId } = await createCompletedOrder(20);
-    const results = await processOrderCompletionSales(db, orderId);
+    const { sales: results } = await processOrderCompletionSales(db, orderId);
 
     expect(results.length).toBe(1);
     expect(results[0].previousSalesCount).toBe(8);
@@ -215,7 +216,7 @@ describe("per-design sales tracking (T068)", () => {
 
     // Already at 28 (above threshold), next order should also create royalty
     const { orderId, orderLineId } = await createCompletedOrder(2);
-    const results = await processOrderCompletionSales(db, orderId);
+    const { sales: results } = await processOrderCompletionSales(db, orderId);
 
     expect(results.length).toBe(1);
     expect(results[0].newSalesCount).toBe(30);
@@ -287,10 +288,11 @@ describe("per-design sales tracking (T068)", () => {
       .returning();
     createdOrderLineIds.push(line.id);
 
-    const results = await processOrderCompletionSales(db, ord.id);
+    const { sales: results } = await processOrderCompletionSales(db, ord.id);
     expect(results.length).toBe(0);
 
-    // Cleanup extra product/variant
+    // Cleanup extra order line, variant, and product (order line references variant)
+    await db.delete(orderLine).where(eq(orderLine.id, line.id));
     await db.delete(productVariant).where(eq(productVariant.id, unlinkedVariant.id));
     await db.delete(product).where(eq(product.id, unlinkedProd.id));
   });
@@ -314,7 +316,7 @@ describe("per-design sales tracking (T068)", () => {
       .returning();
     createdOrderIds.push(ord.id);
 
-    const results = await processOrderCompletionSales(db, ord.id);
+    const { sales: results } = await processOrderCompletionSales(db, ord.id);
     expect(results.length).toBe(0);
   });
 });

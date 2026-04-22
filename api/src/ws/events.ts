@@ -11,7 +11,8 @@ export type DomainEventType =
   | "ticket.updated"
   | "inventory.low_stock"
   | "dispute.opened"
-  | "settings.changed";
+  | "settings.changed"
+  | "milestone.reached";
 
 // ---------------------------------------------------------------------------
 // Domain event publisher

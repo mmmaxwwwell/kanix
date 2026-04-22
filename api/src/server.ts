@@ -1185,7 +1185,22 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           // Track per-design sales on order completion
           if (body.status_type === "status" && body.new_value === "completed") {
             try {
-              await processOrderCompletionSales(database.db, id);
+              const completionResult = await processOrderCompletionSales(database.db, id);
+              // Publish WS events for newly reached milestones
+              for (const milestone of completionResult.newMilestones) {
+                domainEvents.publish(
+                  "milestone.reached",
+                  "contributor",
+                  milestone.contributorId,
+                  {
+                    milestoneId: milestone.id,
+                    milestoneType: milestone.milestoneType,
+                    contributorId: milestone.contributorId,
+                    reachedAt: milestone.reachedAt.toISOString(),
+                    notes: milestone.notes,
+                  },
+                );
+              }
             } catch {
               // Non-fatal: sales tracking failure should not block status transition
             }
@@ -6971,7 +6986,8 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         }
 
         const designs = await listDesignsByContributor(db, contrib.id);
-        return { contributor: contrib, designs };
+        const milestones = await listMilestonesByContributor(db, contrib.id);
+        return { contributor: contrib, designs, milestones };
       },
     );
 

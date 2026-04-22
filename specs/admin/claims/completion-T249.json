@@ -1,0 +1,27 @@
+{
+  "task_id": "T249",
+  "status": "complete",
+  "summary": "Hardened contributor-milestones.integration.test.ts: added 500-unit veteran milestone (20% rate), WebSocket notifications for milestones, milestones in public profile, HTTP-level tests with createTestServer, DB migration for CHECK constraint",
+  "commands_run": [
+    {"command": "pnpm db:migrate", "exit_code": 0},
+    {"command": "npx vitest run src/contributor-milestones.integration.test.ts --reporter=verbose", "exit_code": 0},
+    {"command": "npx vitest run src/contributor-sales.integration.test.ts src/contributor-dashboard.integration.test.ts src/royalty-engine.integration.test.ts src/contributor-milestones.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": [
+    "api/migrations/changesets/015-contributor-veteran-milestone.xml"
+  ],
+  "files_modified": [
+    "api/src/contributor-milestones.integration.test.ts",
+    "api/src/db/queries/contributor.ts",
+    "api/src/db/queries/index.ts",
+    "api/src/ws/events.ts",
+    "api/src/ws/manager.ts",
+    "api/src/server.ts",
+    "api/src/royalty-engine.integration.test.ts",
+    "api/src/contributor-sales.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 3
+}

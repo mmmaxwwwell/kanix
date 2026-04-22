@@ -210,6 +210,7 @@ export async function registerWebSocket(options: RegisterWsOptions): Promise<WsM
             "dispute:*",
             "cart:*",
             "setting:*",
+            "contributor:*",
           ]);
         } else {
           // Check if customer

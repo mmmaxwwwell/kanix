@@ -206,7 +206,10 @@ export {
   clawbackRoyaltiesByOrderId,
   setContributorDonation,
   ROYALTY_ACTIVATION_THRESHOLD,
+  STARTER_KIT_THRESHOLD,
+  VETERAN_THRESHOLD,
   ROYALTY_RATE,
+  VETERAN_RATE,
   DONATION_RATE,
 } from "./contributor.js";
 export type {
@@ -215,6 +218,7 @@ export type {
   ContributorDesignRow,
   LinkDesignInput,
   SalesTrackingResult,
+  OrderCompletionResult,
 } from "./contributor.js";
 export { getShippingSettings, updateShippingSettings } from "./setting.js";
 export type { ShippingSettings } from "./setting.js";

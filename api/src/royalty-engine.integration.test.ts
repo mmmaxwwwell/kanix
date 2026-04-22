@@ -6,6 +6,7 @@ import {
   contributorDesign,
   contributorRoyalty,
   contributorDonation,
+  contributorMilestone,
 } from "./db/schema/contributor.js";
 import { product, productVariant } from "./db/schema/catalog.js";
 import { order, orderLine, orderStatusHistory } from "./db/schema/order.js";
@@ -102,6 +103,7 @@ describe("royalty calculation engine (T069)", () => {
         await db.delete(order).where(eq(order.id, id));
       }
 
+      await db.delete(contributorMilestone).where(eq(contributorMilestone.contributorId, contributorId));
       await db.delete(contributorDesign).where(eq(contributorDesign.id, designId));
       await db.delete(contributor).where(eq(contributor.id, contributorId));
       await db.delete(productVariant).where(eq(productVariant.id, variantId));
@@ -158,7 +160,7 @@ describe("royalty calculation engine (T069)", () => {
     // Orders 1-4: 20 units below threshold (no royalties yet)
     for (let i = 0; i < 4; i++) {
       const { orderId } = await createCompletedOrder(5);
-      const results = await processOrderCompletionSales(db, orderId);
+      const { sales: results } = await processOrderCompletionSales(db, orderId);
       expect(results.length).toBe(1);
       expect(results[0].royaltyCreated).toBe(false);
     }
@@ -172,7 +174,7 @@ describe("royalty calculation engine (T069)", () => {
 
     // Order 5: 5 more units — crosses 25-unit threshold
     const { orderId: crossingOrderId, orderLineId: crossingLineId } = await createCompletedOrder(5);
-    const results = await processOrderCompletionSales(db, crossingOrderId);
+    const { sales: results } = await processOrderCompletionSales(db, crossingOrderId);
 
     expect(results.length).toBe(1);
     expect(results[0].previousSalesCount).toBe(20);
@@ -206,7 +208,7 @@ describe("royalty calculation engine (T069)", () => {
 
     // Already at 25 units. Add 1 more unit.
     const { orderId, orderLineId } = await createCompletedOrder(1);
-    const results = await processOrderCompletionSales(db, orderId);
+    const { sales: results } = await processOrderCompletionSales(db, orderId);
 
     expect(results.length).toBe(1);
     expect(results[0].previousSalesCount).toBe(25);
@@ -350,6 +352,7 @@ describe("royalty calculation engine — donation at 20% (T069)", () => {
         await db.delete(order).where(eq(order.id, id));
       }
 
+      await db.delete(contributorMilestone).where(eq(contributorMilestone.contributorId, contributorId));
       await db.delete(contributorDesign).where(eq(contributorDesign.id, designId));
       await db.delete(contributor).where(eq(contributor.id, contributorId));
       await db.delete(productVariant).where(eq(productVariant.id, variantId));
@@ -400,7 +403,7 @@ describe("royalty calculation engine — donation at 20% (T069)", () => {
 
     // Create enough orders to cross threshold (25 units in one go)
     const { orderId } = await createCompletedOrder(25);
-    const results = await processOrderCompletionSales(db, orderId);
+    const { sales: results } = await processOrderCompletionSales(db, orderId);
 
     expect(results.length).toBe(1);
     expect(results[0].newSalesCount).toBe(25);
@@ -435,7 +438,7 @@ describe("royalty calculation engine — donation at 20% (T069)", () => {
     const donationRoyaltyPerUnit = Math.floor(unitPrice * DONATION_RATE); // 600
 
     const { orderId, orderLineId } = await createCompletedOrder(3);
-    const results = await processOrderCompletionSales(db, orderId);
+    const { sales: results } = await processOrderCompletionSales(db, orderId);
 
     expect(results.length).toBe(1);
     expect(results[0].newSalesCount).toBe(28);
