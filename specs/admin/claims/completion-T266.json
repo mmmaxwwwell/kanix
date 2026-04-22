@@ -1,0 +1,12 @@
+{
+  "task_id": "T266",
+  "status": "complete",
+  "summary": "Created concurrent inventory flow integration test: 10 concurrent checkouts against stock=3, verifying no over-sell, balance integrity, and reservation accounting",
+  "commands_run": [
+    {"command": "source .dev/e2e-state/env.sh && npx vitest run src/flows/concurrent-inventory.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": ["api/src/flows/concurrent-inventory.integration.test.ts"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 2
+}

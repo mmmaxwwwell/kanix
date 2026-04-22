@@ -622,7 +622,7 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T265 Flow test: contributor royalty [mirrors T101, SC-011]
   Done when: new `api/src/flows/contributor-royalty.integration.test.ts` walks: contributor signup → product created and attributed → N units sold crossing each milestone → royalty ledger entries verified at each threshold (retroactive 10%, 20% rate change, starter kit); also verifies contributor dashboard totals match ledger sum.
 
-- [ ] T266 Flow test: concurrent inventory [mirrors T102, SC-003]
+- [x] T266 Flow test: concurrent inventory [mirrors T102, SC-003]
   Done when: new `api/src/flows/concurrent-inventory.integration.test.ts` walks: N concurrent checkouts against a variant with stock M<N → exactly M succeed, N-M fail with 409 and specific out-of-stock; final balance = 0; no over-sell, no negative balance; all reservations accounted for.
 
 - [ ] T267 Flow test: WebSocket real-time propagation [mirrors T103, SC-007]

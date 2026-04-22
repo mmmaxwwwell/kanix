@@ -321,3 +321,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The `/api/contributors/public/:username` endpoint returns `ContributorRow` with camelCase keys (`githubUsername`, `profileVisibility`), not snake_case — Fastify serializes drizzle row objects as-is without case transformation.
 - `processOrderCompletionSales` must be called after the order is in `completed` status because `createRetroactiveRoyalties` filters for `order.status = 'completed'`. Setting status to `completed` before calling the function is required for retroactive royalties to include the current order's lines.
 - The 500-unit veteran rate (20%) only applies to orders processed AFTER `getRoyaltyRate` detects `totalSales >= 500`. The order that crosses the threshold still gets the rate calculated at the moment of processing, which may be 20% if newSalesCount >= 500 at the time.
+
+## T266 — Flow test: concurrent inventory
+- `reserveInventory` uses `SELECT ... FOR UPDATE` on `inventory_balance` which correctly serializes concurrent reservation attempts — exactly M of N concurrent attempts succeed when stock=M. The inventory concurrency model is sound.
+- `generateOrderNumber` in `checkout.ts` has a race condition: it reads `MAX(order_number)` then inserts, causing `uq_order_order_number` violations under concurrency. This means some checkouts that successfully reserved inventory may still fail at order creation (500). The inventory reservation is NOT rolled back on this failure path, creating "orphan" active reservations.
+- Checkout returns 400 (not 409) with `ERR_INVENTORY_INSUFFICIENT` when stock is exhausted — the task description says 409 but the actual code uses 400.
