@@ -281,3 +281,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `getRoyaltyRate` checks donation status first (charityName + charityEin → 20%), then veteran threshold (500+ → 20%), then default (10%) — donation always wins over veteran rate. Test both paths independently with separate `describe` blocks.
 - Zero-price promo lines (unitPriceMinor=0) produce royalty entries with `amountMinor=0` — the engine doesn't skip them, which is correct for tracking/audit purposes.
 - The veteran rate tier test benefits from seeding 499 units in `beforeAll` via a single large order, then testing the 500th crossing and post-veteran sales separately — avoids the 500-iteration loop that would be needed with single-unit orders.
+
+## T252 — Harden notification-dispatch.integration.test.ts
+- `Session.getSessionWithoutRequestResponse(token)` rejects tokens where email is unverified — throws `INVALID_CLAIMS` (not `UNAUTHORISED`). All WS tests that use token auth MUST call `verifyEmail(authSubject)` after `signUpUser` before attempting WS connections.
+- `signUpUser` auto-creates a `customer` row via the SuperTokens `signUpPOST` override — do NOT insert into the `customer` table manually after signup; use `select().from(customer).where(eq(customer.authSubject, ...))` to find the existing row.
+- `dispatchAlert` sends to ALL active admins matching email/both preference; the "last email in the log" may not be the expected target. Search for the specific recipient in the email log rather than checking the last line.

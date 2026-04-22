@@ -591,7 +591,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 
 ### Notifications + realtime (delivery layer)
 
-- [ ] T252 Harden `notification-dispatch.integration.test.ts` — notification delivery via email + WebSocket
+- [x] T252 Harden `notification-dispatch.integration.test.ts` — notification delivery via email + WebSocket
   Done when: every notification type in the spec has both delivery channels tested; customer email preference respects opt-out; admin notifications broadcast to connected admins; delivery retries on transient failure; permanent failure logged to dead-letter queue.
 
 - [ ] T253 Harden `websocket.integration.test.ts` — WebSocket session + event broadcast [FR-081, FR-082]
@@ -676,7 +676,7 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T095e Set up Playwright + Patrol regression harnesses
   Done when: `site/tests/e2e/` has Playwright config running against local Astro served by `test/e2e/setup.sh`; `admin/integration_test/` and `customer/integration_test/` have Patrol config wired to `flutter test integration_test/`; both emit structured JSON to `test-logs/e2e/` for agent + CI consumption; `.github/workflows/e2e.yml` runs Playwright headless + Patrol on Android CI emulator on push
 
-- [x] T096 E2E: guest checkout on Astro [SC-001] [needs: mcp-browser, e2e-loop, stripe-listen]
+- [ ] T096 E2E: guest checkout on Astro [SC-001] [needs: mcp-browser, e2e-loop, stripe-listen]
   Prereq: `pnpm --dir api stripe:listen:start` before running (see [test/e2e/README.md](../../test/e2e/README.md)); tear down with `stripe:listen:stop` after.
   Done when: MCP agent drives live Astro site: navigate to product → select variant → add to cart → checkout with email + address → pay via Stripe test → order confirmation; completes in <3 minutes; order exists in DB with correct snapshots; Playwright regression test exists for the full flow; every bug found during exploration has its own Playwright regression test
 

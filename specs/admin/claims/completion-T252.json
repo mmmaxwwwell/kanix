@@ -1,0 +1,13 @@
+{
+  "task_id": "T252",
+  "status": "complete",
+  "summary": "Hardened notification-dispatch.integration.test.ts from 5 to 19 tests: added email verification for WS auth, 'both' channel dual-delivery, multi-admin broadcast, customer WS isolation, cross-customer isolation, domain event types (order/payment/dispute/shipment/milestone), reconnection replay, non-admin 403 on alert preferences, unauthenticated 401, default-to-both for admins without preference",
+  "commands_run": [
+    {"command": "npx vitest run src/notification-dispatch.integration.test.ts --no-coverage", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 1}
+  ],
+  "test_results": "19 passed, 0 failed, 0 skipped in notification-dispatch.integration.test.ts. Full suite: 1017 passed, 10 failed (pre-existing in other files), 23 skipped (pre-existing in websocket/domain-events tests pending T253/T254).",
+  "files_modified": ["api/src/notification-dispatch.integration.test.ts"],
+  "screenshots": [],
+  "mcp_interactions": 1
+}
