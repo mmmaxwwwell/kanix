@@ -646,7 +646,7 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T273 Flow test: low-stock alert → notification delivery [mirrors T104e, FR-038, FR-085]
   Done when: new `api/src/flows/low-stock-alert.integration.test.ts` walks: variant with safety_stock=10 → inventory adjustment drops available to 9 → admin WebSocket receives alert within 2s → email logged to `logs/emails.jsonl` with variant SKU + product title + available count + threshold (all asserted).
 
-- [ ] T274 Flow test: Stripe Tax calculation [mirrors T104f, FR-117, FR-118]
+- [x] T274 Flow test: Stripe Tax calculation [mirrors T104f, FR-117, FR-118]
   Done when: new `api/src/flows/stripe-tax.integration.test.ts` walks: checkout with TX shipping → Stripe Tax API called → non-zero tax line on the order + PaymentIntent metadata includes tax breakdown; tax-exempt state → zero tax; missing-state returns 400. Preconditions: `STRIPE_TAX_ENABLED=true`, real `sk_test_...` key — if missing, setup fails loudly (no skip). This task may be deferred if test keys aren't provisioned.
 
 - [ ] T275 Flow test: out-of-stock cart + kit rejection [mirrors T104h, FR-010]

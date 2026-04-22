@@ -359,3 +359,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The adjustment endpoint (`POST /api/admin/inventory/adjustments`) returns `low_stock: true` and `balance: { available, safetyStock }` in the response body when the adjustment drops inventory below safety_stock — no need to query balance separately.
 - The `wsManager.messageBuffer` accumulates ALL messages from the test run, including those from other admin targets on the shared DB. Filter by `message.entityId` matching the test variant to isolate flow-specific events.
 - Flow tests that only need the adjustment API can seed `inventoryBalance` directly in `beforeAll` (with `safetyStock` set) instead of making an initial restock adjustment — simpler and avoids cooldown timing issues on the first alert.
+
+## T274 — Flow test: Stripe Tax calculation
+- To assert PaymentIntent metadata (e.g. `tax_calculation_id`), use a capturing payment adapter stub that stores `input.metadata` — the default stub discards it. The checkout handler conditionally spreads `tax_calculation_id` into metadata only when `calculationId` is non-null.
+- The checkout handler validates `shipping_address.state` before reaching the tax adapter — missing state returns 400 `ERR_VALIDATION` at the address validation stage, not a tax calculation error. This means the "missing state → 400" scenario doesn't need a cart with items since it fails before inventory reservation.
+- Tax-exempt flow: when the tax adapter returns `calculationId: null`, the checkout handler's conditional spread `...(taxCalculationId ? { tax_calculation_id: taxCalculationId } : {})` omits the key entirely from PaymentIntent metadata — assert `undefined`, not `null`.

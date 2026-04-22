@@ -1,0 +1,12 @@
+{
+  "task_id": "T274",
+  "status": "complete",
+  "summary": "Created Stripe Tax flow integration test with 3 scenarios: TX address (non-zero tax + metadata), OR tax-exempt (zero tax), missing state (400 validation)",
+  "commands_run": [
+    {"command": "source .dev/e2e-state/env.sh && npx vitest run src/flows/stripe-tax.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["api/src/flows/stripe-tax.integration.test.ts"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 1
+}
