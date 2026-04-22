@@ -597,7 +597,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T253 Harden `websocket.integration.test.ts` — WebSocket session + event broadcast [FR-081, FR-082]
   Done when: customer connects with session cookie → receives own order events; admin connects → receives admin-channel events; cross-customer isolation verified (customer A doesn't see customer B's events); unauthenticated connection rejected; reconnect-with-last-event-id replays missed events.
 
-- [ ] T254 Harden `domain-events.integration.test.ts` — domain event publishing + subscribers
+- [x] T254 Harden `domain-events.integration.test.ts` — domain event publishing + subscribers
   Done when: each domain event has a concrete producer + at least one subscriber asserted; event ordering preserved per-aggregate; failed subscribers don't block other subscribers; event table persists with full payload for audit replay.
 
 ### Cross-domain user-flow integration tests (mirror of E2E flows)

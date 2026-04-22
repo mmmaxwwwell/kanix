@@ -51,10 +51,12 @@ export interface CheckoutOrder {
 // ---------------------------------------------------------------------------
 
 export async function generateOrderNumber(db: PostgresJsDatabase): Promise<string> {
-  // Use a simple count + 1 approach — for production, a sequence would be better
-  const result = await db.execute(sql`SELECT COUNT(*)::int AS cnt FROM "order"`);
-  const count = (result[0]?.cnt as number) ?? 0;
-  const next = count + 1;
+  // Extract the max numeric suffix from existing KNX-NNNNNN order numbers
+  const result = await db.execute(
+    sql`SELECT COALESCE(MAX(substring(order_number from 'KNX-0*([0-9]+)')::int), 0) AS max_num FROM "order" WHERE order_number ~ '^KNX-[0-9]+$'`,
+  );
+  const maxNum = (result[0]?.max_num as number) ?? 0;
+  const next = maxNum + 1;
   return `KNX-${String(next).padStart(6, "0")}`;
 }
 

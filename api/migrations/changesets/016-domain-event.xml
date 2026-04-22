@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="016-domain-event-table" author="kanix">
+        <createTable tableName="domain_event">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" />
+            </column>
+            <column name="event_type" type="text">
+                <constraints nullable="false" />
+            </column>
+            <column name="entity" type="text">
+                <constraints nullable="false" />
+            </column>
+            <column name="entity_id" type="text">
+                <constraints nullable="false" />
+            </column>
+            <column name="payload_json" type="jsonb">
+                <constraints nullable="false" />
+            </column>
+            <column name="customer_id" type="uuid">
+                <constraints nullable="true" />
+            </column>
+            <column name="sequence_id" type="bigint">
+                <constraints nullable="false" />
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false" />
+            </column>
+        </createTable>
+
+        <createIndex tableName="domain_event" indexName="idx_domain_event_entity">
+            <column name="entity" />
+            <column name="entity_id" />
+        </createIndex>
+
+        <createIndex tableName="domain_event" indexName="idx_domain_event_type">
+            <column name="event_type" />
+        </createIndex>
+
+        <createIndex tableName="domain_event" indexName="idx_domain_event_created_at">
+            <column name="created_at" />
+        </createIndex>
+
+        <createIndex tableName="domain_event" indexName="idx_domain_event_sequence_id">
+            <column name="sequence_id" />
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

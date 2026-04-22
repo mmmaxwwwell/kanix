@@ -7742,7 +7742,10 @@ export async function createServer(options: CreateServerOptions): Promise<Server
   }
 
   // Domain event publisher — routes reference this via closure; it's set before server.listen()
-  const domainEvents = createDomainEventPublisher(wsManager);
+  const domainEvents = createDomainEventPublisher({
+    wsManager,
+    db: database?.db,
+  });
 
   // Notification dispatch service — dispatches alerts via email/push/in-app adapters
   const notificationDispatch =

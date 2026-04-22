@@ -12,4 +12,5 @@ export * from "./evidence.js";
 export * from "./contributor.js";
 export * from "./setting.js";
 export * from "./auth-event.js";
+export * from "./domain-event.js";
 // Note: policySnapshot and orderPolicyAcknowledgment are exported from evidence.js

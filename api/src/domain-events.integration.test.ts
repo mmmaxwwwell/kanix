@@ -1,51 +1,31 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { EventEmitter } from "node:events";
-import { createServer, markReady, markNotReady } from "./server.js";
-import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
-import type { Config } from "./config.js";
+import type { DatabaseConnection } from "./db/connection.js";
 import type { FastifyInstance } from "fastify";
 import { adminUser, adminRole, adminUserRole } from "./db/schema/admin.js";
 import { customer } from "./db/schema/customer.js";
 import { product, productVariant } from "./db/schema/catalog.js";
 import { inventoryBalance, inventoryLocation } from "./db/schema/inventory.js";
+import { domainEvent } from "./db/schema/domain-event.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
 import type { WsMessage } from "./ws/manager.js";
-import type { DomainEventPublisher } from "./ws/events.js";
+import type { DomainEventPublisher, DomainEventType } from "./ws/events.js";
 import type { TaxAdapter } from "./services/tax-adapter.js";
 import { createStubShippingAdapter } from "./services/shipping-adapter.js";
 import type { PaymentAdapter } from "./services/payment-adapter.js";
 import WebSocket from "ws";
 import { eq, sql } from "drizzle-orm";
-import { assertSuperTokensUp, getSuperTokensUri, requireDatabaseUrl } from "./test-helpers.js";
+import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
+import EmailVerification from "supertokens-node/recipe/emailverification/index.js";
+import supertokens from "supertokens-node";
 
-const DATABASE_URL = requireDatabaseUrl();
-const SUPERTOKENS_URI = getSuperTokensUri();
-
-function testConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    PORT: 0,
-    LOG_LEVEL: "ERROR",
-    NODE_ENV: "test",
-    DATABASE_URL: DATABASE_URL,
-    STRIPE_SECRET_KEY: "sk_test_xxx",
-    STRIPE_WEBHOOK_SECRET: "whsec_xxx",
-    PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
-    STRIPE_TAX_ENABLED: false,
-    SUPERTOKENS_API_KEY: "test-key",
-    SUPERTOKENS_CONNECTION_URI: SUPERTOKENS_URI,
-    EASYPOST_API_KEY: "test-key",
-    EASYPOST_WEBHOOK_SECRET: "",
-    GITHUB_OAUTH_CLIENT_ID: "test-id",
-    GITHUB_OAUTH_CLIENT_SECRET: "test-secret",
-    CORS_ALLOWED_ORIGINS: ["http://localhost:3000"],
-    RATE_LIMIT_MAX: 1000,
-    RATE_LIMIT_WINDOW_MS: 60000,
-    ...overrides,
-  };
-}
-
-function createFakeProcess(): EventEmitter {
-  return new EventEmitter();
+async function verifyEmail(userId: string): Promise<void> {
+  const tokenRes = await EmailVerification.createEmailVerificationToken(
+    "public",
+    supertokens.convertToRecipeUserId(userId),
+  );
+  if (tokenRes.status === "OK") {
+    await EmailVerification.verifyEmailUsingToken("public", tokenRes.token);
+  }
 }
 
 function createStubTaxAdapter(): TaxAdapter {
@@ -115,6 +95,27 @@ async function signInAndGetAccessToken(
   return accessToken;
 }
 
+function collectMessages(ws: WebSocket, count: number, timeoutMs = 5000): Promise<WsMessage[]> {
+  return new Promise((resolve, reject) => {
+    const messages: WsMessage[] = [];
+    const timer = setTimeout(
+      () => reject(new Error(`Timed out after collecting ${messages.length}/${count} messages`)),
+      timeoutMs,
+    );
+    const handler = (data: Buffer | string) => {
+      messages.push(
+        JSON.parse(typeof data === "string" ? data : data.toString("utf-8")) as WsMessage,
+      );
+      if (messages.length >= count) {
+        clearTimeout(timer);
+        ws.off("message", handler);
+        resolve(messages);
+      }
+    };
+    ws.on("message", handler);
+  });
+}
+
 function waitForMessage(ws: WebSocket, timeoutMs = 5000): Promise<WsMessage> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
@@ -146,7 +147,25 @@ function waitForOpen(ws: WebSocket, timeoutMs = 5000): Promise<void> {
   });
 }
 
-describe("Domain events pub/sub (T074)", () => {
+function expectNoMessage(ws: WebSocket, timeoutMs = 500): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      ws.off("message", handler);
+      resolve();
+    }, timeoutMs);
+    const handler = (data: Buffer | string) => {
+      clearTimeout(timer);
+      ws.off("message", handler);
+      const msg = JSON.parse(typeof data === "string" ? data : data.toString("utf-8"));
+      reject(new Error(`Expected no message but received: ${JSON.stringify(msg)}`));
+    };
+    ws.on("message", handler);
+  });
+}
+
+describe("Domain events pub/sub (T254)", () => {
+  let ts_: TestServer;
+
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let address: string;
@@ -167,29 +186,24 @@ describe("Domain events pub/sub (T074)", () => {
   let locationId: string;
 
   beforeAll(async () => {
-    await assertSuperTokensUp();
-
-    dbConn = createDatabaseConnection(DATABASE_URL);
-    const db = dbConn.db;
-
-    const server = await createServer({
-      config: testConfig(),
-      processRef: createFakeProcess() as unknown as NodeJS.Process,
-      database: dbConn,
-      reservationCleanupIntervalMs: 0,
-      taxAdapter: createStubTaxAdapter(),
-      shippingAdapter: createStubShippingAdapter(),
-      paymentAdapter: createStubPaymentAdapter(),
+    ts_ = await createTestServer({
+      serverOverrides: {
+        taxAdapter: createStubTaxAdapter(),
+        shippingAdapter: createStubShippingAdapter(),
+        paymentAdapter: createStubPaymentAdapter(),
+      },
     });
-    address = await server.start();
-    markReady();
-    app = server.app;
-    domainEvents = server.domainEvents;
+    app = ts_.app;
+    dbConn = ts_.dbConn;
+    address = ts_.address;
+    domainEvents = ts_.server.domainEvents;
+    const db = dbConn.db;
 
     wsAddress = address.replace(/^http/, "ws");
 
-    // Create admin user
+    // Create admin user + verify email for WS auth
     const adminAuthSubject = await signUpUser(address, adminEmail, adminPassword);
+    await verifyEmail(adminAuthSubject);
 
     const [role] = await db
       .insert(adminRole)
@@ -217,18 +231,16 @@ describe("Domain events pub/sub (T074)", () => {
       adminRoleId: role.id,
     });
 
-    // Create customer user
+    // Create customer user — signUpPOST override auto-creates customer row
     const customerAuthSubject = await signUpUser(address, customerEmail, customerPassword);
+    await verifyEmail(customerAuthSubject);
 
     const [cust] = await db
-      .insert(customer)
-      .values({
-        authSubject: customerAuthSubject,
-        email: customerEmail,
-        firstName: "Test",
-        lastName: "DE Customer",
-      })
-      .returning();
+      .select()
+      .from(customer)
+      .where(eq(customer.authSubject, customerAuthSubject))
+      .limit(1);
+    if (!cust) throw new Error("Customer row not created by signUp override");
     testCustomerId = cust.id;
 
     // Seed product, variant, inventory for checkout test
@@ -255,15 +267,27 @@ describe("Domain events pub/sub (T074)", () => {
       .returning();
     activeVariantId = variant.id;
 
-    const [loc] = await db
-      .insert(inventoryLocation)
-      .values({
-        name: `DE Warehouse ${ts}`,
-        code: `DE-WH-${ts}`,
-        type: "warehouse",
-      })
-      .returning();
-    locationId = loc.id;
+    // Checkout handler picks locationId from first existing balance row.
+    // Insert at that same location to avoid ERR_INVENTORY_NOT_FOUND.
+    const existingBalances = await db.select().from(inventoryBalance);
+    if (existingBalances.length > 0) {
+      locationId = existingBalances[0].locationId;
+    } else {
+      const existingLocs = await db.select().from(inventoryLocation);
+      if (existingLocs.length > 0) {
+        locationId = existingLocs[0].id;
+      } else {
+        const [loc] = await db
+          .insert(inventoryLocation)
+          .values({
+            name: `DE Warehouse ${ts}`,
+            code: `DE-WH-${ts}`,
+            type: "warehouse",
+          })
+          .returning();
+        locationId = loc.id;
+      }
+    }
 
     await db.insert(inventoryBalance).values({
       variantId: activeVariantId,
@@ -275,11 +299,13 @@ describe("Domain events pub/sub (T074)", () => {
   }, 30000);
 
   afterAll(async () => {
-    markNotReady();
-
     try {
-      // Cleanup in reverse dependency order
       const db = dbConn.db;
+
+      // Clean up domain events created by this test
+      await db.execute(
+        sql`DELETE FROM domain_event WHERE entity_id LIKE ${"evt-%"} OR entity_id LIKE ${"test-%"} OR event_type IN ('order.placed', 'payment.succeeded', 'shipment.delivered', 'ticket.updated', 'inventory.low_stock', 'dispute.opened')`,
+      );
 
       // Clean up orders, payments, reservations created by checkout tests
       await db.execute(
@@ -296,7 +322,10 @@ describe("Domain events pub/sub (T074)", () => {
         sql`DELETE FROM inventory_reservation WHERE variant_id = ${activeVariantId}`,
       );
       await db.delete(inventoryBalance).where(eq(inventoryBalance.variantId, activeVariantId));
-      await db.delete(inventoryLocation).where(eq(inventoryLocation.id, locationId));
+      // Only delete location if we created it (code starts with DE-WH-)
+      await db.execute(
+        sql`DELETE FROM inventory_location WHERE id = ${locationId} AND code LIKE ${"DE-WH-%"}`,
+      );
       await db.delete(productVariant).where(eq(productVariant.id, activeVariantId));
       await db.delete(product).where(eq(product.id, activeProductId));
 
@@ -313,25 +342,22 @@ describe("Domain events pub/sub (T074)", () => {
       // best-effort cleanup
     }
 
-    await app.close();
-    await dbConn.close();
+    await stopTestServer(ts_);
   }, 15000);
 
   // -------------------------------------------------------------------------
-  // Core test: admin connected → create order → receives order.placed event
+  // Concrete producer: checkout → order.placed event
   // -------------------------------------------------------------------------
 
-  it("admin receives order.placed event when checkout creates an order", async () => {
-    // 1. Connect admin to WebSocket
+  it("checkout produces order.placed event with concrete payload to admin WS", async () => {
     const accessToken = await signInAndGetAccessToken(address, adminEmail, adminPassword);
     const ws = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
+
+    // Collect welcome + event messages eagerly (avoids race from sequential waitForMessage)
+    const msgCollector = collectMessages(ws, 2, 10000);
     await waitForOpen(ws);
 
-    // Consume welcome message
-    const welcome = await waitForMessage(ws);
-    expect(welcome.type).toBe("connected");
-
-    // 2. Create a cart and add items
+    // Create a cart and add items
     const cartRes = await app.inject({
       method: "POST",
       url: "/api/cart",
@@ -348,10 +374,7 @@ describe("Domain events pub/sub (T074)", () => {
       body: JSON.stringify({ variant_id: activeVariantId, quantity: 1 }),
     });
 
-    // 3. Set up message listener BEFORE checkout
-    const eventPromise = waitForMessage(ws, 2000);
-
-    // 4. Perform checkout
+    // Perform checkout
     const checkoutRes = await app.inject({
       method: "POST",
       url: "/api/checkout",
@@ -371,47 +394,56 @@ describe("Domain events pub/sub (T074)", () => {
     });
     expect(checkoutRes.statusCode).toBe(201);
 
-    // 5. Admin should receive order.placed event within 2 seconds
-    const event = await eventPromise;
+    const msgs = await msgCollector;
+    const welcome = msgs[0];
+    const event = msgs[1];
+
+    expect(welcome.type).toBe("connected");
+    expect(welcome.data?.role).toBe("admin");
+
     expect(event.type).toBe("order.placed");
     expect(event.entity).toBe("order");
-    expect(event.entityId).toBeTruthy();
-    expect(event.data?.orderNumber).toBeTruthy();
-    expect(event.data?.totalMinor).toBeGreaterThan(0);
+    expect(typeof event.entityId).toBe("string");
+    expect(event.entityId.length).toBeGreaterThan(0);
+    expect(event.data?.orderNumber).toMatch(/^KNX-/);
+    expect(event.data?.totalMinor).toBeGreaterThanOrEqual(2500);
+    expect(typeof event.sequenceId).toBe("number");
     expect(event.sequenceId).toBeGreaterThan(0);
 
     ws.close();
   }, 15000);
 
   // -------------------------------------------------------------------------
-  // Domain event publisher routes events to customer channel
+  // Customer channel routing
   // -------------------------------------------------------------------------
 
-  it("customer receives domain events published to their channel", async () => {
-    // Connect as customer
+  it("customer receives domain events published to their channel via customerId", async () => {
     const accessToken = await signInAndGetAccessToken(address, customerEmail, customerPassword);
     const ws = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
     await waitForOpen(ws);
 
-    // Consume welcome
     const welcome = await waitForMessage(ws);
+    expect(welcome.type).toBe("connected");
     expect(welcome.data?.role).toBe("customer");
 
-    // Publish an order.placed event with the customer's ID
     const eventPromise = waitForMessage(ws, 2000);
     domainEvents.publish(
       "order.placed",
       "order",
       "test-order-for-customer",
-      { orderNumber: "KNX-CUST-001" },
+      { orderNumber: "KNX-CUST-001", totalMinor: 3000 },
       testCustomerId,
     );
 
     const event = await eventPromise;
     expect(event.type).toBe("order.placed");
+    // Customer channel routes to customer:<customerId>
     expect(event.entity).toBe("customer");
     expect(event.entityId).toBe(testCustomerId);
     expect(event.data?.orderNumber).toBe("KNX-CUST-001");
+    expect(event.data?.totalMinor).toBe(3000);
+    expect(typeof event.sequenceId).toBe("number");
+    expect(event.sequenceId).toBeGreaterThan(0);
 
     ws.close();
   });
@@ -422,32 +454,28 @@ describe("Domain events pub/sub (T074)", () => {
     await waitForOpen(ws);
     await waitForMessage(ws); // welcome
 
-    // Publish an event without customerId — customer should NOT receive it
+    // Publish event without customerId — should go to entity channel only (admin wildcard)
     domainEvents.publish("order.placed", "order", "some-other-order", {
       orderNumber: "KNX-OTHER",
     });
 
-    const received = await Promise.race([
-      waitForMessage(ws, 500).then(() => true),
-      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 600)),
-    ]);
-    expect(received).toBe(false);
+    await expectNoMessage(ws, 500);
 
     ws.close();
   });
 
   // -------------------------------------------------------------------------
-  // All 6 domain event types publish correctly
+  // All domain event types produce correctly
   // -------------------------------------------------------------------------
 
-  it("admin receives all 6 domain event types", async () => {
+  it("admin receives all 8 domain event types with correct shapes", async () => {
     const accessToken = await signInAndGetAccessToken(address, adminEmail, adminPassword);
     const ws = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
     await waitForOpen(ws);
     await waitForMessage(ws); // welcome
 
     const eventTypes: Array<{
-      type: Parameters<DomainEventPublisher["publish"]>[0];
+      type: DomainEventType;
       entity: string;
       entityId: string;
       data: Record<string, unknown>;
@@ -456,13 +484,13 @@ describe("Domain events pub/sub (T074)", () => {
         type: "order.placed",
         entity: "order",
         entityId: "evt-order-1",
-        data: { orderNumber: "KNX-100" },
+        data: { orderNumber: "KNX-100", totalMinor: 5000 },
       },
       {
         type: "payment.succeeded",
         entity: "payment",
         entityId: "evt-pay-1",
-        data: { amountMinor: 5000 },
+        data: { amountMinor: 5000, orderId: "test-order-id" },
       },
       {
         type: "shipment.delivered",
@@ -480,16 +508,29 @@ describe("Domain events pub/sub (T074)", () => {
         type: "inventory.low_stock",
         entity: "inventory",
         entityId: "evt-inv-1",
-        data: { available: 2, safetyStock: 10 },
+        data: { available: 2, safetyStock: 10, locationId: "loc-1" },
       },
       {
         type: "dispute.opened",
         entity: "dispute",
         entityId: "evt-disp-1",
-        data: { reason: "fraudulent", amountMinor: 3000 },
+        data: { reason: "fraudulent", amountMinor: 3000, orderId: "test-ord" },
+      },
+      {
+        type: "settings.changed",
+        entity: "setting",
+        entityId: "evt-setting-1",
+        data: { changes: { freeShippingThreshold: 5000 } },
+      },
+      {
+        type: "milestone.reached",
+        entity: "contributor",
+        entityId: "evt-contrib-1",
+        data: { milestoneId: "ms-1", milestoneType: "veteran" },
       },
     ];
 
+    let prevSequenceId = 0;
     for (const evt of eventTypes) {
       const msgPromise = waitForMessage(ws, 2000);
       domainEvents.publish(evt.type, evt.entity, evt.entityId, evt.data);
@@ -498,9 +539,232 @@ describe("Domain events pub/sub (T074)", () => {
       expect(msg.type).toBe(evt.type);
       expect(msg.entity).toBe(evt.entity);
       expect(msg.entityId).toBe(evt.entityId);
-      expect(msg.sequenceId).toBeGreaterThan(0);
+      // Verify data payload fields match exactly
+      for (const [key, value] of Object.entries(evt.data)) {
+        expect(msg.data?.[key]).toEqual(value);
+      }
+      expect(typeof msg.sequenceId).toBe("number");
+      expect(msg.sequenceId).toBeGreaterThan(prevSequenceId);
+      prevSequenceId = msg.sequenceId;
     }
 
     ws.close();
+  });
+
+  // -------------------------------------------------------------------------
+  // Event ordering preserved per-aggregate
+  // -------------------------------------------------------------------------
+
+  it("event ordering is preserved per-aggregate (monotonic sequence IDs)", async () => {
+    const accessToken = await signInAndGetAccessToken(address, adminEmail, adminPassword);
+    const ws = new WebSocket(`${wsAddress}/ws?token=${accessToken}`);
+    await waitForOpen(ws);
+    await waitForMessage(ws); // welcome
+
+    // Publish 5 events for the same order aggregate in sequence
+    const orderId = `evt-ordering-${ts}`;
+    const eventSequence: DomainEventType[] = [
+      "order.placed",
+      "payment.succeeded",
+      "shipment.delivered",
+      "ticket.updated",
+      "settings.changed",
+    ];
+
+    const receivedSequenceIds: number[] = [];
+    for (const type of eventSequence) {
+      const msgPromise = waitForMessage(ws, 2000);
+      domainEvents.publish(type, "order", orderId, { step: type });
+      const msg = await msgPromise;
+      expect(msg.type).toBe(type);
+      expect(msg.entityId).toBe(orderId);
+      receivedSequenceIds.push(msg.sequenceId);
+    }
+
+    // Verify strictly monotonically increasing sequence IDs
+    for (let i = 1; i < receivedSequenceIds.length; i++) {
+      expect(receivedSequenceIds[i]).toBeGreaterThan(receivedSequenceIds[i - 1]);
+    }
+
+    ws.close();
+  });
+
+  // -------------------------------------------------------------------------
+  // Subscriber registration and isolation
+  // -------------------------------------------------------------------------
+
+  it("registered subscribers receive published events", async () => {
+    const received: Array<{ type: string; entity: string; entityId: string }> = [];
+    const unsub = domainEvents.subscribe((type, entity, entityId) => {
+      received.push({ type, entity, entityId });
+    });
+
+    domainEvents.publish("order.placed", "order", "test-sub-1", { orderNumber: "KNX-SUB" });
+    domainEvents.publish("payment.succeeded", "payment", "test-sub-2", { amountMinor: 100 });
+
+    // Subscribers are called synchronously
+    expect(received).toHaveLength(2);
+    expect(received[0].type).toBe("order.placed");
+    expect(received[0].entity).toBe("order");
+    expect(received[0].entityId).toBe("test-sub-1");
+    expect(received[1].type).toBe("payment.succeeded");
+    expect(received[1].entity).toBe("payment");
+    expect(received[1].entityId).toBe("test-sub-2");
+
+    unsub();
+
+    // After unsubscribe, no more events
+    domainEvents.publish("dispute.opened", "dispute", "test-sub-3", { reason: "test" });
+    expect(received).toHaveLength(2);
+  });
+
+  it("failed subscriber does not block other subscribers", async () => {
+    const results: string[] = [];
+
+    const unsub1 = domainEvents.subscribe(() => {
+      results.push("sub1-before");
+      throw new Error("Subscriber 1 fails!");
+    });
+
+    const unsub2 = domainEvents.subscribe((type, _entity, entityId) => {
+      results.push(`sub2:${type}:${entityId}`);
+    });
+
+    const unsub3 = domainEvents.subscribe(() => {
+      results.push("sub3-ok");
+    });
+
+    domainEvents.publish("ticket.updated", "ticket", "test-fail-sub", {
+      reason: "failure-test",
+    });
+
+    // Sub1 threw but sub2 and sub3 should still have been called
+    expect(results).toContain("sub1-before");
+    expect(results).toContain("sub2:ticket.updated:test-fail-sub");
+    expect(results).toContain("sub3-ok");
+    expect(results).toHaveLength(3);
+
+    unsub1();
+    unsub2();
+    unsub3();
+  });
+
+  it("async subscriber failure does not block other subscribers", async () => {
+    const results: string[] = [];
+
+    const unsub1 = domainEvents.subscribe(async () => {
+      results.push("async-sub1");
+      throw new Error("Async subscriber fails!");
+    });
+
+    const unsub2 = domainEvents.subscribe((_type, _entity, entityId) => {
+      results.push(`sync-sub2:${entityId}`);
+    });
+
+    domainEvents.publish("inventory.low_stock", "inventory", "test-async-fail", {
+      available: 1,
+    });
+
+    // Both subscribers were called despite async failure
+    expect(results).toContain("async-sub1");
+    expect(results).toContain("sync-sub2:test-async-fail");
+
+    unsub1();
+    unsub2();
+  });
+
+  // -------------------------------------------------------------------------
+  // Event table persistence for audit replay
+  // -------------------------------------------------------------------------
+
+  it("domain events are persisted to the domain_event table with full payload", async () => {
+    const db = dbConn.db;
+    const uniqueEntityId = `evt-persist-${ts}`;
+
+    domainEvents.publish("order.placed", "order", uniqueEntityId, {
+      orderNumber: "KNX-PERSIST-001",
+      totalMinor: 9900,
+    });
+
+    // Give the async persistence a moment to complete
+    await new Promise((r) => setTimeout(r, 300));
+
+    const rows = await db
+      .select()
+      .from(domainEvent)
+      .where(eq(domainEvent.entityId, uniqueEntityId));
+
+    expect(rows).toHaveLength(1);
+    const row = rows[0];
+    expect(row.eventType).toBe("order.placed");
+    expect(row.entity).toBe("order");
+    expect(row.entityId).toBe(uniqueEntityId);
+    expect(row.customerId).toBeNull();
+    expect(typeof row.sequenceId).toBe("number");
+    expect(row.sequenceId).toBeGreaterThan(0);
+    expect(row.createdAt).toBeInstanceOf(Date);
+
+    // Full payload preserved
+    const payload = row.payloadJson as Record<string, unknown>;
+    expect(payload.orderNumber).toBe("KNX-PERSIST-001");
+    expect(payload.totalMinor).toBe(9900);
+  });
+
+  it("persisted events include customerId when provided", async () => {
+    const db = dbConn.db;
+    const uniqueEntityId = `evt-persist-cust-${ts}`;
+
+    domainEvents.publish(
+      "ticket.updated",
+      "ticket",
+      uniqueEntityId,
+      { oldStatus: "open", newStatus: "pending" },
+      testCustomerId,
+    );
+
+    await new Promise((r) => setTimeout(r, 300));
+
+    const rows = await db
+      .select()
+      .from(domainEvent)
+      .where(eq(domainEvent.entityId, uniqueEntityId));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].customerId).toBe(testCustomerId);
+    expect(rows[0].eventType).toBe("ticket.updated");
+    const payload = rows[0].payloadJson as Record<string, unknown>;
+    expect(payload.oldStatus).toBe("open");
+    expect(payload.newStatus).toBe("pending");
+  });
+
+  it("multiple events for same aggregate are stored in sequence order", async () => {
+    const db = dbConn.db;
+    const aggregateId = `evt-seq-${ts}`;
+
+    domainEvents.publish("order.placed", "order", aggregateId, { step: 1 });
+    domainEvents.publish("payment.succeeded", "order", aggregateId, { step: 2 });
+    domainEvents.publish("shipment.delivered", "order", aggregateId, { step: 3 });
+
+    await new Promise((r) => setTimeout(r, 500));
+
+    const rows = await db
+      .select()
+      .from(domainEvent)
+      .where(eq(domainEvent.entityId, aggregateId))
+      .orderBy(domainEvent.sequenceId);
+
+    expect(rows).toHaveLength(3);
+    expect(rows[0].eventType).toBe("order.placed");
+    expect(rows[1].eventType).toBe("payment.succeeded");
+    expect(rows[2].eventType).toBe("shipment.delivered");
+
+    // Sequence IDs are strictly increasing
+    expect(rows[1].sequenceId).toBeGreaterThan(rows[0].sequenceId);
+    expect(rows[2].sequenceId).toBeGreaterThan(rows[1].sequenceId);
+
+    // Payloads preserved per event
+    expect((rows[0].payloadJson as Record<string, unknown>).step).toBe(1);
+    expect((rows[1].payloadJson as Record<string, unknown>).step).toBe(2);
+    expect((rows[2].payloadJson as Record<string, unknown>).step).toBe(3);
   });
 });

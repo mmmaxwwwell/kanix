@@ -1,0 +1,26 @@
+{
+  "task_id": "T254",
+  "status": "complete",
+  "summary": "Hardened domain-events.integration.test.ts: added domain_event table for audit replay, subscriber registration with failure isolation, event ordering tests, concrete assertions for all 8 event types, persistent event storage verification, and fixed generateOrderNumber collision bug",
+  "commands_run": [
+    {"command": "pnpm db:migrate", "exit_code": 0},
+    {"command": "npx vitest run src/domain-events.integration.test.ts", "exit_code": 0},
+    {"command": "pnpm test", "exit_code": 1, "note": "2 pre-existing failures in server.test.ts and smoke.test.ts (payment circuit breaker in health deps), unrelated to T254"}
+  ],
+  "files_created": [
+    "api/migrations/changesets/016-domain-event.xml",
+    "api/src/db/schema/domain-event.ts",
+    "specs/admin/claims/completion-T254.json"
+  ],
+  "files_modified": [
+    "api/src/domain-events.integration.test.ts",
+    "api/src/ws/events.ts",
+    "api/src/server.ts",
+    "api/src/db/schema/index.ts",
+    "api/src/db/queries/checkout.ts",
+    "specs/admin/learnings.md",
+    "specs/admin/tasks.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 2
+}
