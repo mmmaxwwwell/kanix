@@ -277,7 +277,7 @@ describe("product variant + classification API (T039)", () => {
       method: "POST",
       headers: { ...adminHeaders, "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: "Modules",
+        name: `Modules-${Date.now()}`,
         slug: `modules-t039-${Date.now()}`,
         description: "Kanix compatible modules",
       }),
@@ -285,7 +285,7 @@ describe("product variant + classification API (T039)", () => {
     expect(classRes.status).toBe(201);
     const classBody = (await classRes.json()) as { product_class: { id: string; name: string } };
     testClassId = classBody.product_class.id;
-    expect(classBody.product_class.name).toBe("Modules");
+    expect(classBody.product_class.name).toMatch(/^Modules-\d+$/);
 
     // Step 6: Assign product to class "modules"
     const assignRes = await fetch(

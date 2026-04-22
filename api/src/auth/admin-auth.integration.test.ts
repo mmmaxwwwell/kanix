@@ -287,7 +287,7 @@ describe("admin auth + capability-based permissions (T034)", () => {
     expect(ordersRes.status).toBe(200);
 
     // Access inventory endpoint (requires inventory.read)
-    const inventoryRes = await fetch(`${address}/api/admin/inventory`, { headers });
+    const inventoryRes = await fetch(`${address}/api/admin/inventory/balances`, { headers });
     expect(inventoryRes.status).toBe(200);
   });
 
@@ -299,7 +299,7 @@ describe("admin auth + capability-based permissions (T034)", () => {
     expect(ordersRes.status).toBe(200);
 
     // Support role CAN read inventory
-    const inventoryRes = await fetch(`${address}/api/admin/inventory`, { headers });
+    const inventoryRes = await fetch(`${address}/api/admin/inventory/balances`, { headers });
     expect(inventoryRes.status).toBe(200);
 
     // Verify admin profile shows correct capabilities (support role)

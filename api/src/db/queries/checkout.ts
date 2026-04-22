@@ -51,10 +51,15 @@ export interface CheckoutOrder {
 // ---------------------------------------------------------------------------
 
 export async function generateOrderNumber(db: PostgresJsDatabase): Promise<string> {
-  // Extract the max numeric suffix from existing KNX-NNNNNN order numbers
-  const result = await db.execute(
-    sql`SELECT COALESCE(MAX(substring(order_number from 'KNX-0*([0-9]+)')::int), 0) AS max_num FROM "order" WHERE order_number ~ '^KNX-[0-9]+$'`,
-  );
+  // Use transaction-scoped advisory lock to serialize order number generation.
+  // pg_advisory_xact_lock is auto-released on commit, and the transaction
+  // guarantees both lock + query use the same pooled connection.
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(2147483647)`);
+    return tx.execute(
+      sql`SELECT COALESCE(MAX(substring(order_number from 'KNX-0*([0-9]+)')::int), 0) AS max_num FROM "order" WHERE order_number ~ '^KNX-[0-9]+$'`,
+    );
+  });
   const maxNum = (result[0]?.max_num as number) ?? 0;
   const next = maxNum + 1;
   return `KNX-${String(next).padStart(6, "0")}`;

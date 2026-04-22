@@ -8,6 +8,7 @@ import {
   shipmentEvent,
   shippingLabelPurchase,
 } from "./db/schema/fulfillment.js";
+import { product, productVariant } from "./db/schema/catalog.js";
 import { eq } from "drizzle-orm";
 import {
   createShipment,
@@ -30,9 +31,36 @@ describe("fulfillment → shipping status propagation (T060)", () => {
   const ts = Date.now();
   const createdOrderIds: string[] = [];
   const createdShipmentIds: string[] = [];
+  let testProductId: string;
+  const testVariantIds: string[] = [];
 
   beforeAll(async () => {
     dbConn = createDatabaseConnection(DATABASE_URL);
+
+    // Create a product and variants so FK constraints on order_line.variant_id are satisfied
+    const [prod] = await dbConn.db
+      .insert(product)
+      .values({
+        slug: `t060-product-${ts}`,
+        title: `T060 Test Product ${ts}`,
+        status: "active",
+      })
+      .returning();
+    testProductId = prod.id;
+
+    for (let i = 1; i <= 5; i++) {
+      const [v] = await dbConn.db
+        .insert(productVariant)
+        .values({
+          productId: testProductId,
+          sku: `T060-VAR-${i}-${ts}`,
+          title: `T060 Variant ${i}`,
+          priceMinor: 2500,
+          status: "active",
+        })
+        .returning();
+      testVariantIds.push(v.id);
+    }
   });
 
   afterAll(async () => {
@@ -50,6 +78,12 @@ describe("fulfillment → shipping status propagation (T060)", () => {
         await db.delete(orderStatusHistory).where(eq(orderStatusHistory.orderId, oid));
         await db.delete(orderLine).where(eq(orderLine.orderId, oid));
         await db.delete(order).where(eq(order.id, oid));
+      }
+      for (const vid of testVariantIds) {
+        await db.delete(productVariant).where(eq(productVariant.id, vid));
+      }
+      if (testProductId) {
+        await db.delete(product).where(eq(product.id, testProductId));
       }
       await dbConn.close();
     }
@@ -88,7 +122,7 @@ describe("fulfillment → shipping status propagation (T060)", () => {
         .insert(orderLine)
         .values({
           orderId: newOrder.id,
-          variantId: `00000000-0000-0000-0000-00000000000${i + 1}`,
+          variantId: testVariantIds[i],
           skuSnapshot: `KNX-T060-${i + 1}`,
           titleSnapshot: `Test Item ${i + 1}`,
           quantity: quantities[i],
@@ -476,11 +510,13 @@ describe("fulfillment → shipping status propagation (T060)", () => {
     const result1 = await handleTrackingUpdate(db, shipment1, "delivered");
     expect(result1.shipmentTransitioned).toBe(true);
 
-    // Order should NOT be delivered or completed yet (second shipment still in_transit)
+    // Order should NOT be delivered yet (second shipment still in_transit),
+    // but fulfillment IS fulfilled because both shipments are >= shipped status
+    // and all order lines have sufficient shipped quantity coverage.
     let orderState = await findOrderById(db, orderId);
     expect(orderState?.shippingStatus).toBe("in_transit"); // not delivered
-    expect(orderState?.fulfillmentStatus).toBe("partially_fulfilled"); // not all lines in delivered shipments? Actually shipment1 is delivered but sid2 is in_transit
-    expect(orderState?.status).toBe("confirmed");
+    expect(orderState?.fulfillmentStatus).toBe("fulfilled"); // all lines covered by shipped-or-better shipments
+    expect(orderState?.status).toBe("confirmed"); // not completed until all delivered
 
     // Second shipment delivers
     const shipment2 = await findShipmentById(db, sid2);
