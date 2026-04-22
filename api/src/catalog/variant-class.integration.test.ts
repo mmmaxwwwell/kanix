@@ -304,7 +304,8 @@ describe("product variant + classification API (T039)", () => {
   });
 
   it("variant status transitions: draft → active → inactive → archived", async function () {
-    if (!testVariantTPUId || !testProductId) return;
+    expect(testVariantTPUId).toEqual(expect.any(String));
+    expect(testProductId).toEqual(expect.any(String));
 
     // draft → active
     const activateRes = await fetch(
@@ -347,7 +348,8 @@ describe("product variant + classification API (T039)", () => {
   });
 
   it("rejects invalid variant status transition (archived → active)", async function () {
-    if (!testVariantTPUId || !testProductId) return;
+    expect(testVariantTPUId).toEqual(expect.any(String));
+    expect(testProductId).toEqual(expect.any(String));
 
     // archived is terminal — cannot transition back
     const res = await fetch(
@@ -364,7 +366,7 @@ describe("product variant + classification API (T039)", () => {
   });
 
   it("variant creation requires sku, title, price_minor", async function () {
-    if (!testProductId) return;
+    expect(testProductId).toEqual(expect.any(String));
 
     const res = await fetch(`${address}/api/admin/products/${testProductId}/variants`, {
       method: "POST",
@@ -432,7 +434,8 @@ describe("product variant + classification API (T039)", () => {
   });
 
   it("remove product from class", async function () {
-    if (!testProductId || !testClassId) return;
+    expect(testProductId).toEqual(expect.any(String));
+    expect(testClassId).toEqual(expect.any(String));
 
     // Remove
     const removeRes = await fetch(
