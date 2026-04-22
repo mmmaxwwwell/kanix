@@ -1,0 +1,12 @@
+{
+  "task_id": "T253",
+  "status": "complete",
+  "summary": "Hardened websocket.integration.test.ts with email verification, cross-customer isolation tests, customer-scoped event delivery, concrete assertions, and fixed reconnect replay race condition using collectMessages pattern",
+  "commands_run": [
+    {"command": "npx vitest run src/websocket.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T253.json"],
+  "files_modified": ["api/src/websocket.integration.test.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

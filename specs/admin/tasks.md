@@ -594,7 +594,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 - [x] T252 Harden `notification-dispatch.integration.test.ts` — notification delivery via email + WebSocket
   Done when: every notification type in the spec has both delivery channels tested; customer email preference respects opt-out; admin notifications broadcast to connected admins; delivery retries on transient failure; permanent failure logged to dead-letter queue.
 
-- [ ] T253 Harden `websocket.integration.test.ts` — WebSocket session + event broadcast [FR-081, FR-082]
+- [x] T253 Harden `websocket.integration.test.ts` — WebSocket session + event broadcast [FR-081, FR-082]
   Done when: customer connects with session cookie → receives own order events; admin connects → receives admin-channel events; cross-customer isolation verified (customer A doesn't see customer B's events); unauthenticated connection rejected; reconnect-with-last-event-id replays missed events.
 
 - [ ] T254 Harden `domain-events.integration.test.ts` — domain event publishing + subscribers
