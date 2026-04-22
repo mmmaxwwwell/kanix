@@ -1,0 +1,12 @@
+{
+  "task_id": "T260",
+  "status": "complete",
+  "summary": "Created guest-checkout flow integration test walking catalog → cart → checkout → Stripe webhook → order confirmed with frozen snapshots",
+  "commands_run": [
+    {"command": "npx vitest run src/flows/guest-checkout.integration.test.ts --no-coverage", "exit_code": 0}
+  ],
+  "files_created": ["api/src/flows/guest-checkout.integration.test.ts"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 2
+}

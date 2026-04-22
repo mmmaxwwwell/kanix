@@ -296,3 +296,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `generateOrderNumber` used `COUNT(*)+1` which collides when prior test runs leave orders with the same number. Fixed to use `MAX(substring(order_number from 'KNX-0*([0-9]+)')::int)` against only `'^KNX-[0-9]+$'` rows. Note: `\d` in JS template literals is just `d` — use `[0-9]` in SQL regex within `sql` tagged templates.
 - `createDomainEventPublisher` now accepts `{ wsManager, db }` options to persist events to `domain_event` table. The fire-and-forget DB insert uses `.catch()` so persistence failure doesn't block event flow. The old single-arg `(wsManager)` signature is auto-detected via `"publish" in arg`.
 - Subscriber isolation: each subscriber is called in a try/catch so sync/async failures in one don't block others. The `subscribe()` method returns an unsubscribe function that removes the callback from the Set.
+
+## T260 — Flow test: guest checkout on Astro
+- `POST /api/cart/items` returns 201 (not 200) — use `toBeLessThan(300)` or check for 201 explicitly when asserting add-to-cart success.
+- `productClass` and `productClassMembership` schemas are in `db/schema/product-class.ts` (not `catalog.ts`) — import from the correct file when setting up class membership for catalog visibility.
+- Flow tests that use sequential `it()` blocks sharing state via outer-scope variables must not bail early — if step N fails, steps N+1..M will fail with empty IDs. Use `skipListen: true` for flow tests that only use `app.inject()`.

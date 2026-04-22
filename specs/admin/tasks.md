@@ -604,7 +604,7 @@ Every user-flow task (T260-range) creates a new multi-step integration test that
 
 Each task below creates a NEW file under `api/src/flows/` that walks the same multi-step flow an E2E task drives, but via HTTP calls against the real stack — no emulator / browser. Purpose: fast (seconds, not minutes) coverage of the complete user journey. When an E2E fails, the mirror flow test tells you whether the bug is in the API layer or past it.
 
-- [ ] T260 Flow test: guest checkout on Astro [mirrors T096, SC-001]
+- [x] T260 Flow test: guest checkout on Astro [mirrors T096, SC-001]
   Done when: new `api/src/flows/guest-checkout.integration.test.ts` walks: fetch catalog → add to cart → set shipping address → compute totals → create payment intent → simulate Stripe confirm via webhook → verify order.status=paid → verify snapshots (price, tax, shipping) are frozen on the order. Runs green against live services with zero skips.
 
 - [ ] T261 Flow test: authenticated checkout [mirrors T097, SC-001]
