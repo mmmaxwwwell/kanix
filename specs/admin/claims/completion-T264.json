@@ -1,0 +1,12 @@
+{
+  "task_id": "T264",
+  "status": "complete",
+  "summary": "Created dispute lifecycle flow integration test covering paid+shipped order → dispute.created webhook → evidence seeding → bundle generation → admin submission → dispute.closed (won) webhook → payment_status restored",
+  "commands_run": [
+    {"command": "cd api && npx vitest run src/flows/dispute-lifecycle.integration.test.ts --no-file-parallelism", "exit_code": 0}
+  ],
+  "files_created": ["api/src/flows/dispute-lifecycle.integration.test.ts", "specs/admin/claims/completion-T264.json"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 2
+}

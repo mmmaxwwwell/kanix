@@ -613,10 +613,10 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T262 Flow test: kit purchase [mirrors T098, SC-010]
   Done when: new `api/src/flows/kit-purchase.integration.test.ts` walks: fetch kits → select a kit → choose variant per class → add-to-cart → checkout → verify kit row-items in order with correct per-variant pricing and kit savings; also tests the invalid-selection branch (missing class → 400).
 
-- [ ] T263 Flow test: full fulfillment + shipping [mirrors T099, SC-005, SC-006]
+- [x] T263 Flow test: full fulfillment + shipping [mirrors T099, SC-005, SC-006]
   Done when: new `api/src/flows/fulfillment-shipping.integration.test.ts` walks: paid order → fulfillment task created → admin assigns → admin buys label → shipment created → EasyPost webhook simulating in_transit + delivered → order.status transitions correctly → customer receives WebSocket notifications for each step (asserted via live WS connection).
 
-- [ ] T264 Flow test: dispute lifecycle [mirrors T100, SC-005]
+- [x] T264 Flow test: dispute lifecycle [mirrors T100, SC-005]
   Done when: new `api/src/flows/dispute-lifecycle.integration.test.ts` walks: paid+shipped order → simulate `charge.dispute.created` webhook → auto-evidence collection fires → admin reviews + submits evidence bundle → simulate dispute won/lost webhooks → verify final order state + refund accounting.
 
 - [ ] T265 Flow test: contributor royalty [mirrors T101, SC-011]

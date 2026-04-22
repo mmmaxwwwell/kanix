@@ -311,3 +311,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - Kit add-to-cart (`POST /api/cart/kits`) creates a single `cart_line` with `unitPriceMinor` = kit price and `variantId` = first selection's variant (the "primary variant"). Checkout creates one order line at the kit price, not one line per kit component.
 - `addKitToCart` returns `{ kitPriceMinor, individualTotalMinor, savingsMinor, selections[] }` — savings = sum(individual prices) - kit price. Assert exact math in the response rather than re-querying DB.
 - Kit class requirements need two separate product classes, each with their own product + variant + class membership. Using `Date.now()` suffix on class names avoids `uq_product_class_name` collisions with prior test runs on the shared DB.
+
+## T264 — Flow test: dispute lifecycle
+- `handleTrackingUpdate` requires going through `in_transit` before `delivered` — skipping in_transit returns `shipmentTransitioned: false` and prevents auto-completion. Always call the in_transit update first (same pattern as T263).
+- The `charge.dispute.created` webhook handler looks up the payment by `chargeId` first, then falls back to `paymentIntentId`. The test must ensure the chargeId is set on the payment row (via `latest_charge` in the `payment_intent.succeeded` webhook payload).
+- Evidence records with immutability triggers need `DISABLE TRIGGER USER` / `ENABLE TRIGGER USER` for both test setup (seeding evidence) and cleanup. Always re-enable triggers in `beforeAll` and `afterAll` to avoid poisoning subsequent test runs.
