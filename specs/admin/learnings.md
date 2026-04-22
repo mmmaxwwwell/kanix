@@ -340,3 +340,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 ## T269 — Flow test: guest-order → account linking
 - Guest checkout steps (cart creation, add items, checkout, webhook) can use `app.inject()` since no auth is needed, but the signup/verify/signin steps need real HTTP (`fetch`) because SuperTokens requires cookie exchange. Using both in the same test works fine since `createTestServer` with default `skipListen: false` starts a real HTTP listener.
 - The `verifyEmailPOST` override must be triggered via the HTTP endpoint (`POST /auth/user/email/verify`) rather than just `EmailVerification.verifyEmailUsingToken` server-side, because the linking logic is in the SuperTokens override — direct SDK calls bypass the override.
+
+## T270 — Flow test: warranty claim submission
+- `TPU_HEAT_KEYWORDS` in `createWarrantyClaim` includes the literal string `"tpu"` — any claim description mentioning TPU (even "TPU phone case has a crack") triggers `material_limitation_flagged: true`. Tests for non-flagged claims must avoid "TPU" in the description text.
+- The warranty flow test exercises the full admin resolution path via ticket status transitions (`open → waiting_on_internal → open → resolved`), not a dedicated "approve/deny" endpoint — there is no separate warranty-specific resolution endpoint.

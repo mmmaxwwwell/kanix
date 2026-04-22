@@ -634,7 +634,7 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T269 Flow test: guest-order → account linking [mirrors T104a, FR-066]
   Done when: new `api/src/flows/guest-order-link.integration.test.ts` walks: guest checkout with email X → signup with email X → verify guest order linked to new account → guest order appears in authenticated order history → link is idempotent on repeat signup attempts.
 
-- [ ] T270 Flow test: warranty claim submission [mirrors T104b, FR-055]
+- [x] T270 Flow test: warranty claim submission [mirrors T104b, FR-055]
   Done when: new `api/src/flows/warranty-claim.integration.test.ts` walks: customer submits warranty claim for their order → verify ticket created with category=warranty → admin reviews → resolution path (approve/deny) → notifications delivered; also tests out-of-window claim rejection.
 
 - [ ] T271 Flow test: admin refund (full + partial) through Stripe [mirrors T104c, FR-030]

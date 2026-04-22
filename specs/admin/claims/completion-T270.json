@@ -1,0 +1,12 @@
+{
+  "task_id": "T270",
+  "status": "complete",
+  "summary": "Created warranty claim flow integration test covering full lifecycle: checkout → delivery → claim submission → admin review/approve/deny → material limitation flagging → expired warranty rejection → non-owner 404 → unauthenticated 401",
+  "commands_run": [
+    {"command": "cd api && npx vitest run src/flows/warranty-claim.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["api/src/flows/warranty-claim.integration.test.ts"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 2
+}
