@@ -326,3 +326,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `reserveInventory` uses `SELECT ... FOR UPDATE` on `inventory_balance` which correctly serializes concurrent reservation attempts — exactly M of N concurrent attempts succeed when stock=M. The inventory concurrency model is sound.
 - `generateOrderNumber` in `checkout.ts` has a race condition: it reads `MAX(order_number)` then inserts, causing `uq_order_order_number` violations under concurrency. This means some checkouts that successfully reserved inventory may still fail at order creation (500). The inventory reservation is NOT rolled back on this failure path, creating "orphan" active reservations.
 - Checkout returns 400 (not 409) with `ERR_INVENTORY_INSUFFICIENT` when stock is exhausted — the task description says 409 but the actual code uses 400.
+
+## T267 — Flow test: WebSocket real-time propagation
+- The customer message endpoint (`POST /api/support/tickets/:id/messages`) was missing `domainEvents.publish("ticket.updated", ...)` — added it so admin WS clients receive real-time notification when customers post messages. The admin message endpoint already had this.
+- The admin internal-notes endpoint (`POST /api/admin/support-tickets/:id/internal-notes`) intentionally does NOT publish domain events — this ensures internal notes are never leaked to customer WS channels.
+- WS flow tests must set up message listeners (via `waitForMessage`) BEFORE triggering the event (HTTP call or wsManager.publish), since the server sends WS messages synchronously in the same tick as the publish call.

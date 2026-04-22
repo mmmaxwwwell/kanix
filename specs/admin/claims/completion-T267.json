@@ -1,0 +1,12 @@
+{
+  "task_id": "T267",
+  "status": "complete",
+  "summary": "Created websocket-realtime.integration.test.ts flow test with 7 tests covering shipment event propagation, ticket message notification, and internal note isolation; added missing domainEvents.publish to customer message endpoint",
+  "commands_run": [
+    {"command": "pnpm --dir api test -- --testPathPattern=flows/websocket-realtime", "exit_code": 0}
+  ],
+  "files_created": ["api/src/flows/websocket-realtime.integration.test.ts"],
+  "files_modified": ["api/src/server.ts", "specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

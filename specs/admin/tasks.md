@@ -625,7 +625,7 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T266 Flow test: concurrent inventory [mirrors T102, SC-003]
   Done when: new `api/src/flows/concurrent-inventory.integration.test.ts` walks: N concurrent checkouts against a variant with stock M<N → exactly M succeed, N-M fail with 409 and specific out-of-stock; final balance = 0; no over-sell, no negative balance; all reservations accounted for.
 
-- [ ] T267 Flow test: WebSocket real-time propagation [mirrors T103, SC-007]
+- [x] T267 Flow test: WebSocket real-time propagation [mirrors T103, SC-007]
   Done when: new `api/src/flows/websocket-realtime.integration.test.ts` walks: customer + admin both connected via WS → admin creates shipment → customer receives `shipment.created` + tracking events within latency budget (asserted); customer posts support ticket message → admin receives `ticket.updated`; admin internal note NOT delivered to customer (asserted absence).
 
 - [ ] T268 Flow test: security boundary enforcement [mirrors T104, SC-008, SC-015]

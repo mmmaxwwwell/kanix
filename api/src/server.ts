@@ -2856,6 +2856,14 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             isInternalNote: false,
           });
 
+          // Publish ticket.updated domain event so admins receive real-time notification
+          domainEvents.publish(
+            "ticket.updated",
+            "ticket",
+            id,
+            { reason: "customer_message_added", messageId: message.id },
+          );
+
           return { message };
         } catch (err: unknown) {
           const error = err as { code?: string; message?: string };
