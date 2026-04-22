@@ -306,3 +306,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `POST /api/cart/items` returns 201 (not 200) — use `toBeLessThan(300)` or check for 201 explicitly when asserting add-to-cart success.
 - `productClass` and `productClassMembership` schemas are in `db/schema/product-class.ts` (not `catalog.ts`) — import from the correct file when setting up class membership for catalog visibility.
 - Flow tests that use sequential `it()` blocks sharing state via outer-scope variables must not bail early — if step N fails, steps N+1..M will fail with empty IDs. Use `skipListen: true` for flow tests that only use `app.inject()`.
+
+## T262 — Flow test: kit purchase
+- Kit add-to-cart (`POST /api/cart/kits`) creates a single `cart_line` with `unitPriceMinor` = kit price and `variantId` = first selection's variant (the "primary variant"). Checkout creates one order line at the kit price, not one line per kit component.
+- `addKitToCart` returns `{ kitPriceMinor, individualTotalMinor, savingsMinor, selections[] }` — savings = sum(individual prices) - kit price. Assert exact math in the response rather than re-querying DB.
+- Kit class requirements need two separate product classes, each with their own product + variant + class membership. Using `Date.now()` suffix on class names avoids `uq_product_class_name` collisions with prior test runs on the shared DB.

@@ -1,0 +1,12 @@
+{
+  "task_id": "T262",
+  "status": "complete",
+  "summary": "Created kit-purchase flow integration test covering: fetch kits, invalid selection (missing class → 400), valid kit add-to-cart with savings, checkout at kit price, Stripe webhook payment confirmation, and frozen order totals verification.",
+  "commands_run": [
+    {"command": "source .dev/e2e-state/env.sh && cd api && pnpm test -- --reporter=verbose src/flows/kit-purchase.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": ["api/src/flows/kit-purchase.integration.test.ts"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 2
+}

@@ -610,7 +610,7 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T261 Flow test: authenticated checkout [mirrors T097, SC-001]
   Done when: new `api/src/flows/authenticated-checkout.integration.test.ts` walks: signup → verify email → login → add to cart → use saved address → checkout → Stripe webhook → order confirmed → order appears in customer order history with correct status transitions.
 
-- [ ] T262 Flow test: kit purchase [mirrors T098, SC-010]
+- [x] T262 Flow test: kit purchase [mirrors T098, SC-010]
   Done when: new `api/src/flows/kit-purchase.integration.test.ts` walks: fetch kits → select a kit → choose variant per class → add-to-cart → checkout → verify kit row-items in order with correct per-variant pricing and kit savings; also tests the invalid-selection branch (missing class → 400).
 
 - [ ] T263 Flow test: full fulfillment + shipping [mirrors T099, SC-005, SC-006]
