@@ -48,6 +48,7 @@ export async function verifySession(request: FastifyRequest, reply: FastifyReply
     const wrappedRes = new STFastifyResponse(reply as never);
     const session = await Session.getSession(wrappedReq as never, wrappedRes as never, {
       overrideGlobalClaimValidators: () => [],
+      checkDatabase: true,
     });
     request.session = session;
   } catch {

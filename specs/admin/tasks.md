@@ -628,7 +628,7 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T267 Flow test: WebSocket real-time propagation [mirrors T103, SC-007]
   Done when: new `api/src/flows/websocket-realtime.integration.test.ts` walks: customer + admin both connected via WS → admin creates shipment → customer receives `shipment.created` + tracking events within latency budget (asserted); customer posts support ticket message → admin receives `ticket.updated`; admin internal note NOT delivered to customer (asserted absence).
 
-- [ ] T268 Flow test: security boundary enforcement [mirrors T104, SC-008, SC-015]
+- [x] T268 Flow test: security boundary enforcement [mirrors T104, SC-008, SC-015]
   Done when: new `api/src/flows/security-boundaries.integration.test.ts` exercises each trust boundary: unauthenticated → 401 on protected routes; customer token on admin route → 403; cross-customer access (customer A reads customer B) → 404 (existence hidden); session token replay after logout → 401; rate-limit exceeded → 429 with Retry-After.
 
 - [ ] T269 Flow test: guest-order → account linking [mirrors T104a, FR-066]

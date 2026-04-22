@@ -331,3 +331,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The customer message endpoint (`POST /api/support/tickets/:id/messages`) was missing `domainEvents.publish("ticket.updated", ...)` — added it so admin WS clients receive real-time notification when customers post messages. The admin message endpoint already had this.
 - The admin internal-notes endpoint (`POST /api/admin/support-tickets/:id/internal-notes`) intentionally does NOT publish domain events — this ensures internal notes are never leaked to customer WS channels.
 - WS flow tests must set up message listeners (via `waitForMessage`) BEFORE triggering the event (HTTP call or wsManager.publish), since the server sends WS messages synchronously in the same tick as the publish call.
+
+## T268 — Flow test: security boundary enforcement
+- SuperTokens access tokens are JWTs verified locally — after signout, they remain valid until expiry unless `checkDatabase: true` is passed to `Session.getSession()`. Added this to the `verifySession` middleware for immediate revocation enforcement.
+- Fastify schema validation on POST routes runs before `preHandler` hooks — using POST admin endpoints for 403 tests may yield 400 from schema validation instead. Use GET endpoints for auth boundary tests.
+- Rate-limit tests need a separate `createTestServer` instance with `RATE_LIMIT_MAX: 3` to avoid hitting the main test server's rate limit counter (which is shared across all tests using that instance).
