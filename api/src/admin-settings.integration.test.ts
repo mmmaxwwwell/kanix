@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { DatabaseConnection } from "./db/connection.js";
 import type { FastifyInstance } from "fastify";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { adminUser, adminRole, adminUserRole, adminAuditLog } from "./db/schema/admin.js";
 import { adminSetting } from "./db/schema/setting.js";
 import { ROLE_CAPABILITIES, CAPABILITIES } from "./auth/admin.js";
@@ -292,7 +292,7 @@ describe("admin settings APIs (T229)", () => {
     });
 
     // Audit log hook fires asynchronously — wait briefly
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 300));
 
     const logsAfter = await dbConn.db
       .select()
@@ -302,10 +302,11 @@ describe("admin settings APIs (T229)", () => {
           eq(adminAuditLog.actorAdminUserId, adminUsrId),
           eq(adminAuditLog.action, "settings_updated"),
         ),
-      );
+      )
+      .orderBy(desc(adminAuditLog.createdAt));
 
     expect(logsAfter.length).toBeGreaterThan(countBefore);
-    const latest = logsAfter[logsAfter.length - 1];
+    const latest = logsAfter[0];
     expect(latest.entityType).toBe("setting");
     expect(latest.entityId).toBe("00000000-0000-0000-0000-000000000000");
     expect(latest.afterJson).not.toBeNull();

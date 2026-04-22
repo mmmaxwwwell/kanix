@@ -68,7 +68,7 @@ describe("smoke test: server boots and responds", () => {
     expect(healthBody.status).toBe("ok");
     expect(typeof healthBody.uptime).toBe("number");
     expect(healthBody.version).toBe("0.1.0");
-    expect(healthBody.dependencies).toEqual({ database: "disconnected" });
+    expect(healthBody.dependencies).toEqual({ database: "disconnected", payment: "ok" });
 
     // GET /ready — should return 503 (no DB connected, server not marked ready)
     const readyRes = await fetch(`${address}/ready`);

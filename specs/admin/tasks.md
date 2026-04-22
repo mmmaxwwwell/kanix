@@ -652,7 +652,7 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T275 Flow test: out-of-stock cart + kit rejection [mirrors T104h, FR-010]
   Done when: new `api/src/flows/out-of-stock-flow.integration.test.ts` walks: drive variant `available→0` via `POST /api/admin/inventory/adjustments` → assert public catalog returns `inStock: false` → `POST /api/cart/:id/items` returns 409 with `ERR_OUT_OF_STOCK` → kit containing the variant rejected at checkout → after `+N` restock, variant orderable again.
 
-- [ ] T276 Phase 14 validation
+- [x] T276 Phase 14 validation
   Done when: `bash test/e2e/setup.sh` exits 0; `source test/e2e/.state/env.sh && pnpm --dir api test` exits 0 with the reporter showing 0 failures AND 0 skips across all integration tests; every FR referenced in tasks T200–T275 has at least one `it()` block that drives the real end-to-end path; runner-verified.json for phase 14 shows passed=true.
 
 ---

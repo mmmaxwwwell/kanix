@@ -101,6 +101,7 @@ describe("server", () => {
       expect(typeof body.ready).toBe("boolean");
       expect(body.dependencies).toEqual({
         database: "disconnected",
+        payment: "ok",
       });
     });
 

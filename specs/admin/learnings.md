@@ -369,3 +369,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The checkout endpoint (`POST /api/checkout`) expects `cart_token` and `email` in the request body, not via `X-Cart-Token` header — using the header results in `ERR_VALIDATION` for missing `cart_token`.
 - OOS add-to-cart returns 400 `ERR_INVENTORY_INSUFFICIENT` (not 409 `ERR_OUT_OF_STOCK` as task description suggests) — same code as T214/T266 learnings.
 - Kit checkout with an OOS variant (stock depleted after add-to-cart) returns 400 `ERR_CART_STALE` with `stale_items[]` including `insufficient_stock: true` — the stale-items check runs before kit validation.
+
+## T276 — Phase 14 validation
+- The circuit breaker (T239) added `payment: "ok"` to `/health` dependencies — `smoke.test.ts` and `server.test.ts` used `toEqual({ database: "disconnected" })` which is exact-match and failed. Updated both to include the `payment` field.
+- `admin-settings.integration.test.ts` audit log test queried `adminAuditLog` without `ORDER BY` — `logsAfter[logsAfter.length - 1]` picked up a stale entry from prior runs. Fixed by adding `orderBy(desc(adminAuditLog.createdAt))` and selecting `logsAfter[0]`.
+- The env file is at `.dev/e2e-state/env.sh` (not `test/e2e/.state/env.sh` as the task description says). The `env` file (no `.sh`) lacks `export` statements and doesn't set `DATABASE_URL` — always use `env.sh`.
