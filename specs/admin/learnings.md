@@ -336,3 +336,7 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - SuperTokens access tokens are JWTs verified locally — after signout, they remain valid until expiry unless `checkDatabase: true` is passed to `Session.getSession()`. Added this to the `verifySession` middleware for immediate revocation enforcement.
 - Fastify schema validation on POST routes runs before `preHandler` hooks — using POST admin endpoints for 403 tests may yield 400 from schema validation instead. Use GET endpoints for auth boundary tests.
 - Rate-limit tests need a separate `createTestServer` instance with `RATE_LIMIT_MAX: 3` to avoid hitting the main test server's rate limit counter (which is shared across all tests using that instance).
+
+## T269 — Flow test: guest-order → account linking
+- Guest checkout steps (cart creation, add items, checkout, webhook) can use `app.inject()` since no auth is needed, but the signup/verify/signin steps need real HTTP (`fetch`) because SuperTokens requires cookie exchange. Using both in the same test works fine since `createTestServer` with default `skipListen: false` starts a real HTTP listener.
+- The `verifyEmailPOST` override must be triggered via the HTTP endpoint (`POST /auth/user/email/verify`) rather than just `EmailVerification.verifyEmailUsingToken` server-side, because the linking logic is in the SuperTokens override — direct SDK calls bypass the override.

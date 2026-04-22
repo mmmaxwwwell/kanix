@@ -1,0 +1,12 @@
+{
+  "task_id": "T269",
+  "status": "complete",
+  "summary": "Created guest-order-link flow integration test: guest checkout → signup → email verify triggers linking → order in history → idempotent re-link",
+  "commands_run": [
+    {"command": "pnpm vitest run --reporter=verbose src/flows/guest-order-link.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": ["api/src/flows/guest-order-link.integration.test.ts"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 2
+}
