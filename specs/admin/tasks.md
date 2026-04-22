@@ -619,7 +619,7 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T264 Flow test: dispute lifecycle [mirrors T100, SC-005]
   Done when: new `api/src/flows/dispute-lifecycle.integration.test.ts` walks: paid+shipped order → simulate `charge.dispute.created` webhook → auto-evidence collection fires → admin reviews + submits evidence bundle → simulate dispute won/lost webhooks → verify final order state + refund accounting.
 
-- [ ] T265 Flow test: contributor royalty [mirrors T101, SC-011]
+- [x] T265 Flow test: contributor royalty [mirrors T101, SC-011]
   Done when: new `api/src/flows/contributor-royalty.integration.test.ts` walks: contributor signup → product created and attributed → N units sold crossing each milestone → royalty ledger entries verified at each threshold (retroactive 10%, 20% rate change, starter kit); also verifies contributor dashboard totals match ledger sum.
 
 - [ ] T266 Flow test: concurrent inventory [mirrors T102, SC-003]

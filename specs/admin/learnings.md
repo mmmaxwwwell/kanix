@@ -316,3 +316,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `handleTrackingUpdate` requires going through `in_transit` before `delivered` — skipping in_transit returns `shipmentTransitioned: false` and prevents auto-completion. Always call the in_transit update first (same pattern as T263).
 - The `charge.dispute.created` webhook handler looks up the payment by `chargeId` first, then falls back to `paymentIntentId`. The test must ensure the chargeId is set on the payment row (via `latest_charge` in the `payment_intent.succeeded` webhook payload).
 - Evidence records with immutability triggers need `DISABLE TRIGGER USER` / `ENABLE TRIGGER USER` for both test setup (seeding evidence) and cleanup. Always re-enable triggers in `beforeAll` and `afterAll` to avoid poisoning subsequent test runs.
+
+## T265 — Flow test: contributor royalty
+- The `/api/contributors/public/:username` endpoint returns `ContributorRow` with camelCase keys (`githubUsername`, `profileVisibility`), not snake_case — Fastify serializes drizzle row objects as-is without case transformation.
+- `processOrderCompletionSales` must be called after the order is in `completed` status because `createRetroactiveRoyalties` filters for `order.status = 'completed'`. Setting status to `completed` before calling the function is required for retroactive royalties to include the current order's lines.
+- The 500-unit veteran rate (20%) only applies to orders processed AFTER `getRoyaltyRate` detects `totalSales >= 500`. The order that crosses the threshold still gets the rate calculated at the moment of processing, which may be 20% if newSalesCount >= 500 at the time.

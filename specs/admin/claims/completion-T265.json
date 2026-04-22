@@ -1,0 +1,12 @@
+{
+  "task_id": "T265",
+  "status": "complete",
+  "summary": "Created contributor-royalty flow integration test covering signup, product attribution, milestone crossing (25/50/500 units), retroactive and veteran-rate royalties, and dashboard verification",
+  "commands_run": [
+    {"command": "npx vitest run --reporter=verbose src/flows/contributor-royalty.integration.test.ts", "exit_code": 0}
+  ],
+  "files_created": ["api/src/flows/contributor-royalty.integration.test.ts"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 2
+}
