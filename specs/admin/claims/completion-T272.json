@@ -1,0 +1,12 @@
+{
+  "task_id": "T272",
+  "status": "complete",
+  "summary": "Created flow test for reservation expiry → late payment race exercising both branches: stock-available (re-reserve + confirm) and stock-exhausted (flag for review + admin alert)",
+  "commands_run": [
+    {"command": "npx vitest run src/flows/reservation-late-payment.integration.test.ts --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["api/src/flows/reservation-late-payment.integration.test.ts"],
+  "files_modified": ["specs/admin/tasks.md", "specs/admin/learnings.md"],
+  "screenshots": [],
+  "mcp_interactions": 1
+}

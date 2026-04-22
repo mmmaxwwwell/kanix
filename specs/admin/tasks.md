@@ -640,7 +640,7 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T271 Flow test: admin refund (full + partial) through Stripe [mirrors T104c, FR-030]
   Done when: new `api/src/flows/admin-refund.integration.test.ts` walks: paid order → admin initiates full refund → Stripe test-mode refund succeeds → verify refund row + order state + customer notification; second walkthrough for partial refund verifying balance math; third walkthrough for double-refund attempt returning 409.
 
-- [ ] T272 Flow test: reservation expiry → late payment race [mirrors T104d, FR-E008]
+- [x] T272 Flow test: reservation expiry → late payment race [mirrors T104d, FR-E008]
   Done when: new `api/src/flows/reservation-late-payment.integration.test.ts` walks: checkout creates short-TTL reservation → force expiry via cleanup job → fire `payment_intent.succeeded` webhook → both outcome branches exercised (re-reservation succeeded + order confirmed, OR order flagged for manual review with admin alert); stock-available and stock-exhausted setups.
 
 - [ ] T273 Flow test: low-stock alert → notification delivery [mirrors T104e, FR-038, FR-085]

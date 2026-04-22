@@ -349,3 +349,8 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - The refund flow test doesn't need real HTTP (`skipListen: false`) for refund operations since the refund endpoint uses `app.inject()` with admin auth headers — only the initial signup/signin needs real HTTP for SuperTokens cookie exchange.
 - No domain event or notification is published on refund creation — the only side effects are the DB refund record, payment_status transition (with order_status_history), and async audit log entry. The task description mentions "customer notification" but the current implementation has none.
 - Partial refund balance math: `processRefund` uses `getTotalRefundedForOrder` (SUM of all refund amounts) to compute remaining. Multiple partial refunds work correctly — each subtracts from the cumulative total, not from the original amount.
+
+## T272 — Flow test: reservation expiry → late payment race
+- `releaseExpiredReservations` from `db/queries/reservation.ts` is the actual cleanup job — force-expire by setting `expiresAt` to the past, then call the function to simulate the cron. This is more realistic than manually updating balance + reservation status.
+- The webhook handler's re-reservation logic uses `reservationReason: "payment_race_recovery"` — the consumed re-reservations can be distinguished from originals by this reason field.
+- Flow tests for this race condition don't need real HTTP (no auth required) — `app.inject()` works for cart/checkout/webhook since none require SuperTokens session cookies.
