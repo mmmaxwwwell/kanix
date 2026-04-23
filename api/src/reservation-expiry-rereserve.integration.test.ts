@@ -17,7 +17,7 @@ import type { PaymentAdapter } from "./services/payment-adapter.js";
 import { createAdminAlertService, type AdminAlertService } from "./services/admin-alert.js";
 import { createHmac } from "node:crypto";
 
-const WEBHOOK_SECRET = "whsec_test_race_handler_secret";
+const WEBHOOK_SECRET = "whsec_test_race_rereserve_secret";
 
 function createStubTaxAdapter(): TaxAdapter {
   return {
@@ -33,12 +33,12 @@ function createStubPaymentAdapter(): PaymentAdapter {
     async createPaymentIntent() {
       paymentAdapterCallCount++;
       return {
-        id: `pi_test_race_${paymentAdapterCallCount}_${Date.now()}`,
-        clientSecret: `pi_test_race_${paymentAdapterCallCount}_secret_${Date.now()}`,
+        id: `pi_test_rr_${paymentAdapterCallCount}_${Date.now()}`,
+        clientSecret: `pi_test_rr_${paymentAdapterCallCount}_secret_${Date.now()}`,
       };
     },
     async createRefund() {
-      return { id: `re_test_race_${Date.now()}`, status: "succeeded" };
+      return { id: `re_test_rr_${Date.now()}`, status: "succeeded" };
     },
     async submitDisputeEvidence() {
       return { id: "de_test_stub", status: "under_review" };
@@ -71,16 +71,16 @@ function generateWebhookPayload(
 }
 
 // ---------------------------------------------------------------------------
-// Expired reservations + out of stock → order flagged for review
+// Expired reservations + stock available → re-reserved and confirmed
 // ---------------------------------------------------------------------------
-describe("Reservation expiry race — flagged for review (FR-E008)", () => {
+describe("Reservation expiry race — re-reserved (FR-E008)", () => {
   let ts_: TestServer;
 
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
   let adminAlertService: AdminAlertService;
 
-  const ts = Date.now() + 100;
+  const ts = Date.now() + 200;
 
   let orderId = "";
   let paymentIntentId = "";
@@ -107,8 +107,8 @@ describe("Reservation expiry race — flagged for review (FR-E008)", () => {
     const [prod] = await db
       .insert(product)
       .values({
-        slug: `race-review-prod-${ts}`,
-        title: `Race Review Product ${ts}`,
+        slug: `race-reresv-prod-${ts}`,
+        title: `Race Re-reserve Product ${ts}`,
         status: "active",
       })
       .returning();
@@ -117,16 +117,15 @@ describe("Reservation expiry race — flagged for review (FR-E008)", () => {
       .insert(productVariant)
       .values({
         productId: prod.id,
-        sku: `RACE-REV-${ts}`,
-        title: `Race Review Variant ${ts}`,
-        priceMinor: 2000,
+        sku: `RACE-RR-${ts}`,
+        title: `Race Re-reserve Variant ${ts}`,
+        priceMinor: 1500,
         status: "active",
         weight: "16",
       })
       .returning();
     variantId = variant.id;
 
-    // Use first existing location or create one
     const existingBalances = await db.select().from(inventoryBalance).limit(1);
     if (existingBalances.length > 0) {
       locationId = existingBalances[0].locationId;
@@ -134,21 +133,21 @@ describe("Reservation expiry race — flagged for review (FR-E008)", () => {
       const [loc] = await db
         .insert(inventoryLocation)
         .values({
-          name: `Race Review WH ${ts}`,
-          code: `RACE-RW-${ts}`,
+          name: `Race Rereserve WH ${ts}`,
+          code: `RACE-RRW-${ts}`,
           type: "warehouse",
         })
         .returning();
       locationId = loc.id;
     }
 
-    // Set inventory to exactly 2 — just enough for checkout
+    // Set inventory to 10 — plenty for re-reservation
     await db.insert(inventoryBalance).values({
       variantId: variant.id,
       locationId,
-      onHand: 2,
+      onHand: 10,
       reserved: 0,
-      available: 2,
+      available: 10,
     });
 
     // Cart + checkout (reserves 2 units)
@@ -176,13 +175,13 @@ describe("Reservation expiry race — flagged for review (FR-E008)", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         cart_token: cartToken,
-        email: `race-review-${ts}@example.com`,
+        email: `race-rereserve-${ts}@example.com`,
         shipping_address: {
-          full_name: "Race Tester",
-          line1: "123 Race St",
-          city: "Austin",
+          full_name: "Rereserve Tester",
+          line1: "456 Reserve St",
+          city: "Houston",
           state: "TX",
-          postal_code: "78701",
+          postal_code: "77001",
           country: "US",
         },
       }),
@@ -195,15 +194,14 @@ describe("Reservation expiry race — flagged for review (FR-E008)", () => {
     const [paymentRow] = await db.select().from(payment).where(eq(payment.orderId, orderId));
     paymentIntentId = paymentRow.providerPaymentIntentId;
 
-    // Force-expire reservations by setting expires_at to the past and status to expired
-    // Simulate what the cleanup cron would do
+    // Force-expire reservations (simulate cron expiry)
     const reservations = await db
       .select()
       .from(inventoryReservation)
       .where(eq(inventoryReservation.orderId, orderId));
 
     for (const res of reservations) {
-      // Release inventory back (simulating cron expiry)
+      // Release inventory back
       await db.execute(
         sql`UPDATE inventory_balance
             SET reserved = reserved - ${res.quantity},
@@ -217,25 +215,16 @@ describe("Reservation expiry race — flagged for review (FR-E008)", () => {
         .set({ status: "expired", releasedAt: new Date() })
         .where(eq(inventoryReservation.id, res.id));
     }
-
-    // Now drain the available inventory so re-reservation fails
-    // Set available to 0 (simulating another customer bought the stock)
-    for (const res of reservations) {
-      await db.execute(
-        sql`UPDATE inventory_balance
-            SET available = 0, on_hand = 0
-            WHERE variant_id = ${res.variantId} AND location_id = ${res.locationId}`,
-      );
-    }
+    // Stock is still available (10 units restored to available → 10)
   });
 
   afterAll(async () => {
     await stopTestServer(ts_);
   });
 
-  it("should flag order for review when reservations expired and stock unavailable", async () => {
+  it("should re-reserve and confirm order when stock is available", async () => {
     const db = dbConn.db;
-    const eventId = `evt_test_race_review_${ts}`;
+    const eventId = `evt_test_race_rereserve_${ts}`;
 
     const { body, signature } = generateWebhookPayload(
       eventId,
@@ -243,10 +232,10 @@ describe("Reservation expiry race — flagged for review (FR-E008)", () => {
       {
         id: paymentIntentId,
         object: "payment_intent",
-        amount: 4599,
+        amount: 3599,
         currency: "usd",
         status: "succeeded",
-        latest_charge: `ch_test_race_review_${ts}`,
+        latest_charge: `ch_test_race_rr_${ts}`,
       },
       WEBHOOK_SECRET,
     );
@@ -263,54 +252,48 @@ describe("Reservation expiry race — flagged for review (FR-E008)", () => {
 
     expect(res.statusCode).toBe(200);
 
-    // Verify order stays in pending_payment (NOT confirmed) — deterministic final state
+    // Verify order IS confirmed — deterministic final state
     const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
-    expect(orderRow.status).toBe("pending_payment");
+    expect(orderRow.status).toBe("confirmed");
     expect(orderRow.paymentStatus).toBe("paid");
 
-    // Verify admin alert was queued with concrete fields
-    const alerts = adminAlertService.getAlerts();
-    const raceAlert = alerts.find(
-      (a) => a.type === "reservation_expired_payment_received" && a.orderId === orderId,
-    );
-    expect(raceAlert).not.toBeUndefined();
-    expect(raceAlert!.type).toBe("reservation_expired_payment_received");
-    expect(raceAlert!.orderId).toBe(orderId);
-    expect(raceAlert!.message).toBe(
-      "Payment received but inventory reservations expired and stock is no longer available. Order requires manual review.",
-    );
-    expect(raceAlert!.timestamp).toBeInstanceOf(Date);
+    // Verify reservations: expired originals + consumed new ones
+    const reservations = await db
+      .select()
+      .from(inventoryReservation)
+      .where(eq(inventoryReservation.orderId, orderId));
 
-    // Verify alert details contain the expired reservation info
-    const details = raceAlert!.details as {
-      expiredReservations: Array<{ variantId: string; locationId: string; quantity: number }>;
-    };
-    expect(Array.isArray(details.expiredReservations)).toBe(true);
-    expect(details.expiredReservations.length).toBe(1);
-    expect(details.expiredReservations[0].variantId).toBe(variantId);
-    expect(details.expiredReservations[0].locationId).toBe(locationId);
-    expect(details.expiredReservations[0].quantity).toBe(2);
+    const expired = reservations.filter((r) => r.status === "expired");
+    const consumed = reservations.filter((r) => r.status === "consumed");
+    expect(expired.length).toBe(1); // original reservation
+    expect(consumed.length).toBe(1); // re-reserved and then consumed
 
-    // Verify inventory balance is still depleted (no re-reservation happened)
+    // Verify the consumed reservation has the recovery reason
+    expect(consumed[0].variantId).toBe(variantId);
+    expect(consumed[0].quantity).toBe(2);
+
+    // Verify inventory balance reflects the consumed re-reservation
+    // Started with 10, checkout reserved 2 (then expired → back to 10),
+    // re-reservation took 2, consumed → onHand should drop by 2
     const [balance] = await db
       .select()
       .from(inventoryBalance)
       .where(
         and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
       );
-    expect(balance.available).toBe(0);
-    expect(balance.onHand).toBe(0);
+    // After re-reserve + consume: reserved goes to 0, onHand stays 10,
+    // available = onHand - reserved = 10 - 0 = 10... but consume decrements onHand by quantity
+    // Actually: reserve does reserved+2/available-2, consume does onHand-2/reserved-2
+    // So: onHand=10-2=8, reserved=2-2=0, available=10-2=8
+    expect(balance.onHand).toBe(8);
+    expect(balance.reserved).toBe(0);
+    expect(balance.available).toBe(8);
 
-    // Verify all reservations for this order are still expired (no new ones created)
-    const reservations = await db
-      .select()
-      .from(inventoryReservation)
-      .where(eq(inventoryReservation.orderId, orderId));
-    const expiredCount = reservations.filter((r) => r.status === "expired").length;
-    const activeOrConsumed = reservations.filter(
-      (r) => r.status === "active" || r.status === "consumed",
-    ).length;
-    expect(expiredCount).toBe(1);
-    expect(activeOrConsumed).toBe(0);
+    // Verify no admin alert was queued (re-reservation succeeded)
+    const alerts = adminAlertService.getAlerts();
+    const raceAlert = alerts.find(
+      (a) => a.type === "reservation_expired_payment_received" && a.orderId === orderId,
+    );
+    expect(raceAlert).toBeUndefined();
   });
 });

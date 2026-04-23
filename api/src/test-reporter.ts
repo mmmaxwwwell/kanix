@@ -154,11 +154,16 @@ export default class SpecKitReporter implements Reporter {
         const relFile = relative(PROJECT_ROOT, filepath);
         const result: TaskResult | undefined = task.result;
         const duration_ms = Math.round(result?.duration ?? 0);
-        let status: Status = "skipped";
-        if (result?.state === "pass") status = "passed";
-        else if (result?.state === "fail") status = "failed";
-        else if ((task as Task).mode === "skip" || (task as Task).mode === "todo")
+        let status: Status;
+        if ((task as Task).mode === "skip" || (task as Task).mode === "todo") {
           status = "skipped";
+        } else if (result?.state === "pass") {
+          status = "passed";
+        } else {
+          // Failed, or no result (e.g., beforeAll threw — test never ran).
+          // Treating missing results as "failed" prevents false skip reports.
+          status = "failed";
+        }
 
         const entry: ResultEntry = { name: fullName, file: relFile, status, duration_ms };
 

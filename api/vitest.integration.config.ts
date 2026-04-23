@@ -4,13 +4,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    include: ["src/**/*.test.ts"],
-    exclude: [
-      "**/node_modules/**",
-      "**/dist/**",
-      "src/**/*.external.test.ts",
-      "src/**/*.integration.test.ts",
-    ],
+    include: ["src/**/*.integration.test.ts"],
+    exclude: ["**/node_modules/**", "**/dist/**"],
     passWithNoTests: true,
     pool: "forks",
     poolOptions: {
