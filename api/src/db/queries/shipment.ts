@@ -440,8 +440,7 @@ export async function voidShipmentLabel(
       try {
         voidResult = await adapter.voidLabel(shipmentId);
       } catch (adapterErr: unknown) {
-        const msg =
-          adapterErr instanceof Error ? adapterErr.message : "Label void failed";
+        const msg = adapterErr instanceof Error ? adapterErr.message : "Label void failed";
         throw {
           code: "ERR_VOID_WINDOW_EXPIRED",
           message: msg,
@@ -460,18 +459,16 @@ export async function voidShipmentLabel(
 
   // Store a shipment event for audit trail
   const now = new Date();
-  await db
-    .insert(shipmentEvent)
-    .values({
-      shipmentId,
-      providerEventId: `void-${shipmentId}-${now.getTime()}`,
-      status: "voided",
-      description: refunded
-        ? `Label voided with refund of ${refundedCostMinor} minor units`
-        : "Label voided (no refund)",
-      occurredAt: now,
-      rawPayloadJson: { refunded, refundedCostMinor },
-    });
+  await db.insert(shipmentEvent).values({
+    shipmentId,
+    providerEventId: `void-${shipmentId}-${now.getTime()}`,
+    status: "voided",
+    description: refunded
+      ? `Label voided with refund of ${refundedCostMinor} minor units`
+      : "Label voided (no refund)",
+    occurredAt: now,
+    rawPayloadJson: { refunded, refundedCostMinor },
+  });
 
   // Fetch the updated shipment
   const [updated] = await db

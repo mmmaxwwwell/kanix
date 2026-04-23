@@ -282,7 +282,9 @@ describe("Reservation expiry race — flagged for review (FR-E008)", () => {
     expect(raceAlert!.timestamp).toBeInstanceOf(Date);
 
     // Verify alert details contain the expired reservation info
-    const details = raceAlert!.details as { expiredReservations: Array<{ variantId: string; locationId: string; quantity: number }> };
+    const details = raceAlert!.details as {
+      expiredReservations: Array<{ variantId: string; locationId: string; quantity: number }>;
+    };
     expect(Array.isArray(details.expiredReservations)).toBe(true);
     expect(details.expiredReservations.length).toBe(1);
     expect(details.expiredReservations[0].variantId).toBe(variantId);
@@ -294,10 +296,7 @@ describe("Reservation expiry race — flagged for review (FR-E008)", () => {
       .select()
       .from(inventoryBalance)
       .where(
-        and(
-          eq(inventoryBalance.variantId, variantId),
-          eq(inventoryBalance.locationId, locationId),
-        ),
+        and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
       );
     expect(balance.available).toBe(0);
     expect(balance.onHand).toBe(0);
@@ -308,7 +307,9 @@ describe("Reservation expiry race — flagged for review (FR-E008)", () => {
       .from(inventoryReservation)
       .where(eq(inventoryReservation.orderId, orderId));
     const expiredCount = reservations.filter((r) => r.status === "expired").length;
-    const activeOrConsumed = reservations.filter((r) => r.status === "active" || r.status === "consumed").length;
+    const activeOrConsumed = reservations.filter(
+      (r) => r.status === "active" || r.status === "consumed",
+    ).length;
     expect(expiredCount).toBe(1);
     expect(activeOrConsumed).toBe(0);
   });
@@ -523,10 +524,7 @@ describe("Reservation expiry race — re-reserved (FR-E008)", () => {
       .select()
       .from(inventoryBalance)
       .where(
-        and(
-          eq(inventoryBalance.variantId, variantId),
-          eq(inventoryBalance.locationId, locationId),
-        ),
+        and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
       );
     // After re-reserve + consume: reserved goes to 0, onHand stays 10,
     // available = onHand - reserved = 10 - 0 = 10... but consume decrements onHand by quantity

@@ -361,9 +361,7 @@ describe("flow: out-of-stock cart + kit rejection (T275, mirrors T104h, FR-010)"
       await db.delete(product).where(eq(product.id, productBId));
       await db.delete(productClass).where(eq(productClass.id, classAId));
       await db.delete(productClass).where(eq(productClass.id, classBId));
-      await db
-        .delete(adminAuditLog)
-        .where(eq(adminAuditLog.actorAdminUserId, adminUserId));
+      await db.delete(adminAuditLog).where(eq(adminAuditLog.actorAdminUserId, adminUserId));
       await db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, adminUserId));
       await db.delete(adminUser).where(eq(adminUser.id, adminUserId));
       await db.delete(adminRole).where(eq(adminRole.id, adminRoleId));
@@ -406,10 +404,7 @@ describe("flow: out-of-stock cart + kit rejection (T275, mirrors T104h, FR-010)"
       .select()
       .from(inventoryBalance)
       .where(
-        and(
-          eq(inventoryBalance.variantId, variantId),
-          eq(inventoryBalance.locationId, locationId),
-        ),
+        and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
       );
     expect(balance.onHand).toBe(INITIAL_STOCK);
     expect(balance.reserved).toBe(0);
@@ -434,10 +429,7 @@ describe("flow: out-of-stock cart + kit rejection (T275, mirrors T104h, FR-010)"
       .select()
       .from(inventoryBalance)
       .where(
-        and(
-          eq(inventoryBalance.variantId, variantId),
-          eq(inventoryBalance.locationId, locationId),
-        ),
+        and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
       );
     expect(balance.onHand).toBe(0);
     expect(balance.available).toBe(0);
@@ -460,9 +452,7 @@ describe("flow: out-of-stock cart + kit rejection (T275, mirrors T104h, FR-010)"
     expect(body.product.slug).toBe(`oos-prod-a-${run}`);
 
     // Find our variant in the product's variants
-    const variant = body.product.variants.find(
-      (v: { id: string }) => v.id === variantId,
-    );
+    const variant = body.product.variants.find((v: { id: string }) => v.id === variantId);
     expect(variant).toBeDefined();
     expect(variant.inStock).toBe(false);
     expect(variant.available).toBe(0);
@@ -512,10 +502,7 @@ describe("flow: out-of-stock cart + kit rejection (T275, mirrors T104h, FR-010)"
       .update(inventoryBalance)
       .set({ onHand: 1, available: 1 })
       .where(
-        and(
-          eq(inventoryBalance.variantId, variantId),
-          eq(inventoryBalance.locationId, locationId),
-        ),
+        and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
       );
 
     // Create cart and add kit
@@ -550,10 +537,7 @@ describe("flow: out-of-stock cart + kit rejection (T275, mirrors T104h, FR-010)"
       .update(inventoryBalance)
       .set({ onHand: 0, available: 0 })
       .where(
-        and(
-          eq(inventoryBalance.variantId, variantId),
-          eq(inventoryBalance.locationId, locationId),
-        ),
+        and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
       );
 
     // Attempt checkout — should fail with ERR_CART_STALE since variant is now OOS
@@ -603,10 +587,7 @@ describe("flow: out-of-stock cart + kit rejection (T275, mirrors T104h, FR-010)"
       .select()
       .from(inventoryBalance)
       .where(
-        and(
-          eq(inventoryBalance.variantId, variantId),
-          eq(inventoryBalance.locationId, locationId),
-        ),
+        and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
       );
     expect(balance.onHand).toBe(20);
     expect(balance.available).toBe(20);
@@ -618,9 +599,7 @@ describe("flow: out-of-stock cart + kit rejection (T275, mirrors T104h, FR-010)"
     });
     expect(catalogRes.statusCode).toBe(200);
     const catalogBody = JSON.parse(catalogRes.body);
-    const variant = catalogBody.product.variants.find(
-      (v: { id: string }) => v.id === variantId,
-    );
+    const variant = catalogBody.product.variants.find((v: { id: string }) => v.id === variantId);
     expect(variant).toBeDefined();
     expect(variant.inStock).toBe(true);
     expect(variant.available).toBe(20);

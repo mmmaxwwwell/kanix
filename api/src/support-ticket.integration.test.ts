@@ -123,9 +123,7 @@ describe("support ticket integration (T061, FR-050)", () => {
       try {
         // Clean up child rows first
         for (const ticketId of createdTicketIds) {
-          await db
-            .delete(evidenceRecord)
-            .where(eq(evidenceRecord.supportTicketId, ticketId));
+          await db.delete(evidenceRecord).where(eq(evidenceRecord.supportTicketId, ticketId));
           await db
             .delete(supportTicketStatusHistory)
             .where(eq(supportTicketStatusHistory.ticketId, ticketId));
@@ -279,9 +277,7 @@ describe("support ticket integration (T061, FR-050)", () => {
       expect(t.status).toBe("open");
     }
     // Verify our test tickets appear
-    const ourIds = createdTicketIds.filter((id) =>
-      tickets.some((t) => t.id === id),
-    );
+    const ourIds = createdTicketIds.filter((id) => tickets.some((t) => t.id === id));
     expect(ourIds.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -314,10 +310,7 @@ describe("support ticket integration (T061, FR-050)", () => {
 
   it("search by customer returns empty for unknown customer", async () => {
     const db = dbConn.db;
-    const tickets = await listTicketsByCustomerId(
-      db,
-      "00000000-0000-0000-0000-ffffffffffff",
-    );
+    const tickets = await listTicketsByCustomerId(db, "00000000-0000-0000-0000-ffffffffffff");
     expect(tickets).toHaveLength(0);
   });
 
@@ -358,9 +351,7 @@ describe("support ticket integration (T061, FR-050)", () => {
     expect(customerMsg.authorType).toBe("customer");
     expect(customerMsg.customerId).toBe(testCustomerId);
     expect(customerMsg.isInternalNote).toBe(false);
-    expect(customerMsg.body).toBe(
-      "The package was crushed and the item inside is broken.",
-    );
+    expect(customerMsg.body).toBe("The package was crushed and the item inside is broken.");
     expect(customerMsg.ticketId).toBe(ticket.id);
     expect(customerMsg.createdAt).toBeInstanceOf(Date);
 

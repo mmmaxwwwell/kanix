@@ -44,9 +44,21 @@ describe("fulfillment task integration (T056)", () => {
     const admins = await db
       .insert(adminUser)
       .values([
-        { authSubject: `t230-admin1-${ts}`, email: `admin1-${ts}@test.kanix.dev`, name: "T230 Admin 1" },
-        { authSubject: `t230-admin2-${ts}`, email: `admin2-${ts}@test.kanix.dev`, name: "T230 Admin 2" },
-        { authSubject: `t230-admin3-${ts}`, email: `admin3-${ts}@test.kanix.dev`, name: "T230 Admin 3" },
+        {
+          authSubject: `t230-admin1-${ts}`,
+          email: `admin1-${ts}@test.kanix.dev`,
+          name: "T230 Admin 1",
+        },
+        {
+          authSubject: `t230-admin2-${ts}`,
+          email: `admin2-${ts}@test.kanix.dev`,
+          name: "T230 Admin 2",
+        },
+        {
+          authSubject: `t230-admin3-${ts}`,
+          email: `admin3-${ts}@test.kanix.dev`,
+          name: "T230 Admin 3",
+        },
       ])
       .returning({ id: adminUser.id });
     adminId1 = admins[0].id;
@@ -108,7 +120,15 @@ describe("fulfillment task integration (T056)", () => {
     taskId: string,
     target: "assigned" | "picking" | "picked" | "packing" | "packed" | "shipment_pending" | "done",
   ) {
-    const steps: string[] = ["assigned", "picking", "picked", "packing", "packed", "shipment_pending", "done"];
+    const steps: string[] = [
+      "assigned",
+      "picking",
+      "picked",
+      "packing",
+      "packed",
+      "shipment_pending",
+      "done",
+    ];
     const targetIdx = steps.indexOf(target);
     // new → assigned via assign
     await assignFulfillmentTask(dbConn.db, taskId, adminId1);
@@ -145,7 +165,15 @@ describe("fulfillment task integration (T056)", () => {
   });
 
   it("allows blocked transition from every active state", () => {
-    const activeStates = ["new", "assigned", "picking", "picked", "packing", "packed", "shipment_pending"];
+    const activeStates = [
+      "new",
+      "assigned",
+      "picking",
+      "picked",
+      "packing",
+      "packed",
+      "shipment_pending",
+    ];
     for (const state of activeStates) {
       expect(isValidFulfillmentTaskTransition(state, "blocked")).toBe(true);
     }
@@ -237,9 +265,7 @@ describe("fulfillment task integration (T056)", () => {
 
     expect(result.orderId).toBe(testOrder.id);
     expect(result.status).toBe("new");
-    expect(result.id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-    );
+    expect(result.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(["normal", "high"]).toContain(result.priority);
     expect(typeof result.slaAtRisk).toBe("boolean");
   });
@@ -704,9 +730,7 @@ describe("fulfillment task integration (T056)", () => {
     createdTaskIds.push(task.id);
     await walkTaskTo(task.id, "done");
 
-    await expect(
-      assignFulfillmentTask(db, task.id, adminId2),
-    ).rejects.toMatchObject({
+    await expect(assignFulfillmentTask(db, task.id, adminId2)).rejects.toMatchObject({
       code: "ERR_INVALID_TRANSITION",
     });
   });

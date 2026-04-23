@@ -36,6 +36,7 @@
     "vitest": "^3.0.0"
   },
   "dependencies": {
+    "@easypost/api": "^8.0.0",
     "@fastify/websocket": "^11.2.0",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.8.5",

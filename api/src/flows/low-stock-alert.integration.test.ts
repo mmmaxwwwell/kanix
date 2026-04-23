@@ -214,9 +214,7 @@ describe("flow: low-stock alert → notification delivery (T273, FR-038, FR-085)
       await dbConn.db
         .delete(inventoryAdjustment)
         .where(eq(inventoryAdjustment.variantId, testVariantId));
-      await dbConn.db
-        .delete(inventoryBalance)
-        .where(eq(inventoryBalance.variantId, testVariantId));
+      await dbConn.db.delete(inventoryBalance).where(eq(inventoryBalance.variantId, testVariantId));
       await dbConn.db.delete(inventoryLocation).where(eq(inventoryLocation.id, testLocationId));
       await dbConn.db.delete(productVariant).where(eq(productVariant.id, testVariantId));
       await dbConn.db.delete(product).where(eq(product.id, testProductId));
@@ -226,9 +224,7 @@ describe("flow: low-stock alert → notification delivery (T273, FR-038, FR-085)
       await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, adminUserId));
       await dbConn.db.delete(adminUser).where(eq(adminUser.id, adminUserId));
       await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));
-      await dbConn.db
-        .delete(adminAuditLog)
-        .where(eq(adminAuditLog.actorAdminUserId, adminUserId));
+      await dbConn.db.delete(adminAuditLog).where(eq(adminAuditLog.actorAdminUserId, adminUserId));
     } catch {
       // Best-effort cleanup
     }
@@ -323,9 +319,7 @@ describe("flow: low-stock alert → notification delivery (T273, FR-038, FR-085)
     // The alert from step 2 should have published an event
     const allEntries = wsManager!.messageBuffer;
     const lowStockEvents = allEntries.filter(
-      (m) =>
-        m.message.type === "inventory.low_stock" &&
-        m.message.entityId === testVariantId,
+      (m) => m.message.type === "inventory.low_stock" && m.message.entityId === testVariantId,
     );
     expect(lowStockEvents.length).toBeGreaterThanOrEqual(1);
 
@@ -357,14 +351,15 @@ describe("flow: low-stock alert → notification delivery (T273, FR-038, FR-085)
     const allLines = readFileSync(defaultEmailLogPath, "utf-8").trim().split("\n");
 
     // Find the email for our specific variant and admin
-    const parsed = allLines.map((line) =>
-      JSON.parse(line) as {
-        to: string;
-        subject: string;
-        body: string;
-        templateId: string;
-        timestamp: string;
-      },
+    const parsed = allLines.map(
+      (line) =>
+        JSON.parse(line) as {
+          to: string;
+          subject: string;
+          body: string;
+          templateId: string;
+          timestamp: string;
+        },
     );
 
     const matchingEntry = parsed.find(
@@ -378,7 +373,7 @@ describe("flow: low-stock alert → notification delivery (T273, FR-038, FR-085)
 
     // Assert all required fields are present in the email body
     expect(matchingEntry!.body).toContain(testVariantId);
-    expect(matchingEntry!.body).toContain("9");  // available count
+    expect(matchingEntry!.body).toContain("9"); // available count
     expect(matchingEntry!.body).toContain("10"); // safety stock threshold
     expect(matchingEntry!.timestamp).toBeTruthy();
 

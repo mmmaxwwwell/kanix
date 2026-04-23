@@ -5,7 +5,7 @@ import EmailVerification from "supertokens-node/recipe/emailverification/index.j
 import ThirdParty from "supertokens-node/recipe/thirdparty/index.js";
 import type { TypeInput } from "supertokens-node/types";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { eq, and, ne, ilike } from "drizzle-orm";
+import { eq, and, ne, sql } from "drizzle-orm";
 import { customer } from "../db/schema/customer.js";
 import { linkGuestOrdersByEmail } from "../db/queries/order.js";
 import type { AdminAlertService } from "../services/admin-alert.js";
@@ -64,7 +64,9 @@ export function initSuperTokens(config: SuperTokensConfig): void {
                 const existingByEmail = await config.db
                   .select({ id: customer.id })
                   .from(customer)
-                  .where(ilike(customer.email, emailField.value as string))
+                  .where(
+                    eq(sql`lower(${customer.email})`, sql`lower(${emailField.value as string})`),
+                  )
                   .limit(1);
 
                 if (existingByEmail.length > 0) {
@@ -260,6 +262,19 @@ export async function linkGitHubToCustomer(
   const rows = await db
     .update(customer)
     .set({ githubUserId, updatedAt: new Date() })
+    .where(eq(customer.id, customerId))
+    .returning({ id: customer.id, githubUserId: customer.githubUserId });
+
+  return rows[0] ?? null;
+}
+
+export async function unlinkGitHubFromCustomer(
+  db: PostgresJsDatabase,
+  customerId: string,
+): Promise<{ id: string; githubUserId: string | null } | null> {
+  const rows = await db
+    .update(customer)
+    .set({ githubUserId: null, updatedAt: new Date() })
     .where(eq(customer.id, customerId))
     .returning({ id: customer.id, githubUserId: customer.githubUserId });
 

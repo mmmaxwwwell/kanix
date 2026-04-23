@@ -3,7 +3,13 @@ import type { DatabaseConnection } from "./db/connection.js";
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { adminUser, adminRole, adminUserRole } from "./db/schema/admin.js";
-import { product, productMedia, productVariant, collection, collectionProduct } from "./db/schema/catalog.js";
+import {
+  product,
+  productMedia,
+  productVariant,
+  collection,
+  collectionProduct,
+} from "./db/schema/catalog.js";
 import { ROLE_CAPABILITIES } from "./auth/admin.js";
 import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
 
@@ -138,10 +144,7 @@ describe("admin product CRUD API (T227)", () => {
         await dbConn.db.delete(product).where(eq(product.id, pid));
       }
       // Cleanup admin records
-      const users = await dbConn.db
-        .select()
-        .from(adminUser)
-        .where(eq(adminUser.email, adminEmail));
+      const users = await dbConn.db.select().from(adminUser).where(eq(adminUser.email, adminEmail));
       for (const u of users) {
         await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, u.id));
         await dbConn.db.delete(adminUser).where(eq(adminUser.id, u.id));
@@ -180,9 +183,7 @@ describe("admin product CRUD API (T227)", () => {
     expect(created.slug).toBe(`test-product-${ts}`);
     expect(created.title).toBe("Test Handler Belt");
     expect(created.description).toBe("A test product");
-    expect(created.id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-    );
+    expect(created.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     createdProductIds.push(created.id);
 
     // Activate (draft → active)
@@ -254,7 +255,9 @@ describe("admin product CRUD API (T227)", () => {
 
     const res = await fetch(`${address}/api/admin/products`, { headers: adminHeaders });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { products: { id: string; slug: string; title: string; status: string }[] };
+    const body = (await res.json()) as {
+      products: { id: string; slug: string; title: string; status: string }[];
+    };
     expect(body.products.length).toBeGreaterThanOrEqual(1);
     const found = body.products.find((pr) => pr.id === p.id);
     expect(found).toBeDefined();

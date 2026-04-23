@@ -164,9 +164,7 @@ describe("EasyPost tracking webhook (T059)", () => {
       try {
         // evidence_record has immutability triggers; disable before cleanup
         await db.execute(sql`ALTER TABLE evidence_record DISABLE TRIGGER USER`);
-        await db.execute(
-          sql`DELETE FROM evidence_record WHERE shipment_id = ${testShipmentId}`,
-        );
+        await db.execute(sql`DELETE FROM evidence_record WHERE shipment_id = ${testShipmentId}`);
         await db.execute(sql`ALTER TABLE evidence_record ENABLE TRIGGER USER`);
       } catch {
         // Best-effort — evidence may not exist
@@ -320,7 +318,9 @@ describe("EasyPost tracking webhook (T059)", () => {
       .from(shipment)
       .where(eq(shipment.id, testShipmentId));
     expect(rawShipment.deliveredAt).toBeInstanceOf(Date);
-    expect(rawShipment.deliveredAt!.getTime()).toBeGreaterThanOrEqual(beforeUpdate.getTime() - 1000);
+    expect(rawShipment.deliveredAt!.getTime()).toBeGreaterThanOrEqual(
+      beforeUpdate.getTime() - 1000,
+    );
 
     // Verify order shipping_status
     const updatedOrder = await findOrderById(db, testOrderId);
@@ -579,9 +579,7 @@ describe("EasyPost webhook HTTP handler (T059)", () => {
         const db = dbConn.db;
         // evidence_record has immutability triggers; disable before cleanup
         await db.execute(sql`ALTER TABLE evidence_record DISABLE TRIGGER USER`);
-        await db.execute(
-          sql`DELETE FROM evidence_record WHERE shipment_id = ${testShipmentId2}`,
-        );
+        await db.execute(sql`DELETE FROM evidence_record WHERE shipment_id = ${testShipmentId2}`);
         await db.execute(sql`ALTER TABLE evidence_record ENABLE TRIGGER USER`);
         await db.delete(shipmentEvent).where(eq(shipmentEvent.shipmentId, testShipmentId2));
         await db.delete(shipmentLine).where(eq(shipmentLine.shipmentId, testShipmentId2));

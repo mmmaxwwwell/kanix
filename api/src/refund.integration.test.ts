@@ -409,10 +409,7 @@ describe("refund API (T052, FR-030)", () => {
     expect(r.providerRefundId).toMatch(/^re_test_/);
 
     // Verify payment_status is now "refunded"
-    const [orderRow] = await dbConn.db
-      .select()
-      .from(order)
-      .where(eq(order.id, fullRefundOrderId));
+    const [orderRow] = await dbConn.db.select().from(order).where(eq(order.id, fullRefundOrderId));
     expect(orderRow.paymentStatus).toBe("refunded");
 
     // Verify the status transition event was recorded
@@ -530,10 +527,7 @@ describe("refund API (T052, FR-030)", () => {
       .select()
       .from(adminAuditLog)
       .where(
-        and(
-          eq(adminAuditLog.entityId, partialOrderId),
-          eq(adminAuditLog.action, "refund.create"),
-        ),
+        and(eq(adminAuditLog.entityId, partialOrderId), eq(adminAuditLog.action, "refund.create")),
       );
     expect(partialAudits.length).toBeGreaterThanOrEqual(1);
     const partialAudit = partialAudits[0];

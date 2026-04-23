@@ -343,7 +343,9 @@ export async function releaseExpiredReservations(db: PostgresJsDatabase): Promis
   const [keptResult] = await db
     .select({ count: count() })
     .from(inventoryReservation)
-    .where(and(eq(inventoryReservation.status, "active"), gte(inventoryReservation.expiresAt, now)));
+    .where(
+      and(eq(inventoryReservation.status, "active"), gte(inventoryReservation.expiresAt, now)),
+    );
 
   const kept = keptResult?.count ?? 0;
 
@@ -390,9 +392,7 @@ export async function listReservations(
     conditions.push(lte(inventoryReservation.expiresAt, filter.expiresBefore));
   }
 
-  const query = db
-    .select()
-    .from(inventoryReservation);
+  const query = db.select().from(inventoryReservation);
 
   if (conditions.length > 0) {
     return query.where(and(...conditions)).orderBy(desc(inventoryReservation.createdAt));

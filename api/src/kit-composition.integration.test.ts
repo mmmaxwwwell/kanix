@@ -234,9 +234,9 @@ describe("kit composition (T047)", () => {
       .returning();
     inactiveKitDefId = inactiveKit.id;
 
-    await dbConn.db.insert(kitClassRequirement).values([
-      { kitDefinitionId: inactiveKitDefId, productClassId: platesClassId, quantity: 1 },
-    ]);
+    await dbConn.db
+      .insert(kitClassRequirement)
+      .values([{ kitDefinitionId: inactiveKitDefId, productClassId: platesClassId, quantity: 1 }]);
 
     // Kit requires: 2 from Plates, 1 from Bowls
     await dbConn.db.insert(kitClassRequirement).values([
@@ -261,9 +261,7 @@ describe("kit composition (T047)", () => {
       if (cartId) {
         const lines = await dbConn.db.select().from(cartLine).where(eq(cartLine.cartId, cartId));
         for (const line of lines) {
-          await dbConn.db
-            .delete(cartKitSelection)
-            .where(eq(cartKitSelection.cartLineId, line.id));
+          await dbConn.db.delete(cartKitSelection).where(eq(cartKitSelection.cartLineId, line.id));
         }
         await dbConn.db.delete(cartLine).where(eq(cartLine.cartId, cartId));
         await dbConn.db.delete(cart).where(eq(cart.id, cartId));
@@ -498,9 +496,7 @@ describe("kit composition (T047)", () => {
       },
       body: JSON.stringify({
         kit_definition_id: inactiveKitDefId,
-        selections: [
-          { product_class_id: platesClassId, variant_id: variantA1Id },
-        ],
+        selections: [{ product_class_id: platesClassId, variant_id: variantA1Id }],
       }),
     });
 
@@ -561,7 +557,7 @@ describe("kit composition (T047)", () => {
         selections: [
           { product_class_id: platesClassId, variant_id: variantA2Id }, // PA11 @ 2500
           { product_class_id: platesClassId, variant_id: variantB1Id }, // TPU @ 1800
-          { product_class_id: bowlsClassId, variant_id: variantC1Id },  // TPU @ 1500
+          { product_class_id: bowlsClassId, variant_id: variantC1Id }, // TPU @ 1500
         ],
       }),
     });

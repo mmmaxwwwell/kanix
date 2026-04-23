@@ -281,13 +281,24 @@ describe("admin customer APIs (T224)", () => {
         await dbConn.db.delete(order).where(eq(order.id, testOrderId));
         await dbConn.db.delete(order).where(eq(order.id, testOrder2Id));
         // Reset customer status in case ban test changed it
-        await dbConn.db.update(customer).set({ status: "active" }).where(eq(customer.id, testCustomerId));
+        await dbConn.db
+          .update(customer)
+          .set({ status: "active" })
+          .where(eq(customer.id, testCustomerId));
         await dbConn.db.delete(customer).where(eq(customer.id, testCustomerId));
         await dbConn.db.delete(customer).where(eq(customer.id, testCustomer2Id));
-        await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, superAdminUserId));
-        await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, operatorAdminUserId));
-        await dbConn.db.delete(adminAuditLog).where(eq(adminAuditLog.actorAdminUserId, superAdminUserId));
-        await dbConn.db.delete(adminAuditLog).where(eq(adminAuditLog.actorAdminUserId, operatorAdminUserId));
+        await dbConn.db
+          .delete(adminUserRole)
+          .where(eq(adminUserRole.adminUserId, superAdminUserId));
+        await dbConn.db
+          .delete(adminUserRole)
+          .where(eq(adminUserRole.adminUserId, operatorAdminUserId));
+        await dbConn.db
+          .delete(adminAuditLog)
+          .where(eq(adminAuditLog.actorAdminUserId, superAdminUserId));
+        await dbConn.db
+          .delete(adminAuditLog)
+          .where(eq(adminAuditLog.actorAdminUserId, operatorAdminUserId));
         await dbConn.db.delete(adminUser).where(eq(adminUser.id, superAdminUserId));
         await dbConn.db.delete(adminUser).where(eq(adminUser.id, operatorAdminUserId));
         await dbConn.db.delete(adminRole).where(eq(adminRole.id, superAdminRoleId));

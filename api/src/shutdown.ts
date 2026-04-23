@@ -28,6 +28,11 @@ export function isShuttingDown(): boolean {
   return shutdownInitiated;
 }
 
+/** Reset shutdown state — for test harness use only. */
+export function resetShutdownState(): void {
+  shutdownInitiated = false;
+}
+
 // ---------------------------------------------------------------------------
 // Shutdown Manager
 // ---------------------------------------------------------------------------

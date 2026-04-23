@@ -176,18 +176,14 @@ describe("admin reservation view + override (T228)", () => {
 
   afterAll(async () => {
     try {
-      await dbConn.db
-        .delete(adminAuditLog)
-        .where(eq(adminAuditLog.actorAdminUserId, adminUserId));
+      await dbConn.db.delete(adminAuditLog).where(eq(adminAuditLog.actorAdminUserId, adminUserId));
       await dbConn.db
         .delete(inventoryMovement)
         .where(eq(inventoryMovement.variantId, testVariantId));
       await dbConn.db
         .delete(inventoryReservation)
         .where(eq(inventoryReservation.variantId, testVariantId));
-      await dbConn.db
-        .delete(inventoryBalance)
-        .where(eq(inventoryBalance.variantId, testVariantId));
+      await dbConn.db.delete(inventoryBalance).where(eq(inventoryBalance.variantId, testVariantId));
       await dbConn.db.delete(inventoryLocation).where(eq(inventoryLocation.id, testLocationId));
       await dbConn.db.delete(productVariant).where(eq(productVariant.id, testVariantId));
       await dbConn.db.delete(product).where(eq(product.id, testProductId));
@@ -215,7 +211,15 @@ describe("admin reservation view + override (T228)", () => {
     });
     expect(res.status).toBe(201);
     const body = (await res.json()) as {
-      reservation: { id: string; status: string; quantity: number; variantId: string; locationId: string; reservationReason: string; expiresAt: string };
+      reservation: {
+        id: string;
+        status: string;
+        quantity: number;
+        variantId: string;
+        locationId: string;
+        reservationReason: string;
+        expiresAt: string;
+      };
       movement: { movementType: string; quantityDelta: number };
     };
     return body;
@@ -241,7 +245,9 @@ describe("admin reservation view + override (T228)", () => {
       `${address}/api/admin/inventory/balances?variant_id=${testVariantId}`,
       { headers: adminHeaders },
     );
-    const balBody = (await balRes.json()) as { balances: Array<{ available: number; reserved: number; onHand: number }> };
+    const balBody = (await balRes.json()) as {
+      balances: Array<{ available: number; reserved: number; onHand: number }>;
+    };
     expect(balBody.balances[0].available).toBe(95);
     expect(balBody.balances[0].reserved).toBe(5);
     expect(balBody.balances[0].onHand).toBe(100);
@@ -265,7 +271,9 @@ describe("admin reservation view + override (T228)", () => {
       `${address}/api/admin/inventory/balances?variant_id=${testVariantId}`,
       { headers: adminHeaders },
     );
-    const bal2Body = (await bal2.json()) as { balances: Array<{ available: number; reserved: number; onHand: number }> };
+    const bal2Body = (await bal2.json()) as {
+      balances: Array<{ available: number; reserved: number; onHand: number }>;
+    };
     expect(bal2Body.balances[0].onHand).toBe(95);
     expect(bal2Body.balances[0].reserved).toBe(0);
     expect(bal2Body.balances[0].available).toBe(95);
@@ -280,7 +288,9 @@ describe("admin reservation view + override (T228)", () => {
       `${address}/api/admin/inventory/balances?variant_id=${testVariantId}`,
       { headers: adminHeaders },
     );
-    const balBeforeBody = (await balBefore.json()) as { balances: Array<{ available: number; reserved: number }> };
+    const balBeforeBody = (await balBefore.json()) as {
+      balances: Array<{ available: number; reserved: number }>;
+    };
     expect(balBeforeBody.balances[0].available).toBe(85);
     expect(balBeforeBody.balances[0].reserved).toBe(10);
 
@@ -303,7 +313,9 @@ describe("admin reservation view + override (T228)", () => {
       `${address}/api/admin/inventory/balances?variant_id=${testVariantId}`,
       { headers: adminHeaders },
     );
-    const balAfterBody = (await balAfter.json()) as { balances: Array<{ available: number; reserved: number; onHand: number }> };
+    const balAfterBody = (await balAfter.json()) as {
+      balances: Array<{ available: number; reserved: number; onHand: number }>;
+    };
     expect(balAfterBody.balances[0].available).toBe(95);
     expect(balAfterBody.balances[0].reserved).toBe(0);
     expect(balAfterBody.balances[0].onHand).toBe(95);
@@ -320,10 +332,9 @@ describe("admin reservation view + override (T228)", () => {
     expect(metrics.released).toBeGreaterThanOrEqual(1);
 
     // Verify expired
-    const getRes = await fetch(
-      `${address}/api/admin/inventory/reservations/${reservation.id}`,
-      { headers: adminHeaders },
-    );
+    const getRes = await fetch(`${address}/api/admin/inventory/reservations/${reservation.id}`, {
+      headers: adminHeaders,
+    });
     expect(getRes.status).toBe(200);
     const getBody = (await getRes.json()) as { reservation: { status: string } };
     expect(getBody.reservation.status).toBe("expired");
@@ -333,7 +344,9 @@ describe("admin reservation view + override (T228)", () => {
       `${address}/api/admin/inventory/balances?variant_id=${testVariantId}`,
       { headers: adminHeaders },
     );
-    const balBody = (await balRes.json()) as { balances: Array<{ available: number; reserved: number }> };
+    const balBody = (await balRes.json()) as {
+      balances: Array<{ available: number; reserved: number }>;
+    };
     expect(balBody.balances[0].available).toBe(95);
     expect(balBody.balances[0].reserved).toBe(0);
   });
@@ -461,10 +474,10 @@ describe("admin reservation view + override (T228)", () => {
   it("force-release on non-active reservation returns 422", async () => {
     // Create and consume a reservation
     const { reservation } = await createReservation(1, 60000, "force_release_consumed");
-    await fetch(
-      `${address}/api/admin/inventory/reservations/${reservation.id}/consume`,
-      { method: "POST", headers: adminHeaders },
-    );
+    await fetch(`${address}/api/admin/inventory/reservations/${reservation.id}/consume`, {
+      method: "POST",
+      headers: adminHeaders,
+    });
 
     const forceRes = await fetch(
       `${address}/api/admin/inventory/reservations/${reservation.id}/force-release`,
@@ -547,20 +560,18 @@ describe("admin reservation view + override (T228)", () => {
   // -----------------------------------------------------------------------
 
   it("non-admin user gets 403 on reservation list", async () => {
-    const res = await fetch(
-      `${address}/api/admin/inventory/reservations/list`,
-      { headers: nonAdminHeaders },
-    );
+    const res = await fetch(`${address}/api/admin/inventory/reservations/list`, {
+      headers: nonAdminHeaders,
+    });
     expect(res.status).toBe(403);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("ERR_FORBIDDEN");
   });
 
   it("non-admin user gets 403 on reservation stats", async () => {
-    const res = await fetch(
-      `${address}/api/admin/inventory/reservations/stats`,
-      { headers: nonAdminHeaders },
-    );
+    const res = await fetch(`${address}/api/admin/inventory/reservations/stats`, {
+      headers: nonAdminHeaders,
+    });
     expect(res.status).toBe(403);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("ERR_FORBIDDEN");
@@ -584,10 +595,10 @@ describe("admin reservation view + override (T228)", () => {
 
   it("non-admin user gets 403 on force-release", async () => {
     const fakeId = "00000000-0000-0000-0000-000000000001";
-    const res = await fetch(
-      `${address}/api/admin/inventory/reservations/${fakeId}/force-release`,
-      { method: "POST", headers: nonAdminHeaders },
-    );
+    const res = await fetch(`${address}/api/admin/inventory/reservations/${fakeId}/force-release`, {
+      method: "POST",
+      headers: nonAdminHeaders,
+    });
     expect(res.status).toBe(403);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("ERR_FORBIDDEN");
@@ -595,10 +606,9 @@ describe("admin reservation view + override (T228)", () => {
 
   it("non-admin user gets 403 on get reservation by ID", async () => {
     const fakeId = "00000000-0000-0000-0000-000000000001";
-    const res = await fetch(
-      `${address}/api/admin/inventory/reservations/${fakeId}`,
-      { headers: nonAdminHeaders },
-    );
+    const res = await fetch(`${address}/api/admin/inventory/reservations/${fakeId}`, {
+      headers: nonAdminHeaders,
+    });
     expect(res.status).toBe(403);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("ERR_FORBIDDEN");

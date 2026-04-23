@@ -107,7 +107,9 @@ describe("royalty calculation engine (T069)", () => {
         await db.delete(order).where(eq(order.id, id));
       }
 
-      await db.delete(contributorMilestone).where(eq(contributorMilestone.contributorId, contributorId));
+      await db
+        .delete(contributorMilestone)
+        .where(eq(contributorMilestone.contributorId, contributorId));
       await db.delete(contributorDesign).where(eq(contributorDesign.id, designId));
       await db.delete(contributor).where(eq(contributor.id, contributorId));
       await db.delete(productVariant).where(eq(productVariant.id, variantId));
@@ -430,7 +432,9 @@ describe("royalty calculation engine — donation at 20% (T069)", () => {
         await db.delete(order).where(eq(order.id, id));
       }
 
-      await db.delete(contributorMilestone).where(eq(contributorMilestone.contributorId, contributorId));
+      await db
+        .delete(contributorMilestone)
+        .where(eq(contributorMilestone.contributorId, contributorId));
       await db.delete(contributorDesign).where(eq(contributorDesign.id, designId));
       await db.delete(contributor).where(eq(contributor.id, contributorId));
       await db.delete(productVariant).where(eq(productVariant.id, variantId));
@@ -649,7 +653,9 @@ describe("royalty calculation engine — veteran rate tier (T069)", () => {
         await db.delete(order).where(eq(order.id, id));
       }
 
-      await db.delete(contributorMilestone).where(eq(contributorMilestone.contributorId, contributorId));
+      await db
+        .delete(contributorMilestone)
+        .where(eq(contributorMilestone.contributorId, contributorId));
       await db.delete(contributorDesign).where(eq(contributorDesign.id, designId));
       await db.delete(contributor).where(eq(contributor.id, contributorId));
       await db.delete(productVariant).where(eq(productVariant.id, variantId));

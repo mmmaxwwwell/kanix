@@ -345,19 +345,29 @@ wait_for_port "$PORT_ASTRO" "Astro site" 60
 log "Astro site ready."
 
 # -------------------------------------------------------------------
-# Step 6: Android emulator
+# Step 6: Android emulator (opt-in, gated by E2E_WANT_EMULATOR=1)
 # -------------------------------------------------------------------
-# The runner's PlatformManager checks whether an emulator is reachable
-# (`mcp-android --check` / `adb devices`) AFTER MCP readiness but does
-# not start the emulator itself.  Without this step, every boot ends in
-# `platform_init_fail` because `adb devices` shows no connected device.
-if command -v start-emulator >/dev/null 2>&1; then
-  log "Starting Android emulator..."
-  if start-emulator 2>"$STATE_DIR/emulator.log"; then
-    log "Android emulator ready."
-  else
-    log "  WARNING: start-emulator exited $? — see $STATE_DIR/emulator.log"
+# The emulator is a 3+GB qemu-system-x86 process and takes 25s+ to boot.
+# Integration-test tasks that only harden a single *.integration.test.ts
+# file do not need it — they only need postgres + supertokens + API.
+# Booting it unconditionally (and leaving it running between tasks)
+# accounted for ~3.2GB of resident memory that accumulated across many
+# serial agent runs and pushed total system memory to 95%.
+#
+# The runner's PlatformManager sets E2E_WANT_EMULATOR=1 only for tasks
+# tagged [needs: mcp-android].  E2E driver scripts that need an emulator
+# directly can also export E2E_WANT_EMULATOR=1 before calling setup.sh.
+if [ "${E2E_WANT_EMULATOR:-0}" = "1" ]; then
+  if command -v start-emulator >/dev/null 2>&1; then
+    log "Starting Android emulator (E2E_WANT_EMULATOR=1)..."
+    if start-emulator 2>"$STATE_DIR/emulator.log"; then
+      log "Android emulator ready."
+    else
+      log "  WARNING: start-emulator exited $? — see $STATE_DIR/emulator.log"
+    fi
   fi
+else
+  log "Skipping Android emulator (E2E_WANT_EMULATOR not set)."
 fi
 
 # -------------------------------------------------------------------
@@ -370,7 +380,7 @@ fi
 # as their ELF interpreter, which doesn't exist on NixOS.  We trigger one
 # build to create the overlays + download components, then patchelf all
 # binaries so subsequent builds succeed.
-if command -v flutter >/dev/null 2>&1 && command -v patchelf >/dev/null 2>&1; then
+if [ "${E2E_WANT_EMULATOR:-0}" = "1" ] && command -v flutter >/dev/null 2>&1 && command -v patchelf >/dev/null 2>&1; then
   for _app_dir in "$PROJECT_ROOT/customer" "$PROJECT_ROOT/admin"; do
     _sdk_overlay="$_app_dir/.dev/android-sdk"
     _patched_marker="$_sdk_overlay/.nixos-patched"

@@ -13,10 +13,7 @@ import type { FastifyInstance } from "fastify";
 import { eq, sql } from "drizzle-orm";
 import { product, productVariant } from "../db/schema/catalog.js";
 import { productClass, productClassMembership } from "../db/schema/product-class.js";
-import {
-  inventoryBalance,
-  inventoryLocation,
-} from "../db/schema/inventory.js";
+import { inventoryBalance, inventoryLocation } from "../db/schema/inventory.js";
 import { order, orderLine, orderStatusHistory } from "../db/schema/order.js";
 import { payment } from "../db/schema/payment.js";
 import { shipment } from "../db/schema/fulfillment.js";
@@ -146,9 +143,8 @@ async function signUpUser(
 
 async function verifyEmail(userId: string): Promise<void> {
   const { default: supertokens } = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -320,10 +316,7 @@ describe("warranty claim flow (T270, mirrors T104b/FR-055)", () => {
     customerAuthHeaders = customerSignIn.headers;
 
     // Get customer ID
-    const custRows = await db
-      .select()
-      .from(customer)
-      .where(eq(customer.authSubject, userId));
+    const custRows = await db.select().from(customer).where(eq(customer.authSubject, userId));
     customerId = custRows[0].id;
 
     // 5. Admin user with SUPPORT_MANAGE capability
@@ -368,15 +361,11 @@ describe("warranty claim flow (T270, mirrors T104b/FR-055)", () => {
 
         // Clean tickets + messages + status history
         for (const ticketId of createdTicketIds) {
-          await db.execute(
-            sql`DELETE FROM evidence_record WHERE support_ticket_id = ${ticketId}`,
-          );
+          await db.execute(sql`DELETE FROM evidence_record WHERE support_ticket_id = ${ticketId}`);
           await db
             .delete(supportTicketStatusHistory)
             .where(eq(supportTicketStatusHistory.ticketId, ticketId));
-          await db
-            .delete(supportTicketMessage)
-            .where(eq(supportTicketMessage.ticketId, ticketId));
+          await db.delete(supportTicketMessage).where(eq(supportTicketMessage.ticketId, ticketId));
           await db.execute(
             sql`UPDATE support_ticket SET linked_ticket_id = NULL WHERE linked_ticket_id = ${ticketId}`,
           );
@@ -394,9 +383,7 @@ describe("warranty claim flow (T270, mirrors T104b/FR-055)", () => {
             sql`DELETE FROM payment_event WHERE payment_id IN (SELECT id FROM payment WHERE order_id = ${oid})`,
           );
           await db.delete(payment).where(eq(payment.orderId, oid));
-          await db.execute(
-            sql`DELETE FROM inventory_reservation WHERE order_id = ${oid}`,
-          );
+          await db.execute(sql`DELETE FROM inventory_reservation WHERE order_id = ${oid}`);
           await db.delete(orderStatusHistory).where(eq(orderStatusHistory.orderId, oid));
           await db.delete(orderLine).where(eq(orderLine.orderId, oid));
           await db.delete(order).where(eq(order.id, oid));
@@ -404,7 +391,9 @@ describe("warranty claim flow (T270, mirrors T104b/FR-055)", () => {
 
         // Clean inventory + product
         await db.delete(inventoryBalance).where(eq(inventoryBalance.variantId, variantId));
-        await db.delete(productClassMembership).where(eq(productClassMembership.productId, productId));
+        await db
+          .delete(productClassMembership)
+          .where(eq(productClassMembership.productId, productId));
         await db.delete(productClass).where(eq(productClass.id, classId));
         await db.delete(productVariant).where(eq(productVariant.productId, productId));
         await db.delete(product).where(eq(product.id, productId));
@@ -616,10 +605,9 @@ describe("warranty claim flow (T270, mirrors T104b/FR-055)", () => {
 
   it("step 4: admin can view the warranty ticket and its messages", async () => {
     // Get ticket details
-    const ticketRes = await fetch(
-      `${address}/api/admin/support-tickets/${warrantyTicketId}`,
-      { headers: adminHeaders },
-    );
+    const ticketRes = await fetch(`${address}/api/admin/support-tickets/${warrantyTicketId}`, {
+      headers: adminHeaders,
+    });
     expect(ticketRes.status).toBe(200);
     const ticketBody = (await ticketRes.json()) as {
       ticket: {
@@ -769,7 +757,8 @@ describe("warranty claim flow (T270, mirrors T104b/FR-055)", () => {
       body: JSON.stringify({
         order_id: orderId,
         order_line_id: orderLineId,
-        description: "The case warped and deformed after I left it on my car dashboard in the heat.",
+        description:
+          "The case warped and deformed after I left it on my car dashboard in the heat.",
       }),
     });
 
@@ -813,16 +802,13 @@ describe("warranty claim flow (T270, mirrors T104b/FR-055)", () => {
     const heatTicketId = createdTicketIds[createdTicketIds.length - 1];
 
     // Admin posts denial reply
-    const replyRes = await fetch(
-      `${address}/api/admin/support-tickets/${heatTicketId}/messages`,
-      {
-        method: "POST",
-        headers: { ...adminHeaders, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          body: "This claim has been denied. The damage is consistent with heat exposure, which is a documented material limitation of TPU products and not covered under warranty.",
-        }),
-      },
-    );
+    const replyRes = await fetch(`${address}/api/admin/support-tickets/${heatTicketId}/messages`, {
+      method: "POST",
+      headers: { ...adminHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        body: "This claim has been denied. The damage is consistent with heat exposure, which is a documented material limitation of TPU products and not covered under warranty.",
+      }),
+    });
     expect(replyRes.status).toBe(200);
 
     // Transition to resolved (denied)

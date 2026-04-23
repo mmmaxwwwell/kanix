@@ -296,10 +296,7 @@ describe("concurrent inventory flow (T266, mirrors T102/SC-003)", () => {
       .select()
       .from(inventoryBalance)
       .where(
-        and(
-          eq(inventoryBalance.variantId, variantId),
-          eq(inventoryBalance.locationId, locationId),
-        ),
+        and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
       );
 
     expect(balance).toBeDefined();

@@ -14,11 +14,7 @@ import type { DatabaseConnection } from "./db/connection.js";
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function signUpUser(
-  address: string,
-  email: string,
-  password: string,
-): Promise<string> {
+async function signUpUser(address: string, email: string, password: string): Promise<string> {
   const res = await fetch(`${address}/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json", origin: "http://localhost:3000" },

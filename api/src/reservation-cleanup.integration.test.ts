@@ -188,18 +188,14 @@ describe("reservation cleanup cron (T042)", () => {
       await dbConn.db
         .delete(inventoryReservation)
         .where(eq(inventoryReservation.variantId, testVariantId));
-      await dbConn.db
-        .delete(inventoryBalance)
-        .where(eq(inventoryBalance.variantId, testVariantId));
+      await dbConn.db.delete(inventoryBalance).where(eq(inventoryBalance.variantId, testVariantId));
       await dbConn.db.delete(inventoryLocation).where(eq(inventoryLocation.id, testLocationId));
       await dbConn.db.delete(productVariant).where(eq(productVariant.id, testVariantId));
       await dbConn.db.delete(product).where(eq(product.id, testProductId));
       await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, adminUserId));
       await dbConn.db.delete(adminUser).where(eq(adminUser.id, adminUserId));
       await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));
-      await dbConn.db
-        .delete(adminAuditLog)
-        .where(eq(adminAuditLog.actorAdminUserId, adminUserId));
+      await dbConn.db.delete(adminAuditLog).where(eq(adminAuditLog.actorAdminUserId, adminUserId));
     } catch {
       // Best-effort cleanup
     }

@@ -15,10 +15,7 @@ import type { FastifyInstance } from "fastify";
 import { eq, sql } from "drizzle-orm";
 import { product, productVariant } from "../db/schema/catalog.js";
 import { productClass, productClassMembership } from "../db/schema/product-class.js";
-import {
-  inventoryBalance,
-  inventoryLocation,
-} from "../db/schema/inventory.js";
+import { inventoryBalance, inventoryLocation } from "../db/schema/inventory.js";
 import { order, orderLine, orderStatusHistory } from "../db/schema/order.js";
 import { payment, paymentEvent } from "../db/schema/payment.js";
 import {
@@ -99,11 +96,7 @@ function createStubPaymentAdapter(): PaymentAdapter {
 // Auth helpers (require real HTTP — SuperTokens uses cookies)
 // ---------------------------------------------------------------------------
 
-async function signUpUser(
-  address: string,
-  email: string,
-  password: string,
-): Promise<string> {
+async function signUpUser(address: string, email: string, password: string): Promise<string> {
   const res = await fetch(`${address}/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json", origin: "http://localhost:3000" },
@@ -123,9 +116,8 @@ async function signUpUser(
 
 async function verifyEmail(userId: string): Promise<void> {
   const supertokens = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -447,7 +439,9 @@ describe("WebSocket real-time propagation flow (T267, mirrors T103/SC-007)", () 
     for (const ws of openSockets) {
       try {
         ws.close();
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     // Wait for close events to propagate
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -460,7 +454,9 @@ describe("WebSocket real-time propagation flow (T267, mirrors T103/SC-007)", () 
         // Clean support ticket messages + tickets
         if (ticketId) {
           await db.delete(supportTicketMessage).where(eq(supportTicketMessage.ticketId, ticketId));
-          await db.execute(sql`UPDATE support_ticket SET linked_ticket_id = NULL WHERE id = ${ticketId}`);
+          await db.execute(
+            sql`UPDATE support_ticket SET linked_ticket_id = NULL WHERE id = ${ticketId}`,
+          );
           await db.delete(supportTicket).where(eq(supportTicket.id, ticketId));
         }
 
@@ -480,7 +476,9 @@ describe("WebSocket real-time propagation flow (T267, mirrors T103/SC-007)", () 
 
         // Clean inventory + product
         await db.delete(inventoryBalance).where(eq(inventoryBalance.variantId, variantId));
-        await db.delete(productClassMembership).where(eq(productClassMembership.productId, productId));
+        await db
+          .delete(productClassMembership)
+          .where(eq(productClassMembership.productId, productId));
         await db.delete(productClass).where(eq(productClass.id, classId));
         await db.delete(productVariant).where(eq(productVariant.productId, productId));
         await db.delete(product).where(eq(product.id, productId));

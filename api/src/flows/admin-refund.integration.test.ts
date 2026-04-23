@@ -115,11 +115,7 @@ function generateStripeWebhookPayload(
 // Auth helpers
 // ---------------------------------------------------------------------------
 
-async function signUpUser(
-  address: string,
-  email: string,
-  password: string,
-): Promise<string> {
+async function signUpUser(address: string, email: string, password: string): Promise<string> {
   const res = await fetch(`${address}/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json", origin: "http://localhost:3000" },
@@ -139,9 +135,8 @@ async function signUpUser(
 
 async function verifyEmail(userId: string): Promise<void> {
   const { default: supertokens } = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -310,7 +305,13 @@ async function createPaidOrder(
   const [orderRow] = await db.select().from(order).where(eq(order.id, orderId));
   expect(orderRow.paymentStatus).toBe("paid");
 
-  return { orderId, paymentIntentId, paymentAmountMinor, productId: prod.id, variantId: variant.id };
+  return {
+    orderId,
+    paymentIntentId,
+    paymentAmountMinor,
+    productId: prod.id,
+    variantId: variant.id,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -444,7 +445,10 @@ describe("admin refund flow (T271, mirrors T104c/FR-030)", () => {
   });
 
   it("step 3: verify refund record persisted in DB with correct fields", async () => {
-    const refunds = await dbConn.db.select().from(refund).where(eq(refund.orderId, fullRefundOrderId));
+    const refunds = await dbConn.db
+      .select()
+      .from(refund)
+      .where(eq(refund.orderId, fullRefundOrderId));
     expect(refunds.length).toBe(1);
     expect(refunds[0].amountMinor).toBe(fullRefundPaymentAmount);
     expect(refunds[0].reason).toBe("Defective product — full refund");
@@ -526,7 +530,10 @@ describe("admin refund flow (T271, mirrors T104c/FR-030)", () => {
   });
 
   it("step 7: verify order payment_status is 'partially_refunded' after partial refund", async () => {
-    const [orderRow] = await dbConn.db.select().from(order).where(eq(order.id, partialRefundOrderId));
+    const [orderRow] = await dbConn.db
+      .select()
+      .from(order)
+      .where(eq(order.id, partialRefundOrderId));
     expect(orderRow.paymentStatus).toBe("partially_refunded");
   });
 
@@ -570,11 +577,17 @@ describe("admin refund flow (T271, mirrors T104c/FR-030)", () => {
     expect(body.refund.status).toBe("succeeded");
 
     // Now fully refunded
-    const [orderRow] = await dbConn.db.select().from(order).where(eq(order.id, partialRefundOrderId));
+    const [orderRow] = await dbConn.db
+      .select()
+      .from(order)
+      .where(eq(order.id, partialRefundOrderId));
     expect(orderRow.paymentStatus).toBe("refunded");
 
     // Should have 2 refund records totaling the original payment
-    const refunds = await dbConn.db.select().from(refund).where(eq(refund.orderId, partialRefundOrderId));
+    const refunds = await dbConn.db
+      .select()
+      .from(refund)
+      .where(eq(refund.orderId, partialRefundOrderId));
     expect(refunds.length).toBe(2);
     const totalRefunded = refunds.reduce((sum, r) => sum + r.amountMinor, 0);
     expect(totalRefunded).toBe(partialRefundPaymentAmount);
@@ -592,7 +605,9 @@ describe("admin refund flow (T271, mirrors T104c/FR-030)", () => {
     expect(Array.isArray(body.refunds)).toBe(true);
     expect(body.refunds.length).toBe(2);
 
-    const amounts = body.refunds.map((r: { amountMinor: number }) => r.amountMinor).sort((a: number, b: number) => a - b);
+    const amounts = body.refunds
+      .map((r: { amountMinor: number }) => r.amountMinor)
+      .sort((a: number, b: number) => a - b);
     const remaining = partialRefundPaymentAmount - 2000;
     expect(amounts).toEqual([remaining, 2000].sort((a, b) => a - b));
   });
@@ -617,7 +632,10 @@ describe("admin refund flow (T271, mirrors T104c/FR-030)", () => {
     expect(body.refund.amountMinor).toBe(doubleRefundPaymentAmount);
     expect(body.refund.status).toBe("succeeded");
 
-    const [orderRow] = await dbConn.db.select().from(order).where(eq(order.id, doubleRefundOrderId));
+    const [orderRow] = await dbConn.db
+      .select()
+      .from(order)
+      .where(eq(order.id, doubleRefundOrderId));
     expect(orderRow.paymentStatus).toBe("refunded");
   });
 
@@ -656,7 +674,10 @@ describe("admin refund flow (T271, mirrors T104c/FR-030)", () => {
   });
 
   it("step 14: verify no refund record created by the rejected double-refund", async () => {
-    const refunds = await dbConn.db.select().from(refund).where(eq(refund.orderId, doubleRefundOrderId));
+    const refunds = await dbConn.db
+      .select()
+      .from(refund)
+      .where(eq(refund.orderId, doubleRefundOrderId));
     // Only the single successful refund, not the rejected one
     expect(refunds.length).toBe(1);
     expect(refunds[0].amountMinor).toBe(doubleRefundPaymentAmount);

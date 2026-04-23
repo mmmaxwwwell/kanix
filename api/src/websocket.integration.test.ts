@@ -34,9 +34,8 @@ async function signUpUser(address: string, email: string, password: string): Pro
 
 async function verifyEmail(userId: string): Promise<void> {
   const supertokens = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -253,17 +252,11 @@ describe("WebSocket session + event broadcast (T253) [FR-081, FR-082]", () => {
       await dbConn.db.delete(cart).where(eq(cart.id, testCartId));
     }
     if (testAdminUserId) {
-      await dbConn.db
-        .delete(adminUserRole)
-        .where(eq(adminUserRole.adminUserId, testAdminUserId));
-      await dbConn.db
-        .delete(adminUser)
-        .where(eq(adminUser.id, testAdminUserId));
+      await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, testAdminUserId));
+      await dbConn.db.delete(adminUser).where(eq(adminUser.id, testAdminUserId));
     }
     if (testRoleId) {
-      await dbConn.db
-        .delete(adminRole)
-        .where(eq(adminRole.id, testRoleId));
+      await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));
     }
     // Customers auto-created by signup — clean up
     if (testCustomerAId) {

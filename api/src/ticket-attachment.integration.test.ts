@@ -46,9 +46,8 @@ async function signUpUser(address: string, email: string, password: string): Pro
 
 async function verifyUserEmail(userId: string): Promise<void> {
   const { default: supertokens } = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -263,9 +262,7 @@ describe("ticket attachment integration (T062)", () => {
       await db.execute(sql`ALTER TABLE evidence_record DISABLE TRIGGER USER`);
       try {
         for (const ticketId of createdTicketIds) {
-          await db.execute(
-            sql`DELETE FROM evidence_record WHERE support_ticket_id = ${ticketId}`,
-          );
+          await db.execute(sql`DELETE FROM evidence_record WHERE support_ticket_id = ${ticketId}`);
           await db
             .delete(supportTicketAttachment)
             .where(eq(supportTicketAttachment.ticketId, ticketId));
@@ -276,9 +273,7 @@ describe("ticket attachment integration (T062)", () => {
           await db.delete(supportTicket).where(eq(supportTicket.id, ticketId));
         }
         for (const orderId of createdOrderIds) {
-          await db.execute(
-            sql`DELETE FROM order_status_history WHERE order_id = ${orderId}`,
-          );
+          await db.execute(sql`DELETE FROM order_status_history WHERE order_id = ${orderId}`);
           await db.delete(order).where(eq(order.id, orderId));
         }
         // Clean up admin (audit log FK first)
@@ -737,18 +732,15 @@ describe("ticket attachment integration (T062)", () => {
 
   it("upload to non-existent ticket returns 404", async () => {
     const fakeTicketId = "00000000-0000-0000-0000-000000000000";
-    const res = await fetch(
-      `${address}/api/admin/support-tickets/${fakeTicketId}/attachments`,
-      {
-        method: "POST",
-        headers: { ...adminHeaders, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileName: "test.jpg",
-          contentType: "image/jpeg",
-          data: Buffer.from("test").toString("base64"),
-        }),
-      },
-    );
+    const res = await fetch(`${address}/api/admin/support-tickets/${fakeTicketId}/attachments`, {
+      method: "POST",
+      headers: { ...adminHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: "test.jpg",
+        contentType: "image/jpeg",
+        data: Buffer.from("test").toString("base64"),
+      }),
+    });
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("ERR_TICKET_NOT_FOUND");

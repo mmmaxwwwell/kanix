@@ -83,9 +83,8 @@ async function signIn(
  */
 async function verifyEmail(userId: string): Promise<void> {
   const { default: supertokens } = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -148,9 +147,7 @@ describe("customer auth: email/password + email verification (T032)", () => {
     expect(body.status).toBe("OK");
 
     // Assert SuperTokens user properties
-    expect(body.user.id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-    );
+    expect(body.user.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(body.user.emails).toContain(testEmail);
     signupUserId = body.user.id;
 
@@ -169,9 +166,7 @@ describe("customer auth: email/password + email verification (T032)", () => {
     expect(rows[0].email).toBe(testEmail);
     expect(rows[0].authSubject).toBe(signupUserId);
     expect(rows[0].status).toBe("active");
-    expect(rows[0].id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-    );
+    expect(rows[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
   });
 
   it("unauthenticated request to protected endpoint returns 401", async () => {

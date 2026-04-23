@@ -388,7 +388,8 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       stripeSecretKey: config.STRIPE_SECRET_KEY,
     });
   const paymentCircuitBreaker =
-    options.paymentCircuitBreaker ?? createCircuitBreaker({ failureThreshold: 5, resetTimeoutMs: 30_000 });
+    options.paymentCircuitBreaker ??
+    createCircuitBreaker({ failureThreshold: 5, resetTimeoutMs: 30_000 });
   const notificationService = options.notificationService ?? createNotificationService();
   const storageAdapter = options.storageAdapter ?? createStorageAdapter();
 
@@ -1188,18 +1189,13 @@ export async function createServer(options: CreateServerOptions): Promise<Server
               const completionResult = await processOrderCompletionSales(database.db, id);
               // Publish WS events for newly reached milestones
               for (const milestone of completionResult.newMilestones) {
-                domainEvents.publish(
-                  "milestone.reached",
-                  "contributor",
-                  milestone.contributorId,
-                  {
-                    milestoneId: milestone.id,
-                    milestoneType: milestone.milestoneType,
-                    contributorId: milestone.contributorId,
-                    reachedAt: milestone.reachedAt.toISOString(),
-                    notes: milestone.notes,
-                  },
-                );
+                domainEvents.publish("milestone.reached", "contributor", milestone.contributorId, {
+                  milestoneId: milestone.id,
+                  milestoneType: milestone.milestoneType,
+                  contributorId: milestone.contributorId,
+                  reachedAt: milestone.reachedAt.toISOString(),
+                  notes: milestone.notes,
+                });
               }
             } catch {
               // Non-fatal: sales tracking failure should not block status transition
@@ -1278,9 +1274,10 @@ export async function createServer(options: CreateServerOptions): Promise<Server
 
         // Reject refund on already-fully-refunded order
         if (found.paymentStatus === "refunded") {
-          return reply
-            .status(409)
-            .send({ error: "ERR_ORDER_ALREADY_REFUNDED", message: "Order has already been fully refunded" });
+          return reply.status(409).send({
+            error: "ERR_ORDER_ALREADY_REFUNDED",
+            message: "Order has already been fully refunded",
+          });
         }
 
         const actorAdminUserId = request.adminContext?.adminUserId ?? "";
@@ -2857,12 +2854,10 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           });
 
           // Publish ticket.updated domain event so admins receive real-time notification
-          domainEvents.publish(
-            "ticket.updated",
-            "ticket",
-            id,
-            { reason: "customer_message_added", messageId: message.id },
-          );
+          domainEvents.publish("ticket.updated", "ticket", id, {
+            reason: "customer_message_added",
+            messageId: message.id,
+          });
 
           return { message };
         } catch (err: unknown) {
@@ -3441,15 +3436,13 @@ export async function createServer(options: CreateServerOptions): Promise<Server
 
         const latestBundle = bundles
           .filter((b) => b.status === "generated" || b.status === "failed")
-          .sort(
-            (a, b) =>
-              (b.generatedAt?.getTime() ?? 0) - (a.generatedAt?.getTime() ?? 0),
-          )[0];
+          .sort((a, b) => (b.generatedAt?.getTime() ?? 0) - (a.generatedAt?.getTime() ?? 0))[0];
 
         if (!latestBundle) {
           return reply.status(422).send({
             error: "ERR_NO_BUNDLE",
-            message: "No generated evidence bundle found for this dispute. Generate a bundle first.",
+            message:
+              "No generated evidence bundle found for this dispute. Generate a bundle first.",
           });
         }
 
@@ -3459,7 +3452,9 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           .filter((r) => r.textContent)
           .map((r) => {
             try {
-              return typeof r.textContent === "string" ? r.textContent : JSON.stringify(r.textContent);
+              return typeof r.textContent === "string"
+                ? r.textContent
+                : JSON.stringify(r.textContent);
             } catch {
               return String(r.textContent);
             }
@@ -3471,7 +3466,8 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             providerDisputeId: disputeRow.providerDisputeId ?? "",
             evidence: {
               customer_email_address: undefined,
-              uncategorized_text: uncategorizedText || "Evidence bundle submitted. See attached documents.",
+              uncategorized_text:
+                uncategorizedText || "Evidence bundle submitted. See attached documents.",
             },
           });
 
@@ -3614,7 +3610,11 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           }
 
           // Validate content type against whitelist
-          const ALLOWED_EVIDENCE_CONTENT_TYPES = ["image/jpeg", "image/png", "application/pdf"] as const;
+          const ALLOWED_EVIDENCE_CONTENT_TYPES = [
+            "image/jpeg",
+            "image/png",
+            "application/pdf",
+          ] as const;
           if (!(ALLOWED_EVIDENCE_CONTENT_TYPES as readonly string[]).includes(body.contentType)) {
             return reply.status(400).send({
               error: "ERR_INVALID_CONTENT_TYPE",
@@ -3818,9 +3818,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           sql`ALTER TABLE evidence_record DISABLE TRIGGER trg_evidence_record_no_delete`,
         );
         try {
-          await database.db.execute(
-            sql`DELETE FROM evidence_record WHERE id = ${evidenceId}`,
-          );
+          await database.db.execute(sql`DELETE FROM evidence_record WHERE id = ${evidenceId}`);
         } finally {
           await database.db.execute(
             sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_delete`,
@@ -4082,16 +4080,30 @@ export async function createServer(options: CreateServerOptions): Promise<Server
 
         for (let i = 0; i < body.adjustments.length; i++) {
           const adj = body.adjustments[i];
-          if (!adj.variant_id || !adj.location_id || !adj.adjustment_type || adj.quantity_delta == null || !adj.reason) {
+          if (
+            !adj.variant_id ||
+            !adj.location_id ||
+            !adj.adjustment_type ||
+            adj.quantity_delta == null ||
+            !adj.reason
+          ) {
             errors.push({ index: i, error: "ERR_VALIDATION", message: "Missing required fields" });
             continue;
           }
           if (!validTypes.includes(adj.adjustment_type)) {
-            errors.push({ index: i, error: "ERR_VALIDATION", message: `Invalid adjustment_type: ${adj.adjustment_type}` });
+            errors.push({
+              index: i,
+              error: "ERR_VALIDATION",
+              message: `Invalid adjustment_type: ${adj.adjustment_type}`,
+            });
             continue;
           }
           if (!Number.isInteger(adj.quantity_delta) || adj.quantity_delta === 0) {
-            errors.push({ index: i, error: "ERR_VALIDATION", message: "quantity_delta must be a non-zero integer" });
+            errors.push({
+              index: i,
+              error: "ERR_VALIDATION",
+              message: "quantity_delta must be a non-zero integer",
+            });
             continue;
           }
 
@@ -4099,7 +4111,12 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             const result = await createInventoryAdjustment(database.db, {
               variantId: adj.variant_id,
               locationId: adj.location_id,
-              adjustmentType: adj.adjustment_type as "restock" | "shrinkage" | "correction" | "damage" | "return",
+              adjustmentType: adj.adjustment_type as
+                | "restock"
+                | "shrinkage"
+                | "correction"
+                | "damage"
+                | "return",
               quantityDelta: adj.quantity_delta,
               reason: adj.reason,
               notes: adj.notes,
@@ -4109,7 +4126,11 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           } catch (err: unknown) {
             const appErr = err as { code?: string };
             if (appErr.code === "ERR_INVENTORY_INSUFFICIENT") {
-              errors.push({ index: i, error: "ERR_INVENTORY_INSUFFICIENT", message: "Would result in negative balance" });
+              errors.push({
+                index: i,
+                error: "ERR_INVENTORY_INSUFFICIENT",
+                message: "Would result in negative balance",
+              });
             } else {
               errors.push({ index: i, error: "ERR_INTERNAL", message: "Unexpected error" });
             }
@@ -4492,7 +4513,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             status,
           });
         } catch (err: unknown) {
-          const drizzleErr = err as { cause?: { code?: string } ; code?: string };
+          const drizzleErr = err as { cause?: { code?: string }; code?: string };
           const pgCode = drizzleErr.cause?.code ?? drizzleErr.code;
           if (pgCode === "23505") {
             return reply.status(400).send({
@@ -6077,8 +6098,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       }
 
       // PO Box rejection — ship-only carriers cannot deliver to PO Boxes
-      const poBoxPattern =
-        /\b(P\.?\s*O\.?\s*Box|Post\s+Office\s+Box)\b/i;
+      const poBoxPattern = /\b(P\.?\s*O\.?\s*Box|Post\s+Office\s+Box)\b/i;
       if (
         poBoxPattern.test(shippingAddr.line1) ||
         (shippingAddr.line2 && poBoxPattern.test(shippingAddr.line2))
@@ -6154,7 +6174,8 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             await import("supertokens-node/lib/build/framework/fastify/framework.js");
           const wrappedReq = new STFastifyRequest(request as never);
           const wrappedRes = new STFastifyResponse(reply as never);
-          const { default: SessionRecipe } = await import("supertokens-node/recipe/session/index.js");
+          const { default: SessionRecipe } =
+            await import("supertokens-node/recipe/session/index.js");
           session = await SessionRecipe.getSession(wrappedReq as never, wrappedRes as never, {
             sessionRequired: false,
             overrideGlobalClaimValidators: () => [],
@@ -6304,13 +6325,10 @@ export async function createServer(options: CreateServerOptions): Promise<Server
             /* best-effort */
           }
         }
-        return reply
-          .status(503)
-          .header("Retry-After", "30")
-          .send({
-            error: "ERR_EXTERNAL_SERVICE_UNAVAILABLE",
-            message: "Payment service is temporarily unavailable",
-          });
+        return reply.status(503).header("Retry-After", "30").send({
+          error: "ERR_EXTERNAL_SERVICE_UNAVAILABLE",
+          message: "Payment service is temporarily unavailable",
+        });
       }
 
       try {
@@ -6343,13 +6361,10 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           stripeErr.code === "ETIMEDOUT"
         ) {
           paymentCircuitBreaker.recordFailure();
-          return reply
-            .status(503)
-            .header("Retry-After", "30")
-            .send({
-              error: "ERR_EXTERNAL_SERVICE_UNAVAILABLE",
-              message: "Payment service is temporarily unavailable",
-            });
+          return reply.status(503).header("Retry-After", "30").send({
+            error: "ERR_EXTERNAL_SERVICE_UNAVAILABLE",
+            message: "Payment service is temporarily unavailable",
+          });
         }
         throw err;
       }
@@ -6992,29 +7007,23 @@ export async function createServer(options: CreateServerOptions): Promise<Server
     );
 
     // GET /api/contributors/public — list public contributors (no auth)
-    app.get(
-      "/api/contributors/public",
-      async () => {
-        const contributors = await listPublicContributors(db);
-        return { contributors };
-      },
-    );
+    app.get("/api/contributors/public", async () => {
+      const contributors = await listPublicContributors(db);
+      return { contributors };
+    });
 
     // GET /api/contributors/public/:username — get public contributor profile (no auth)
-    app.get(
-      "/api/contributors/public/:username",
-      async (request, reply) => {
-        const { username } = request.params as { username: string };
-        const contrib = await findContributorByGithubUsername(db, username);
-        if (!contrib || contrib.profileVisibility !== "public") {
-          return reply.status(404).send({ error: "Contributor not found" });
-        }
+    app.get("/api/contributors/public/:username", async (request, reply) => {
+      const { username } = request.params as { username: string };
+      const contrib = await findContributorByGithubUsername(db, username);
+      if (!contrib || contrib.profileVisibility !== "public") {
+        return reply.status(404).send({ error: "Contributor not found" });
+      }
 
-        const designs = await listDesignsByContributor(db, contrib.id);
-        const milestones = await listMilestonesByContributor(db, contrib.id);
-        return { contributor: contrib, designs, milestones };
-      },
-    );
+      const designs = await listDesignsByContributor(db, contrib.id);
+      const milestones = await listMilestonesByContributor(db, contrib.id);
+      return { contributor: contrib, designs, milestones };
+    });
 
     // PUT /api/admin/contributors/:id/donation — configure 501(c)(3) donation [FR-076]
     app.put(
@@ -7312,14 +7321,18 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         if (query.from) {
           const d = new Date(query.from);
           if (isNaN(d.getTime())) {
-            return reply.status(400).send({ error: "ERR_INVALID_DATE", message: "Invalid 'from' date" });
+            return reply
+              .status(400)
+              .send({ error: "ERR_INVALID_DATE", message: "Invalid 'from' date" });
           }
           filter.from = d;
         }
         if (query.to) {
           const d = new Date(query.to);
           if (isNaN(d.getTime())) {
-            return reply.status(400).send({ error: "ERR_INVALID_DATE", message: "Invalid 'to' date" });
+            return reply
+              .status(400)
+              .send({ error: "ERR_INVALID_DATE", message: "Invalid 'to' date" });
           }
           filter.to = d;
         }
@@ -7476,14 +7489,12 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         const options: { from?: Date; to?: Date } = {};
         if (from) {
           const d = new Date(from);
-          if (isNaN(d.getTime()))
-            return reply.status(400).send({ error: "Invalid 'from' date" });
+          if (isNaN(d.getTime())) return reply.status(400).send({ error: "Invalid 'from' date" });
           options.from = d;
         }
         if (to) {
           const d = new Date(to);
-          if (isNaN(d.getTime()))
-            return reply.status(400).send({ error: "Invalid 'to' date" });
+          if (isNaN(d.getTime())) return reply.status(400).send({ error: "Invalid 'to' date" });
           options.to = d;
         }
         const summary = await getDashboardSummary(db, options);
@@ -7528,6 +7539,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           limit: limit ? parseInt(limit, 10) : undefined,
           offset: offset ? parseInt(offset, 10) : undefined,
         });
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const hasPII = request.adminContext!.capabilities.includes(CAPABILITIES.CUSTOMERS_PII);
         if (!hasPII) {
           return { ...result, customers: result.customers.map(redactCustomerPII) };
@@ -7547,6 +7559,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         if (!detail) {
           return reply.status(404).send({ error: "Customer not found" });
         }
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const hasPII = request.adminContext!.capabilities.includes(CAPABILITIES.CUSTOMERS_PII);
         return hasPII ? detail : redactCustomerPII(detail);
       },
@@ -7612,7 +7625,10 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           return reply.status(404).send({ error: "Customer not found" });
         }
         // Look up authSubject from the customer record
-        const [custRow] = await db.select({ authSubject: customer.authSubject }).from(customer).where(eq(customer.id, request.params.id));
+        const [custRow] = await db
+          .select({ authSubject: customer.authSubject })
+          .from(customer)
+          .where(eq(customer.id, request.params.id));
         const events = custRow ? await getCustomerAuditTrail(db, custRow.authSubject) : [];
         return { events };
       },

@@ -100,12 +100,8 @@ describe("evidence browsing API (T066b)", () => {
     const db = dbConn.db;
 
     // Re-enable immutability triggers in case a prior run crashed mid-cleanup
-    await db.execute(
-      sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_update`,
-    );
-    await db.execute(
-      sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_delete`,
-    );
+    await db.execute(sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_update`);
+    await db.execute(sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_delete`);
 
     // ----- Admin user with DISPUTES_READ capability (super_admin) -----
     const authSubject = await signUpUser(address, adminEmail, adminPassword);
@@ -532,9 +528,12 @@ describe("evidence browsing API (T066b)", () => {
   });
 
   it("should filter evidence by type", async () => {
-    const res = await fetch(`${address}/api/admin/evidence?type=delivery_proof&order_id=${orderId}`, {
-      headers: adminHeaders,
-    });
+    const res = await fetch(
+      `${address}/api/admin/evidence?type=delivery_proof&order_id=${orderId}`,
+      {
+        headers: adminHeaders,
+      },
+    );
     expect(res.status).toBe(200);
 
     const body = (await res.json()) as {
@@ -599,9 +598,12 @@ describe("evidence browsing API (T066b)", () => {
   });
 
   it("should combine type and order filters", async () => {
-    const res = await fetch(`${address}/api/admin/evidence?type=customer_communication&order_id=${orderId}`, {
-      headers: adminHeaders,
-    });
+    const res = await fetch(
+      `${address}/api/admin/evidence?type=customer_communication&order_id=${orderId}`,
+      {
+        headers: adminHeaders,
+      },
+    );
     expect(res.status).toBe(200);
 
     const body = (await res.json()) as {
@@ -667,7 +669,12 @@ describe("evidence browsing API (T066b)", () => {
       evidence: {
         id: string;
         storageKey: string | null;
-        metadataJson: { source: string; fileName: string; contentType: string; adminAttached: boolean };
+        metadataJson: {
+          source: string;
+          fileName: string;
+          contentType: string;
+          adminAttached: boolean;
+        };
       };
       download_url: string | null;
     };

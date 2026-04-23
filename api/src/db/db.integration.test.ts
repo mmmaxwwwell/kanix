@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createDatabaseConnection, type DatabaseConnection } from "./connection.js";
 import { checkDatabaseConnectivity } from "./queries/health.js";
-import { insertProduct, findProductById, findProductBySlug, findAllProducts } from "./queries/product.js";
+import {
+  insertProduct,
+  findProductById,
+  findProductBySlug,
+  findAllProducts,
+} from "./queries/product.js";
 import { requireDatabaseUrl } from "../test-helpers.js";
 
 const DATABASE_URL = requireDatabaseUrl();
@@ -71,9 +76,7 @@ describe("Database integration", () => {
 
       // Concrete assertions — no toBeDefined()
       expect(typeof inserted.id).toBe("string");
-      expect(inserted.id).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-      );
+      expect(inserted.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
       expect(inserted.slug).toBe(slug);
       expect(inserted.title).toBe("Test Product");
       expect(inserted.description).toBe("A test product for integration testing");
@@ -118,10 +121,7 @@ describe("Database integration", () => {
     });
 
     it("findProductById returns undefined for non-existent id", async () => {
-      const missing = await findProductById(
-        conn.db,
-        "00000000-0000-0000-0000-000000000000",
-      );
+      const missing = await findProductById(conn.db, "00000000-0000-0000-0000-000000000000");
       expect(missing).toBeUndefined();
     });
 

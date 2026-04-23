@@ -327,7 +327,9 @@ describe("order state machine integration (T050)", () => {
 
     const history = await findOrderStatusHistory(db, o.id);
     expect(history.length).toBe(2);
-    expect(history.some((h) => h.newValue === "disputed" && h.reason === "charge.dispute.created")).toBe(true);
+    expect(
+      history.some((h) => h.newValue === "disputed" && h.reason === "charge.dispute.created"),
+    ).toBe(true);
     expect(history.some((h) => h.oldValue === "disputed" && h.newValue === "paid")).toBe(true);
   });
 
@@ -818,7 +820,9 @@ describe("order state machine integration (T050)", () => {
     expect(history.length).toBe(3);
 
     // Verify each entry has concrete values
-    const h1 = history.find((h) => h.statusType === "payment_status" && h.newValue === "processing");
+    const h1 = history.find(
+      (h) => h.statusType === "payment_status" && h.newValue === "processing",
+    );
     expect(h1).toBeDefined();
     expect(h1!.oldValue).toBe("unpaid");
     expect(h1!.reason).toBe("PI created");

@@ -34,12 +34,8 @@ describe("evidence auto-collection (T065)", () => {
     const db = dbConn.db;
 
     // Re-enable immutability triggers in case a prior run crashed mid-cleanup
-    await db.execute(
-      sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_update`,
-    );
-    await db.execute(
-      sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_delete`,
-    );
+    await db.execute(sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_update`);
+    await db.execute(sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_delete`);
 
     // 1. Create product + variant
     const [prod] = await db
@@ -471,8 +467,8 @@ describe("evidence auto-collection (T065)", () => {
     expect(records.length).toBeGreaterThan(0);
     const record = records[0];
 
-    await expect(
-      db.delete(evidenceRecord).where(eq(evidenceRecord.id, record.id)),
-    ).rejects.toThrow(/evidence_record/);
+    await expect(db.delete(evidenceRecord).where(eq(evidenceRecord.id, record.id))).rejects.toThrow(
+      /evidence_record/,
+    );
   });
 });

@@ -222,10 +222,7 @@ export async function getCustomerTickets(
 // Customer addresses (admin view)
 // ---------------------------------------------------------------------------
 
-export async function getCustomerAddresses(
-  db: PostgresJsDatabase,
-  customerId: string,
-) {
+export async function getCustomerAddresses(db: PostgresJsDatabase, customerId: string) {
   return db
     .select()
     .from(customerAddress)
@@ -237,10 +234,7 @@ export async function getCustomerAddresses(
 // Customer audit trail (auth events)
 // ---------------------------------------------------------------------------
 
-export async function getCustomerAuditTrail(
-  db: PostgresJsDatabase,
-  authSubject: string,
-) {
+export async function getCustomerAuditTrail(db: PostgresJsDatabase, authSubject: string) {
   return db
     .select()
     .from(authEventLog)
@@ -281,7 +275,14 @@ export async function unbanCustomer(
 // PII redaction for non-super_admin roles
 // ---------------------------------------------------------------------------
 
-export function redactCustomerPII<T extends { email: string; phone: string | null; firstName: string | null; lastName: string | null }>(detail: T): T {
+export function redactCustomerPII<
+  T extends {
+    email: string;
+    phone: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  },
+>(detail: T): T {
   return {
     ...detail,
     email: "***@redacted",

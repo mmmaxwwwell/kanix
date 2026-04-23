@@ -52,9 +52,8 @@ async function signUpUser(address: string, email: string, password: string): Pro
 
 async function verifyEmail(userId: string): Promise<void> {
   const supertokens = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -183,10 +182,18 @@ describe("milestone transitions (T249)", () => {
   afterAll(async () => {
     try {
       const db = dbConn.db;
-      await db.delete(contributorPayout).where(eq(contributorPayout.contributorId, ownerContributorId));
-      await db.delete(contributorTaxDocument).where(eq(contributorTaxDocument.contributorId, ownerContributorId));
-      await db.delete(contributorMilestone).where(eq(contributorMilestone.contributorId, ownerContributorId));
-      await db.delete(contributorRoyalty).where(eq(contributorRoyalty.contributorId, ownerContributorId));
+      await db
+        .delete(contributorPayout)
+        .where(eq(contributorPayout.contributorId, ownerContributorId));
+      await db
+        .delete(contributorTaxDocument)
+        .where(eq(contributorTaxDocument.contributorId, ownerContributorId));
+      await db
+        .delete(contributorMilestone)
+        .where(eq(contributorMilestone.contributorId, ownerContributorId));
+      await db
+        .delete(contributorRoyalty)
+        .where(eq(contributorRoyalty.contributorId, ownerContributorId));
 
       for (const id of createdOrderLineIds) {
         await db.delete(orderLine).where(eq(orderLine.id, id));
@@ -196,9 +203,12 @@ describe("milestone transitions (T249)", () => {
         await db.delete(order).where(eq(order.id, id));
       }
 
-      if (ownerDesignId) await db.delete(contributorDesign).where(eq(contributorDesign.id, ownerDesignId));
-      if (ownerContributorId) await db.delete(contributor).where(eq(contributor.id, ownerContributorId));
-      if (ownerVariantId) await db.delete(productVariant).where(eq(productVariant.id, ownerVariantId));
+      if (ownerDesignId)
+        await db.delete(contributorDesign).where(eq(contributorDesign.id, ownerDesignId));
+      if (ownerContributorId)
+        await db.delete(contributor).where(eq(contributor.id, ownerContributorId));
+      if (ownerVariantId)
+        await db.delete(productVariant).where(eq(productVariant.id, ownerVariantId));
       if (ownerProductId) await db.delete(product).where(eq(product.id, ownerProductId));
     } catch {
       // Cleanup best-effort
@@ -248,7 +258,12 @@ describe("milestone transitions (T249)", () => {
 
   it("manually records accepted_pr milestone with concrete fields", async () => {
     const db = dbConn.db;
-    const milestone = await recordMilestone(db, ownerContributorId, "accepted_pr", "First merged PR");
+    const milestone = await recordMilestone(
+      db,
+      ownerContributorId,
+      "accepted_pr",
+      "First merged PR",
+    );
     expect(milestone.milestoneType).toBe("accepted_pr");
     expect(milestone.notes).toBe("First merged PR");
     expect(milestone.contributorId).toBe(ownerContributorId);
@@ -315,7 +330,9 @@ describe("milestone transitions (T249)", () => {
     const db = dbConn.db;
 
     // Already at 25 units; add 25 more to reach 50
-    const { orderId } = await createCompletedOrder(STARTER_KIT_THRESHOLD - ROYALTY_ACTIVATION_THRESHOLD);
+    const { orderId } = await createCompletedOrder(
+      STARTER_KIT_THRESHOLD - ROYALTY_ACTIVATION_THRESHOLD,
+    );
     const result = await processOrderCompletionSales(db, orderId);
 
     expect(result.sales).toHaveLength(1);
@@ -555,8 +572,12 @@ describe("milestone transitions (T249)", () => {
     ws.close();
     await new Promise<void>((resolve) => setTimeout(resolve, 100));
 
-    await db.delete(contributorMilestone).where(eq(contributorMilestone.contributorId, freshContrib.id));
-    await db.delete(contributorRoyalty).where(eq(contributorRoyalty.contributorId, freshContrib.id));
+    await db
+      .delete(contributorMilestone)
+      .where(eq(contributorMilestone.contributorId, freshContrib.id));
+    await db
+      .delete(contributorRoyalty)
+      .where(eq(contributorRoyalty.contributorId, freshContrib.id));
     for (const id of freshOrderLineIds) {
       await db.delete(orderLine).where(eq(orderLine.id, id));
     }

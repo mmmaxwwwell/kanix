@@ -80,7 +80,9 @@ function createStripePaymentAdapter(stripeSecretKey: string): PaymentAdapter {
         status: refund.status ?? "pending",
       };
     },
-    async submitDisputeEvidence(input: SubmitDisputeEvidenceInput): Promise<SubmitDisputeEvidenceResult> {
+    async submitDisputeEvidence(
+      input: SubmitDisputeEvidenceInput,
+    ): Promise<SubmitDisputeEvidenceResult> {
       const updated = await stripe.disputes.update(input.providerDisputeId, {
         evidence: input.evidence,
         submit: true,
@@ -115,7 +117,9 @@ function createStubPaymentAdapter(): PaymentAdapter {
         status: "succeeded",
       };
     },
-    async submitDisputeEvidence(input: SubmitDisputeEvidenceInput): Promise<SubmitDisputeEvidenceResult> {
+    async submitDisputeEvidence(
+      input: SubmitDisputeEvidenceInput,
+    ): Promise<SubmitDisputeEvidenceResult> {
       stubCounter++;
       return {
         id: input.providerDisputeId,

@@ -139,12 +139,7 @@ describe("policy acknowledgment (T216)", () => {
 
     // Ensure all 4 policy types have an effective snapshot (use onConflictDoNothing
     // since the shared DB may already have them from prior runs)
-    const policyTypes = [
-      "terms_of_service",
-      "refund_policy",
-      "shipping_policy",
-      "privacy_policy",
-    ];
+    const policyTypes = ["terms_of_service", "refund_policy", "shipping_policy", "privacy_policy"];
     for (const pt of policyTypes) {
       await db
         .insert(policySnapshot)
@@ -235,9 +230,7 @@ describe("policy acknowledgment (T216)", () => {
       // Make all policy snapshots "not yet effective" by shifting effective_at to far future.
       // This avoids FK constraint issues from deleting referenced rows.
       const farFuture = new Date("3000-01-01T00:00:00Z");
-      await db
-        .update(policySnapshot)
-        .set({ effectiveAt: farFuture });
+      await db.update(policySnapshot).set({ effectiveAt: farFuture });
 
       try {
         const cartToken = await createCartWithItem();
@@ -265,9 +258,7 @@ describe("policy acknowledgment (T216)", () => {
       } finally {
         // Restore effective_at to the past so subsequent tests work
         const past = new Date(Date.now() - 86400000);
-        await db
-          .update(policySnapshot)
-          .set({ effectiveAt: past });
+        await db.update(policySnapshot).set({ effectiveAt: past });
       }
     }, 30000);
 
@@ -346,7 +337,8 @@ describe("policy acknowledgment (T216)", () => {
 
       // Find the terms_of_service acknowledgment
       let tosAck: { policySnapshotId: string; acknowledgedAt: Date } | null = null;
-      let tosSnap: { id: string; version: number; policyType: string; contentText: string } | null = null;
+      let tosSnap: { id: string; version: number; policyType: string; contentText: string } | null =
+        null;
 
       for (const ack of acks) {
         const [snap] = await db

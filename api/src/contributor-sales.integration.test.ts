@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createDatabaseConnection, type DatabaseConnection } from "./db/connection.js";
 import { eq } from "drizzle-orm";
-import { contributor, contributorDesign, contributorRoyalty, contributorMilestone } from "./db/schema/contributor.js";
+import {
+  contributor,
+  contributorDesign,
+  contributorRoyalty,
+  contributorMilestone,
+} from "./db/schema/contributor.js";
 import { product, productVariant } from "./db/schema/catalog.js";
 import { order, orderLine, orderStatusHistory } from "./db/schema/order.js";
 import { requireDatabaseUrl } from "./test-helpers.js";
@@ -93,7 +98,9 @@ describe("per-design sales tracking (T068)", () => {
       }
 
       // Delete milestones, design, contributor, variant, product
-      await db.delete(contributorMilestone).where(eq(contributorMilestone.contributorId, contributorId));
+      await db
+        .delete(contributorMilestone)
+        .where(eq(contributorMilestone.contributorId, contributorId));
       await db.delete(contributorDesign).where(eq(contributorDesign.id, designId));
       await db.delete(contributor).where(eq(contributor.id, contributorId));
       await db.delete(productVariant).where(eq(productVariant.id, variantId));

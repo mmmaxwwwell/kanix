@@ -270,7 +270,13 @@ describe("checkout API (T215)", () => {
       body: JSON.stringify(
         checkoutPayload({
           cart_token: mainCartToken,
-          shipping_address: { ...VALID_TX_ADDRESS, country: "GB", city: "London", state: "EN", postal_code: "SW1A 1AA" },
+          shipping_address: {
+            ...VALID_TX_ADDRESS,
+            country: "GB",
+            city: "London",
+            state: "EN",
+            postal_code: "SW1A 1AA",
+          },
         }),
       ),
     });
@@ -305,9 +311,7 @@ describe("checkout API (T215)", () => {
       method: "POST",
       url: "/api/checkout",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(
-        checkoutPayload({ cart_token: "00000000-0000-0000-0000-000000000000" }),
-      ),
+      body: JSON.stringify(checkoutPayload({ cart_token: "00000000-0000-0000-0000-000000000000" })),
     });
     expect(res.statusCode).toBe(404);
     expect(JSON.parse(res.body).error).toBe("ERR_CART_NOT_FOUND");
@@ -418,10 +422,7 @@ describe("checkout API (T215)", () => {
       .update(inventoryBalance)
       .set({ available: 1, onHand: 1 })
       .where(
-        and(
-          eq(inventoryBalance.variantId, oosVar.id),
-          eq(inventoryBalance.locationId, locationId),
-        ),
+        and(eq(inventoryBalance.variantId, oosVar.id), eq(inventoryBalance.locationId, locationId)),
       );
 
     const res = await app.inject({
@@ -680,10 +681,7 @@ describe("checkout API (T215)", () => {
       expect(body.order.total_minor).toBe(3000 + 413 + 599);
 
       // Verify tax persisted in DB
-      const [savedOrder] = await taxDb
-        .select()
-        .from(order)
-        .where(eq(order.id, body.order.id));
+      const [savedOrder] = await taxDb.select().from(order).where(eq(order.id, body.order.id));
       expect(savedOrder.taxMinor).toBe(413);
       expect(savedOrder.totalMinor).toBe(3000 + 413 + 599);
     } finally {

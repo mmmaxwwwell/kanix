@@ -20,14 +20,20 @@ import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { product, productVariant } from "../db/schema/catalog.js";
 import { productClass, productClassMembership } from "../db/schema/product-class.js";
-import {
-  inventoryBalance,
-  inventoryLocation,
-} from "../db/schema/inventory.js";
+import { inventoryBalance, inventoryLocation } from "../db/schema/inventory.js";
 import { order } from "../db/schema/order.js";
-import type { TaxAdapter, ShippingAddress, TaxLineItem, TaxCalculationResult } from "../services/tax-adapter.js";
+import type {
+  TaxAdapter,
+  ShippingAddress,
+  TaxLineItem,
+  TaxCalculationResult,
+} from "../services/tax-adapter.js";
 import { createStubShippingAdapter } from "../services/shipping-adapter.js";
-import type { PaymentAdapter, CreatePaymentIntentInput, PaymentIntentResult } from "../services/payment-adapter.js";
+import type {
+  PaymentAdapter,
+  CreatePaymentIntentInput,
+  PaymentIntentResult,
+} from "../services/payment-adapter.js";
 
 // ---------------------------------------------------------------------------
 // Constants

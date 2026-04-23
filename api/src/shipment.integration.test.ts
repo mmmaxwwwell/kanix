@@ -147,13 +147,9 @@ describe("shipment integration (T058)", () => {
       // Disable only the user-defined triggers to clean up, then re-enable.
       await db.execute(sql`ALTER TABLE evidence_record DISABLE TRIGGER USER`);
       for (const sid of createdShipmentIds) {
-        await db.execute(
-          sql`DELETE FROM evidence_record WHERE shipment_id = ${sid}::uuid`,
-        );
+        await db.execute(sql`DELETE FROM evidence_record WHERE shipment_id = ${sid}::uuid`);
       }
-      await db.execute(
-        sql`DELETE FROM evidence_record WHERE order_id = ${testOrderId}::uuid`,
-      );
+      await db.execute(sql`DELETE FROM evidence_record WHERE order_id = ${testOrderId}::uuid`);
       await db.execute(sql`ALTER TABLE evidence_record ENABLE TRIGGER USER`);
       // Delete shipments after evidence records are gone
       for (const sid of createdShipmentIds) {
@@ -163,8 +159,10 @@ describe("shipment integration (T058)", () => {
       await db.delete(orderLine).where(eq(orderLine.orderId, testOrderId));
       await db.delete(order).where(eq(order.id, testOrderId));
       // Clean up product fixtures
-      if (testVariantId1) await db.delete(productVariant).where(eq(productVariant.id, testVariantId1));
-      if (testVariantId2) await db.delete(productVariant).where(eq(productVariant.id, testVariantId2));
+      if (testVariantId1)
+        await db.delete(productVariant).where(eq(productVariant.id, testVariantId1));
+      if (testVariantId2)
+        await db.delete(productVariant).where(eq(productVariant.id, testVariantId2));
       if (testProductId) await db.delete(product).where(eq(product.id, testProductId));
       await dbConn.close();
     }
@@ -329,7 +327,9 @@ describe("shipment integration (T058)", () => {
     expect(result.shipment.trackingNumber!.length).toBeGreaterThan(0);
     expect(result.shipment.trackingNumber).toMatch(/^STUB\d+/);
     expect(typeof result.shipment.labelUrl).toBe("string");
-    expect(result.shipment.labelUrl).toMatch(/^https:\/\/stub-labels\.example\.com\/label_\d+\.png$/);
+    expect(result.shipment.labelUrl).toMatch(
+      /^https:\/\/stub-labels\.example\.com\/label_\d+\.png$/,
+    );
     expect(result.shipment.carrier).toBe("USPS");
     expect(result.shipment.serviceLevel).toBe("Priority");
 
@@ -577,7 +577,9 @@ describe("shipment integration (T058)", () => {
     const events = await findShipmentEventsByShipmentId(db, sid);
     const refreshEvents = events.filter((e) => e.providerEventId?.startsWith("refresh-"));
     expect(refreshEvents).toHaveLength(1);
-    expect(refreshEvents[0].providerEventId).toBe(`refresh-${new Date(ts).toISOString()}-in_transit`);
+    expect(refreshEvents[0].providerEventId).toBe(
+      `refresh-${new Date(ts).toISOString()}-in_transit`,
+    );
   });
 
   it("rejects refresh-tracking for draft shipment", async () => {
@@ -775,7 +777,11 @@ describe("shipment integration (T058)", () => {
 
     await buyShipmentLabel(
       db,
-      { shipmentId: sid, providerShipmentId: "shp_stub_void_ready", rateId: "rate_stub_void_ready" },
+      {
+        shipmentId: sid,
+        providerShipmentId: "shp_stub_void_ready",
+        rateId: "rate_stub_void_ready",
+      },
       adapter,
     );
     await transitionShipmentStatus(db, sid, "ready");
@@ -802,7 +808,11 @@ describe("shipment integration (T058)", () => {
 
     await buyShipmentLabel(
       db,
-      { shipmentId: sid, providerShipmentId: "shp_stub_void_shipped", rateId: "rate_stub_void_shipped" },
+      {
+        shipmentId: sid,
+        providerShipmentId: "shp_stub_void_shipped",
+        rateId: "rate_stub_void_shipped",
+      },
       adapter,
     );
     await transitionShipmentStatus(db, sid, "ready");
@@ -859,7 +869,11 @@ describe("shipment integration (T058)", () => {
 
       // Verify the fulfillment task exists for the same order
       const [taskRow] = await db
-        .select({ id: fulfillmentTask.id, orderId: fulfillmentTask.orderId, status: fulfillmentTask.status })
+        .select({
+          id: fulfillmentTask.id,
+          orderId: fulfillmentTask.orderId,
+          status: fulfillmentTask.status,
+        })
         .from(fulfillmentTask)
         .where(eq(fulfillmentTask.id, task.id));
       expect(taskRow.orderId).toBe(testOrderId);

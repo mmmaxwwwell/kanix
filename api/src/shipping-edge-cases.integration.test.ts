@@ -3,10 +3,7 @@ import type { DatabaseConnection } from "./db/connection.js";
 import type { FastifyInstance } from "fastify";
 import { eq, sql } from "drizzle-orm";
 import { product, productVariant } from "./db/schema/catalog.js";
-import {
-  inventoryBalance,
-  inventoryLocation,
-} from "./db/schema/inventory.js";
+import { inventoryBalance, inventoryLocation } from "./db/schema/inventory.js";
 import { order, orderLine, orderStatusHistory } from "./db/schema/order.js";
 import { cartLine } from "./db/schema/cart.js";
 import {
@@ -26,10 +23,7 @@ import {
   handleTrackingUpdate,
   storeShipmentEvent,
 } from "./db/queries/shipment.js";
-import {
-  createStubShippingAdapter,
-  type ShippingAdapter,
-} from "./services/shipping-adapter.js";
+import { createStubShippingAdapter, type ShippingAdapter } from "./services/shipping-adapter.js";
 import { createAdminAlertService } from "./services/admin-alert.js";
 import type { TaxAdapter } from "./services/tax-adapter.js";
 import type { PaymentAdapter } from "./services/payment-adapter.js";
@@ -101,10 +95,7 @@ async function createCartWithItem(
   return token;
 }
 
-function checkoutBody(
-  cartToken: string,
-  addressOverrides: Record<string, unknown> = {},
-) {
+function checkoutBody(cartToken: string, addressOverrides: Record<string, unknown> = {}) {
   return {
     cart_token: cartToken,
     email: "ship-edge@example.com",
@@ -347,9 +338,7 @@ describe("shipping edge cases (T234 — T066d)", () => {
         method: "POST",
         url: "/api/checkout",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          checkoutBody(token, { line1: "Post Office Box 55" }),
-        ),
+        body: JSON.stringify(checkoutBody(token, { line1: "Post Office Box 55" })),
       });
       expect(res.statusCode).toBe(400);
       const body = JSON.parse(res.body);
@@ -396,9 +385,7 @@ describe("shipping edge cases (T234 — T066d)", () => {
         method: "POST",
         url: "/api/checkout",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          checkoutBody(token, { postal_code: "78701-1234" }),
-        ),
+        body: JSON.stringify(checkoutBody(token, { postal_code: "78701-1234" })),
       });
       // Should pass validation (may fail later for other reasons, but NOT 400 for postal code)
       if (res.statusCode === 400) {
@@ -772,44 +759,24 @@ describe("shipping edge cases (T234 — T066d)", () => {
       if (dbConn) {
         const db = dbConn.db;
         // Disable immutability triggers to allow evidence_record cleanup
-        await db.execute(
-          sql`ALTER TABLE evidence_record DISABLE TRIGGER USER`,
-        );
+        await db.execute(sql`ALTER TABLE evidence_record DISABLE TRIGGER USER`);
         try {
           for (const sid of createdShipmentIds) {
-            await db
-              .delete(evidenceRecord)
-              .where(eq(evidenceRecord.shipmentId, sid));
-            await db
-              .delete(shipmentEvent)
-              .where(eq(shipmentEvent.shipmentId, sid));
-            await db
-              .delete(shippingLabelPurchase)
-              .where(eq(shippingLabelPurchase.shipmentId, sid));
-            await db
-              .delete(shipmentLine)
-              .where(eq(shipmentLine.shipmentId, sid));
-            await db
-              .delete(shipmentPackage)
-              .where(eq(shipmentPackage.shipmentId, sid));
+            await db.delete(evidenceRecord).where(eq(evidenceRecord.shipmentId, sid));
+            await db.delete(shipmentEvent).where(eq(shipmentEvent.shipmentId, sid));
+            await db.delete(shippingLabelPurchase).where(eq(shippingLabelPurchase.shipmentId, sid));
+            await db.delete(shipmentLine).where(eq(shipmentLine.shipmentId, sid));
+            await db.delete(shipmentPackage).where(eq(shipmentPackage.shipmentId, sid));
             await db.delete(shipment).where(eq(shipment.id, sid));
           }
           if (testOrderId) {
-            await db
-              .delete(evidenceRecord)
-              .where(eq(evidenceRecord.orderId, testOrderId));
-            await db
-              .delete(orderStatusHistory)
-              .where(eq(orderStatusHistory.orderId, testOrderId));
-            await db
-              .delete(orderLine)
-              .where(eq(orderLine.orderId, testOrderId));
+            await db.delete(evidenceRecord).where(eq(evidenceRecord.orderId, testOrderId));
+            await db.delete(orderStatusHistory).where(eq(orderStatusHistory.orderId, testOrderId));
+            await db.delete(orderLine).where(eq(orderLine.orderId, testOrderId));
             await db.delete(order).where(eq(order.id, testOrderId));
           }
         } finally {
-          await db.execute(
-            sql`ALTER TABLE evidence_record ENABLE TRIGGER USER`,
-          );
+          await db.execute(sql`ALTER TABLE evidence_record ENABLE TRIGGER USER`);
         }
         await dbConn.close();
       }
@@ -824,9 +791,7 @@ describe("shipping edge cases (T234 — T066d)", () => {
         const failingAdapter: ShippingAdapter = {
           ...createStubShippingAdapter(),
           async buyLabel(): Promise<never> {
-            throw new Error(
-              "EasyPost API error: address verification failed",
-            );
+            throw new Error("EasyPost API error: address verification failed");
           },
         };
 
@@ -938,12 +903,7 @@ describe("shipping edge cases (T234 — T066d)", () => {
           rawPayloadJson: { status: "failure" },
         });
 
-        const result = await handleTrackingUpdate(
-          db,
-          shipmentRecord!,
-          "failure",
-          alertService,
-        );
+        const result = await handleTrackingUpdate(db, shipmentRecord!, "failure", alertService);
         expect(result.shipmentTransitioned).toBe(true);
 
         const afterException = await findShipmentById(db, created.id);
@@ -952,20 +912,12 @@ describe("shipping edge cases (T234 — T066d)", () => {
         const alerts = alertService.getAlerts();
         expect(alerts.length).toBeGreaterThanOrEqual(1);
 
-        const exceptionAlert = alerts.find(
-          (a) => a.type === "delivery_exception",
-        );
+        const exceptionAlert = alerts.find((a) => a.type === "delivery_exception");
         expect(exceptionAlert).toBeDefined();
         expect(exceptionAlert!.orderId).toBe(testOrderId);
         expect(exceptionAlert!.message).toContain("Delivery exception");
-        expect(exceptionAlert!.details).toHaveProperty(
-          "shipmentId",
-          created.id,
-        );
-        expect(exceptionAlert!.details).toHaveProperty(
-          "easypostStatus",
-          "failure",
-        );
+        expect(exceptionAlert!.details).toHaveProperty("shipmentId", created.id);
+        expect(exceptionAlert!.details).toHaveProperty("easypostStatus", "failure");
       });
 
       it("supports exception → in_transit recovery transition", async () => {
@@ -997,21 +949,14 @@ describe("shipping edge cases (T234 — T066d)", () => {
         const inException = await findShipmentById(db, created.id);
         expect(inException!.status).toBe("exception");
 
-        const result = await handleTrackingUpdate(
-          db,
-          inException!,
-          "in_transit",
-          alertService,
-        );
+        const result = await handleTrackingUpdate(db, inException!, "in_transit", alertService);
         expect(result.shipmentTransitioned).toBe(true);
 
         const recovered = await findShipmentById(db, created.id);
         expect(recovered!.status).toBe("in_transit");
 
         const alerts = alertService.getAlerts();
-        const exceptionAlerts = alerts.filter(
-          (a) => a.type === "delivery_exception",
-        );
+        const exceptionAlerts = alerts.filter((a) => a.type === "delivery_exception");
         expect(exceptionAlerts.length).toBe(0);
       });
     });

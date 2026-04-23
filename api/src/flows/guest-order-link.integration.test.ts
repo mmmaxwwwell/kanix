@@ -13,10 +13,7 @@ import type { FastifyInstance } from "fastify";
 import { eq, and, isNull } from "drizzle-orm";
 import { product, productVariant } from "../db/schema/catalog.js";
 import { productClass, productClassMembership } from "../db/schema/product-class.js";
-import {
-  inventoryBalance,
-  inventoryLocation,
-} from "../db/schema/inventory.js";
+import { inventoryBalance, inventoryLocation } from "../db/schema/inventory.js";
 import { order } from "../db/schema/order.js";
 import { customer } from "../db/schema/customer.js";
 import type { TaxAdapter } from "../services/tax-adapter.js";
@@ -135,9 +132,8 @@ async function signUpUser(
 
 async function verifyEmail(address: string, userId: string): Promise<void> {
   const { default: supertokens } = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -368,10 +364,7 @@ describe("guest-order → account linking flow (T269, mirrors T104a/FR-066)", ()
 
     // Get the payment intent ID from DB
     const { payment } = await import("../db/schema/payment.js");
-    const [paymentRow] = await db
-      .select()
-      .from(payment)
-      .where(eq(payment.orderId, guestOrderId));
+    const [paymentRow] = await db.select().from(payment).where(eq(payment.orderId, guestOrderId));
     expect(paymentRow).toBeDefined();
     paymentIntentId = paymentRow.providerPaymentIntentId;
 
@@ -406,10 +399,7 @@ describe("guest-order → account linking flow (T269, mirrors T104a/FR-066)", ()
     expect(JSON.parse(res.body).received).toBe(true);
 
     // Order confirmed + paid
-    const [confirmedOrder] = await db
-      .select()
-      .from(order)
-      .where(eq(order.id, guestOrderId));
+    const [confirmedOrder] = await db.select().from(order).where(eq(order.id, guestOrderId));
     expect(confirmedOrder.status).toBe("confirmed");
     expect(confirmedOrder.paymentStatus).toBe("paid");
 

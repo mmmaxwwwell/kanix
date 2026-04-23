@@ -73,6 +73,16 @@ export default class SpecKitReporter implements Reporter {
   }
 
   onFinished(files?: File[]): void {
+    // Vitest may invoke onFinished multiple times (e.g. a spurious empty
+    // callback before the real run, or once per fork pool completion). An
+    // invocation with no files and no previously-collected results is not a
+    // real test run — it's noise. Writing a 0/0/0 summary here overwrites
+    // the real summary and trips the vacuous-run guard with exit 1 even
+    // though every test passed. Skip it.
+    if ((files?.length ?? 0) === 0 && this.results.length === 0) {
+      return;
+    }
+
     const timestamp = new Date().toISOString();
     const runDir = join(LOG_ROOT, RUN_TYPE, nowIsoCompact());
     const failuresDir = join(runDir, "failures");
@@ -147,7 +157,8 @@ export default class SpecKitReporter implements Reporter {
         let status: Status = "skipped";
         if (result?.state === "pass") status = "passed";
         else if (result?.state === "fail") status = "failed";
-        else if ((task as Task).mode === "skip" || (task as Task).mode === "todo") status = "skipped";
+        else if ((task as Task).mode === "skip" || (task as Task).mode === "todo")
+          status = "skipped";
 
         const entry: ResultEntry = { name: fullName, file: relFile, status, duration_ms };
 

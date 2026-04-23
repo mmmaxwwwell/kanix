@@ -514,10 +514,15 @@ describe("critical path checkpoint (Phase 6)", () => {
         ];
 
         for (const oid of orderIds) {
-          await db.delete(orderPolicyAcknowledgment).where(eq(orderPolicyAcknowledgment.orderId, oid));
+          await db
+            .delete(orderPolicyAcknowledgment)
+            .where(eq(orderPolicyAcknowledgment.orderId, oid));
           const payments = await db.select().from(payment).where(eq(payment.orderId, oid));
           for (const p of payments) {
-            await db.delete(paymentEvent).where(eq(paymentEvent.paymentId, p.id)).catch(() => {});
+            await db
+              .delete(paymentEvent)
+              .where(eq(paymentEvent.paymentId, p.id))
+              .catch(() => {});
           }
           await db.delete(payment).where(eq(payment.orderId, oid));
           await db.delete(orderStatusHistory).where(eq(orderStatusHistory.orderId, oid));
@@ -528,8 +533,12 @@ describe("critical path checkpoint (Phase 6)", () => {
         // Clean up inventory
         await db.delete(inventoryMovement).where(eq(inventoryMovement.variantId, activeVariantId));
         await db.delete(inventoryMovement).where(eq(inventoryMovement.variantId, secondVariantId));
-        await db.delete(inventoryReservation).where(eq(inventoryReservation.variantId, activeVariantId));
-        await db.delete(inventoryReservation).where(eq(inventoryReservation.variantId, secondVariantId));
+        await db
+          .delete(inventoryReservation)
+          .where(eq(inventoryReservation.variantId, activeVariantId));
+        await db
+          .delete(inventoryReservation)
+          .where(eq(inventoryReservation.variantId, secondVariantId));
         await db.delete(inventoryBalance).where(eq(inventoryBalance.variantId, activeVariantId));
         await db.delete(inventoryBalance).where(eq(inventoryBalance.variantId, secondVariantId));
 

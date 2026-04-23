@@ -234,9 +234,7 @@ describe("kit cart re-validation on state change (T054a)", () => {
       if (cartId) {
         const lines = await dbConn.db.select().from(cartLine).where(eq(cartLine.cartId, cartId));
         for (const line of lines) {
-          await dbConn.db
-            .delete(cartKitSelection)
-            .where(eq(cartKitSelection.cartLineId, line.id));
+          await dbConn.db.delete(cartKitSelection).where(eq(cartKitSelection.cartLineId, line.id));
         }
         await dbConn.db.delete(cartLine).where(eq(cartLine.cartId, cartId));
         await dbConn.db.delete(cart).where(eq(cart.id, cartId));
@@ -333,9 +331,7 @@ describe("kit cart re-validation on state change (T054a)", () => {
 
   it("variant going out-of-stock flags insufficientStock on cart read", async () => {
     // Delete all inventory balance rows for variant A1 (the kit line's primary variant)
-    await dbConn.db
-      .delete(inventoryBalance)
-      .where(eq(inventoryBalance.variantId, variantA1Id));
+    await dbConn.db.delete(inventoryBalance).where(eq(inventoryBalance.variantId, variantA1Id));
 
     const { status, body } = await readCart();
     expect(status).toBe(200);
@@ -360,9 +356,7 @@ describe("kit cart re-validation on state change (T054a)", () => {
 
   it("checkout rejects cart when kit variant is out-of-stock with ERR_CART_STALE", async () => {
     // Delete all inventory for variant A1 (the kit line's primary variant)
-    await dbConn.db
-      .delete(inventoryBalance)
-      .where(eq(inventoryBalance.variantId, variantA1Id));
+    await dbConn.db.delete(inventoryBalance).where(eq(inventoryBalance.variantId, variantA1Id));
 
     const res = await fetch(`${address}/api/checkout`, {
       method: "POST",
@@ -559,8 +553,14 @@ describe("kit cart re-validation on state change (T054a)", () => {
     // Plates: cart has 2 but now needs 1 → warning
     // Cups: now required but cart has 0 → warning
     expect(reqWarnings.length).toBe(2);
-    expect(reqWarnings.some((w) => w.message.includes("requires 1 selections but cart has 2"))).toBe(true);
-    expect(reqWarnings.some((w) => w.message.includes(`${cupsClassId} now requires 1 selections but has none`))).toBe(true);
+    expect(
+      reqWarnings.some((w) => w.message.includes("requires 1 selections but cart has 2")),
+    ).toBe(true);
+    expect(
+      reqWarnings.some((w) =>
+        w.message.includes(`${cupsClassId} now requires 1 selections but has none`),
+      ),
+    ).toBe(true);
 
     // Restore original requirements
     await dbConn.db

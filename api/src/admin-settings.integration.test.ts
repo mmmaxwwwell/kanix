@@ -254,9 +254,7 @@ describe("admin settings APIs (T229)", () => {
     // Verify the event was buffered
     expect(wsManager).toBeDefined();
     const newMessages = wsManager!.messageBuffer.slice(bufferLenBefore);
-    const settingsEvent = newMessages.find(
-      (m) => m.message.type === "settings.changed",
-    );
+    const settingsEvent = newMessages.find((m) => m.message.type === "settings.changed");
     expect(settingsEvent).toBeDefined();
     expect(settingsEvent!.message.entity).toBe("setting");
     expect(settingsEvent!.message.entityId).toBe("shipping");

@@ -244,9 +244,8 @@ describe("email conflict handling (T054e, T205)", () => {
 
     // Generate email verification token for account B (for verifyEmail)
     const { default: supertokens } = await import("supertokens-node");
-    const { default: EmailVerification } = await import(
-      "supertokens-node/recipe/emailverification/index.js"
-    );
+    const { default: EmailVerification } =
+      await import("supertokens-node/recipe/emailverification/index.js");
     const tokenRes = await EmailVerification.createEmailVerificationToken(
       "public",
       supertokens.convertToRecipeUserId(userBId),
@@ -289,7 +288,9 @@ describe("email conflict handling (T054e, T205)", () => {
     expect(isVerified).toBe(false);
 
     // Clean up
-    await dbConn.db.delete(customer).where(eq(customer.authSubject, `verify-owner-${uniqueSuffix}`));
+    await dbConn.db
+      .delete(customer)
+      .where(eq(customer.authSubject, `verify-owner-${uniqueSuffix}`));
     await dbConn.db.delete(customer).where(eq(customer.email, differentEmail));
   });
 });

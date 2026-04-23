@@ -221,10 +221,7 @@ async function forceExpireReservations(
     .update(inventoryReservation)
     .set({ expiresAt: new Date(Date.now() - 60_000) })
     .where(
-      and(
-        eq(inventoryReservation.orderId, orderId),
-        eq(inventoryReservation.status, "active"),
-      ),
+      and(eq(inventoryReservation.orderId, orderId), eq(inventoryReservation.status, "active")),
     );
 
   // Run the actual cleanup job (same as the cron would)
@@ -268,9 +265,7 @@ describe("reservation late-payment race — stock available (FR-E008)", () => {
   });
 
   it("step 1: checkout creates reservation against available inventory", async () => {
-    const result = await createCheckoutWithReservation(
-      app, dbConn.db, "avail", 2500, 2, 20,
-    );
+    const result = await createCheckoutWithReservation(app, dbConn.db, "avail", 2500, 2, 20);
     orderId = result.orderId;
     paymentIntentId = result.paymentIntentId;
     variantId = result.variantId;
@@ -286,10 +281,7 @@ describe("reservation late-payment race — stock available (FR-E008)", () => {
       .select()
       .from(inventoryReservation)
       .where(
-        and(
-          eq(inventoryReservation.orderId, orderId),
-          eq(inventoryReservation.status, "active"),
-        ),
+        and(eq(inventoryReservation.orderId, orderId), eq(inventoryReservation.status, "active")),
       );
     expect(reservations.length).toBe(1);
     expect(reservations[0].quantity).toBe(2);
@@ -300,10 +292,7 @@ describe("reservation late-payment race — stock available (FR-E008)", () => {
       .select()
       .from(inventoryBalance)
       .where(
-        and(
-          eq(inventoryBalance.variantId, variantId),
-          eq(inventoryBalance.locationId, locationId),
-        ),
+        and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
       );
     expect(balance.reserved).toBe(2);
     expect(balance.available).toBe(18); // 20 - 2
@@ -327,10 +316,7 @@ describe("reservation late-payment race — stock available (FR-E008)", () => {
       .select()
       .from(inventoryBalance)
       .where(
-        and(
-          eq(inventoryBalance.variantId, variantId),
-          eq(inventoryBalance.locationId, locationId),
-        ),
+        and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
       );
     expect(balance.reserved).toBe(0);
     expect(balance.available).toBe(20); // fully restored
@@ -396,10 +382,7 @@ describe("reservation late-payment race — stock available (FR-E008)", () => {
       .select()
       .from(inventoryBalance)
       .where(
-        and(
-          eq(inventoryBalance.variantId, variantId),
-          eq(inventoryBalance.locationId, locationId),
-        ),
+        and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
       );
     expect(balance.onHand).toBe(18);
     expect(balance.reserved).toBe(0);
@@ -453,7 +436,12 @@ describe("reservation late-payment race — stock exhausted (FR-E008)", () => {
 
   it("step 1: checkout creates reservation with limited stock", async () => {
     const result = await createCheckoutWithReservation(
-      app, dbConn.db, "exhaust", 3000, 2, 2, // exactly 2 units — just enough for checkout
+      app,
+      dbConn.db,
+      "exhaust",
+      3000,
+      2,
+      2, // exactly 2 units — just enough for checkout
     );
     orderId = result.orderId;
     paymentIntentId = result.paymentIntentId;
@@ -470,10 +458,7 @@ describe("reservation late-payment race — stock exhausted (FR-E008)", () => {
       .select()
       .from(inventoryReservation)
       .where(
-        and(
-          eq(inventoryReservation.orderId, orderId),
-          eq(inventoryReservation.status, "active"),
-        ),
+        and(eq(inventoryReservation.orderId, orderId), eq(inventoryReservation.status, "active")),
       );
     expect(reservations.length).toBe(1);
     expect(reservations[0].quantity).toBe(2);
@@ -503,10 +488,7 @@ describe("reservation late-payment race — stock exhausted (FR-E008)", () => {
       .select()
       .from(inventoryBalance)
       .where(
-        and(
-          eq(inventoryBalance.variantId, variantId),
-          eq(inventoryBalance.locationId, locationId),
-        ),
+        and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
       );
     expect(balance.available).toBe(0);
     expect(balance.onHand).toBe(0);
@@ -581,10 +563,7 @@ describe("reservation late-payment race — stock exhausted (FR-E008)", () => {
       .select()
       .from(inventoryBalance)
       .where(
-        and(
-          eq(inventoryBalance.variantId, variantId),
-          eq(inventoryBalance.locationId, locationId),
-        ),
+        and(eq(inventoryBalance.variantId, variantId), eq(inventoryBalance.locationId, locationId)),
       );
     expect(balance.available).toBe(0);
     expect(balance.onHand).toBe(0);

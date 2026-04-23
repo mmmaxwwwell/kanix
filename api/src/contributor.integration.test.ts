@@ -227,9 +227,12 @@ describe("contributor onboarding + profile (T247)", () => {
   });
 
   it("returns 404 for non-existent contributor ID", async () => {
-    const res = await fetch(`${address}/api/admin/contributors/00000000-0000-0000-0000-000000000000`, {
-      headers: adminHeaders,
-    });
+    const res = await fetch(
+      `${address}/api/admin/contributors/00000000-0000-0000-0000-000000000000`,
+      {
+        headers: adminHeaders,
+      },
+    );
 
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string };
@@ -251,7 +254,10 @@ describe("contributor onboarding + profile (T247)", () => {
 
     // Verify our created contributors are present
     const ourUsernames = body.contributors
-      .filter((c) => typeof c.githubUsername === "string" && (c.githubUsername as string).includes(`${ts}`))
+      .filter(
+        (c) =>
+          typeof c.githubUsername === "string" && (c.githubUsername as string).includes(`${ts}`),
+      )
       .map((c) => c.githubUsername);
     expect(ourUsernames).toContain(`testuser-${ts}`);
     expect(ourUsernames).toContain(`pending-user-${ts}`);
@@ -330,11 +336,14 @@ describe("contributor onboarding + profile (T247)", () => {
       .returning();
     createdProductIds.push(prod.id);
 
-    const res = await fetch(`${address}/api/admin/contributors/00000000-0000-0000-0000-000000000000/designs`, {
-      method: "POST",
-      headers: { ...adminHeaders, "Content-Type": "application/json" },
-      body: JSON.stringify({ product_id: prod.id }),
-    });
+    const res = await fetch(
+      `${address}/api/admin/contributors/00000000-0000-0000-0000-000000000000/designs`,
+      {
+        method: "POST",
+        headers: { ...adminHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: prod.id }),
+      },
+    );
 
     expect(res.status).toBe(404);
   });
@@ -404,11 +413,14 @@ describe("contributor onboarding + profile (T247)", () => {
   });
 
   it("visibility update on non-existent contributor returns 404", async () => {
-    const res = await fetch(`${address}/api/admin/contributors/00000000-0000-0000-0000-000000000000/visibility`, {
-      method: "PATCH",
-      headers: { ...adminHeaders, "Content-Type": "application/json" },
-      body: JSON.stringify({ profile_visibility: "private" }),
-    });
+    const res = await fetch(
+      `${address}/api/admin/contributors/00000000-0000-0000-0000-000000000000/visibility`,
+      {
+        method: "PATCH",
+        headers: { ...adminHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ profile_visibility: "private" }),
+      },
+    );
 
     expect(res.status).toBe(404);
   });

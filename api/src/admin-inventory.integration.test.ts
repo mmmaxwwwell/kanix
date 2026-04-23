@@ -182,9 +182,7 @@ describe("admin inventory balance + adjustment API (T226)", () => {
       await dbConn.db
         .delete(inventoryAdjustment)
         .where(eq(inventoryAdjustment.variantId, testVariant2Id));
-      await dbConn.db
-        .delete(inventoryBalance)
-        .where(eq(inventoryBalance.variantId, testVariantId));
+      await dbConn.db.delete(inventoryBalance).where(eq(inventoryBalance.variantId, testVariantId));
       await dbConn.db
         .delete(inventoryBalance)
         .where(eq(inventoryBalance.variantId, testVariant2Id));
@@ -197,9 +195,7 @@ describe("admin inventory balance + adjustment API (T226)", () => {
       await dbConn.db.delete(adminUser).where(eq(adminUser.id, adminUserId));
       await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));
       // Cleanup audit logs
-      await dbConn.db
-        .delete(adminAuditLog)
-        .where(eq(adminAuditLog.actorAdminUserId, adminUserId));
+      await dbConn.db.delete(adminAuditLog).where(eq(adminAuditLog.actorAdminUserId, adminUserId));
     } catch {
       // Best-effort cleanup
     }
@@ -224,7 +220,14 @@ describe("admin inventory balance + adjustment API (T226)", () => {
     });
     expect(res.status).toBe(201);
     const body = (await res.json()) as {
-      adjustment: { id: string; adjustmentType: string; quantityDelta: number; reason: string; variantId: string; locationId: string };
+      adjustment: {
+        id: string;
+        adjustmentType: string;
+        quantityDelta: number;
+        reason: string;
+        variantId: string;
+        locationId: string;
+      };
       movement: { id: string; movementType: string; quantityDelta: number; referenceType: string };
       balance: { onHand: number; reserved: number; available: number; safetyStock: number };
       low_stock: boolean;
@@ -268,7 +271,12 @@ describe("admin inventory balance + adjustment API (T226)", () => {
     });
     expect(res.status).toBe(201);
     const body = (await res.json()) as {
-      adjustment: { adjustmentType: string; quantityDelta: number; reason: string; notes: string | null };
+      adjustment: {
+        adjustmentType: string;
+        quantityDelta: number;
+        reason: string;
+        notes: string | null;
+      };
       balance: { onHand: number; available: number };
     };
     expect(body.adjustment.adjustmentType).toBe("shrinkage");
@@ -307,7 +315,14 @@ describe("admin inventory balance + adjustment API (T226)", () => {
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      balances: Array<{ variantId: string; locationId: string; onHand: number; available: number; reserved: number; safetyStock: number }>;
+      balances: Array<{
+        variantId: string;
+        locationId: string;
+        onHand: number;
+        available: number;
+        reserved: number;
+        safetyStock: number;
+      }>;
     };
     expect(body.balances.length).toBeGreaterThanOrEqual(1);
     const match = body.balances.find((b) => b.variantId === testVariantId);
@@ -636,10 +651,9 @@ describe("admin inventory balance + adjustment API (T226)", () => {
 
   it("returns empty adjustments array when variant has no history", async () => {
     const fakeId = "00000000-0000-0000-0000-000000000000";
-    const res = await fetch(
-      `${address}/api/admin/inventory/adjustments?variant_id=${fakeId}`,
-      { headers: adminHeaders },
-    );
+    const res = await fetch(`${address}/api/admin/inventory/adjustments?variant_id=${fakeId}`, {
+      headers: adminHeaders,
+    });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { adjustments: unknown[] };
     expect(body.adjustments).toEqual([]);

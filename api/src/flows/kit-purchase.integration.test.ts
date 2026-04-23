@@ -18,10 +18,7 @@ import {
   kitDefinition,
   kitClassRequirement,
 } from "../db/schema/product-class.js";
-import {
-  inventoryBalance,
-  inventoryLocation,
-} from "../db/schema/inventory.js";
+import { inventoryBalance, inventoryLocation } from "../db/schema/inventory.js";
 import { order, orderLine } from "../db/schema/order.js";
 import { payment } from "../db/schema/payment.js";
 import type { TaxAdapter } from "../services/tax-adapter.js";
@@ -285,9 +282,7 @@ describe("kit purchase flow (T262, mirrors T098/SC-010)", () => {
     const body = JSON.parse(res.body);
     expect(body.kits).toBeInstanceOf(Array);
 
-    const found = body.kits.find(
-      (k: { slug: string }) => k.slug === `starter-kit-${run}`,
-    );
+    const found = body.kits.find((k: { slug: string }) => k.slug === `starter-kit-${run}`);
     expect(found).toBeDefined();
     expect(found.title).toBe(`Starter Kit ${run}`);
     expect(found.priceMinor).toBe(KIT_PRICE);
@@ -304,13 +299,9 @@ describe("kit purchase flow (T262, mirrors T098/SC-010)", () => {
     expect(reqA.products.length).toBeGreaterThanOrEqual(1);
 
     // Verify variant A is listed under class A's products
-    const prodAEntry = reqA.products.find(
-      (p: { id: string }) => p.id === productAId,
-    );
+    const prodAEntry = reqA.products.find((p: { id: string }) => p.id === productAId);
     expect(prodAEntry).toBeDefined();
-    const varAEntry = prodAEntry.variants.find(
-      (v: { id: string }) => v.id === variantAId,
-    );
+    const varAEntry = prodAEntry.variants.find((v: { id: string }) => v.id === variantAId);
     expect(varAEntry).toBeDefined();
     expect(varAEntry.priceCents).toBe(VARIANT_A_PRICE);
     expect(varAEntry.inStock).toBe(true);
@@ -406,16 +397,12 @@ describe("kit purchase flow (T262, mirrors T098/SC-010)", () => {
     expect(body.kit.selections).toBeInstanceOf(Array);
     expect(body.kit.selections.length).toBe(2);
 
-    const selA = body.kit.selections.find(
-      (s: { variantId: string }) => s.variantId === variantAId,
-    );
+    const selA = body.kit.selections.find((s: { variantId: string }) => s.variantId === variantAId);
     expect(selA).toBeDefined();
     expect(selA.productClassId).toBe(classAId);
     expect(selA.individualPriceMinor).toBe(VARIANT_A_PRICE);
 
-    const selB = body.kit.selections.find(
-      (s: { variantId: string }) => s.variantId === variantBId,
-    );
+    const selB = body.kit.selections.find((s: { variantId: string }) => s.variantId === variantBId);
     expect(selB).toBeDefined();
     expect(selB.productClassId).toBe(classBId);
     expect(selB.individualPriceMinor).toBe(VARIANT_B_PRICE);

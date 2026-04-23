@@ -5,7 +5,12 @@ import { eq, and } from "drizzle-orm";
 import { product, productVariant } from "./db/schema/catalog.js";
 import { inventoryBalance, inventoryLocation } from "./db/schema/inventory.js";
 import { cart, cartLine, cartKitSelection } from "./db/schema/cart.js";
-import { productClass, productClassMembership, kitDefinition, kitClassRequirement } from "./db/schema/product-class.js";
+import {
+  productClass,
+  productClassMembership,
+  kitDefinition,
+  kitClassRequirement,
+} from "./db/schema/product-class.js";
 import { createTestServer, stopTestServer, type TestServer } from "./test-server.js";
 
 describe("cart API (T046)", () => {
@@ -181,14 +186,18 @@ describe("cart API (T046)", () => {
         await dbConn.db.delete(cart).where(eq(cart.id, cid));
       }
       // Cleanup kit data
-      await dbConn.db.delete(kitClassRequirement).where(eq(kitClassRequirement.kitDefinitionId, kitDefId));
+      await dbConn.db
+        .delete(kitClassRequirement)
+        .where(eq(kitClassRequirement.kitDefinitionId, kitDefId));
       await dbConn.db.delete(kitDefinition).where(eq(kitDefinition.id, kitDefId));
-      await dbConn.db.delete(productClassMembership).where(
-        and(
-          eq(productClassMembership.productId, activeProductId),
-          eq(productClassMembership.productClassId, kitClassId),
-        ),
-      );
+      await dbConn.db
+        .delete(productClassMembership)
+        .where(
+          and(
+            eq(productClassMembership.productId, activeProductId),
+            eq(productClassMembership.productClassId, kitClassId),
+          ),
+        );
       await dbConn.db.delete(productClass).where(eq(productClass.id, kitClassId));
       // Cleanup inventory
       await dbConn.db.delete(inventoryBalance).where(eq(inventoryBalance.locationId, locationId));
@@ -229,9 +238,7 @@ describe("cart API (T046)", () => {
 
     // Concrete assertions — no toBeDefined()
     expect(typeof body.cart.id).toBe("string");
-    expect(body.cart.id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-    );
+    expect(body.cart.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(typeof body.cart.token).toBe("string");
     expect(body.cart.token).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
@@ -680,9 +687,7 @@ describe("cart API (T046)", () => {
       },
       body: JSON.stringify({
         kit_definition_id: kitDefId,
-        selections: [
-          { product_class_id: kitClassId, variant_id: activeVariantId },
-        ],
+        selections: [{ product_class_id: kitClassId, variant_id: activeVariantId }],
       }),
     });
     expect(res.status).toBe(201);
@@ -903,10 +908,7 @@ describe("cart API (T046)", () => {
     expect(addRes.status).toBe(201);
 
     // Simulate expiry by marking cart as "expired" directly in DB
-    await dbConn.db
-      .update(cart)
-      .set({ status: "expired" })
-      .where(eq(cart.id, cartBody.cart.id));
+    await dbConn.db.update(cart).set({ status: "expired" }).where(eq(cart.id, cartBody.cart.id));
 
     // GET with the old token should now return 404
     const getRes = await fetch(`${address}/api/cart`, {
@@ -918,10 +920,7 @@ describe("cart API (T046)", () => {
     expect(getBody.error).toBe("ERR_CART_NOT_FOUND");
 
     // Restore to active for cleanup
-    await dbConn.db
-      .update(cart)
-      .set({ status: "active" })
-      .where(eq(cart.id, cartBody.cart.id));
+    await dbConn.db.update(cart).set({ status: "active" }).where(eq(cart.id, cartBody.cart.id));
   });
 
   // ---------------------------------------------------------------------------

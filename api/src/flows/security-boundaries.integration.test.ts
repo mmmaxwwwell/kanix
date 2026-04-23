@@ -59,9 +59,8 @@ async function signUpUser(
 
 async function verifyEmail(userId: string): Promise<void> {
   const { default: supertokens } = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -109,10 +108,7 @@ async function signIn(
   return { headers, userId: body.user.id };
 }
 
-async function signOut(
-  address: string,
-  headers: Record<string, string>,
-): Promise<void> {
+async function signOut(address: string, headers: Record<string, string>): Promise<void> {
   const res = await fetch(`${address}/auth/signout`, {
     method: "POST",
     headers: {
@@ -310,27 +306,21 @@ describe("security boundary enforcement flow (T268, mirrors T104/SC-008/SC-015)"
 
   describe("cross-customer access returns 404 (hides existence)", () => {
     it("customer A cannot update customer B address — returns 404", async () => {
-      const res = await fetch(
-        `${address}/api/customer/addresses/${userBAddressId}`,
-        {
-          method: "PATCH",
-          headers: { ...userAHeaders, "Content-Type": "application/json" },
-          body: JSON.stringify({ full_name: "Hacked Name" }),
-        },
-      );
+      const res = await fetch(`${address}/api/customer/addresses/${userBAddressId}`, {
+        method: "PATCH",
+        headers: { ...userAHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ full_name: "Hacked Name" }),
+      });
       expect(res.status).toBe(404);
       const body = (await res.json()) as { error: string };
       expect(body.error).toBe("ERR_NOT_FOUND");
     });
 
     it("customer A cannot delete customer B address — returns 404", async () => {
-      const res = await fetch(
-        `${address}/api/customer/addresses/${userBAddressId}`,
-        {
-          method: "DELETE",
-          headers: userAHeaders,
-        },
-      );
+      const res = await fetch(`${address}/api/customer/addresses/${userBAddressId}`, {
+        method: "DELETE",
+        headers: userAHeaders,
+      });
       expect(res.status).toBe(404);
       const body = (await res.json()) as { error: string };
       expect(body.error).toBe("ERR_NOT_FOUND");

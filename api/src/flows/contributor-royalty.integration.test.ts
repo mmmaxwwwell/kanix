@@ -15,10 +15,7 @@ import type { FastifyInstance } from "fastify";
 import { eq, sql, inArray, and } from "drizzle-orm";
 import { product, productVariant } from "../db/schema/catalog.js";
 import { productClass, productClassMembership } from "../db/schema/product-class.js";
-import {
-  inventoryBalance,
-  inventoryLocation,
-} from "../db/schema/inventory.js";
+import { inventoryBalance, inventoryLocation } from "../db/schema/inventory.js";
 import { order, orderLine, orderStatusHistory } from "../db/schema/order.js";
 import { payment } from "../db/schema/payment.js";
 import {
@@ -160,9 +157,8 @@ async function signUpUser(
 
 async function verifyEmail(userId: string): Promise<void> {
   const { default: supertokens } = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -429,9 +425,15 @@ describe("contributor royalty flow (T265, mirrors T101/SC-011)", () => {
       try {
         // Clean royalties
         if (contributorId) {
-          await db.delete(contributorRoyalty).where(eq(contributorRoyalty.contributorId, contributorId));
-          await db.delete(contributorMilestone).where(eq(contributorMilestone.contributorId, contributorId));
-          await db.delete(contributorDonation).where(eq(contributorDonation.contributorId, contributorId));
+          await db
+            .delete(contributorRoyalty)
+            .where(eq(contributorRoyalty.contributorId, contributorId));
+          await db
+            .delete(contributorMilestone)
+            .where(eq(contributorMilestone.contributorId, contributorId));
+          await db
+            .delete(contributorDonation)
+            .where(eq(contributorDonation.contributorId, contributorId));
         }
 
         // Clean order-related data
@@ -440,9 +442,7 @@ describe("contributor royalty flow (T265, mirrors T101/SC-011)", () => {
             sql`DELETE FROM payment_event WHERE payment_id IN (SELECT id FROM payment WHERE order_id = ${oid})`,
           );
           await db.delete(payment).where(eq(payment.orderId, oid));
-          await db.execute(
-            sql`DELETE FROM inventory_reservation WHERE order_id = ${oid}`,
-          );
+          await db.execute(sql`DELETE FROM inventory_reservation WHERE order_id = ${oid}`);
           await db.delete(orderStatusHistory).where(eq(orderStatusHistory.orderId, oid));
           await db.delete(orderLine).where(eq(orderLine.orderId, oid));
           await db.delete(order).where(eq(order.id, oid));
@@ -460,7 +460,9 @@ describe("contributor royalty flow (T265, mirrors T101/SC-011)", () => {
 
         // Clean inventory + product
         await db.delete(inventoryBalance).where(eq(inventoryBalance.variantId, variantId));
-        await db.delete(productClassMembership).where(eq(productClassMembership.productId, productId));
+        await db
+          .delete(productClassMembership)
+          .where(eq(productClassMembership.productId, productId));
         await db.delete(productClass).where(eq(productClass.id, classId));
         await db.delete(productVariant).where(eq(productVariant.productId, productId));
         await db.delete(product).where(eq(product.id, productId));

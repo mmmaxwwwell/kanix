@@ -7,6 +7,13 @@ export default defineConfig({
     include: ["src/**/*.test.ts"],
     exclude: ["**/node_modules/**", "**/dist/**", "src/**/*.external.test.ts"],
     passWithNoTests: true,
+    pool: "forks",
+    poolOptions: {
+      forks: {
+        minForks: 1,
+        maxForks: Number(process.env.VITEST_MAX_FORKS ?? 2),
+      },
+    },
     reporters: ["default", "./src/test-reporter.ts"],
     coverage: {
       provider: "v8",

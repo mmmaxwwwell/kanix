@@ -250,10 +250,7 @@ describe("order cancellation API (T053)", () => {
 
     // --- Create order 4: already canceled (for duplicate-cancel rejection) ---
     alreadyCanceledOrderId = await createCheckoutOrder(app, db, variantId, `cxl-already-${ts}`);
-    await db
-      .update(order)
-      .set({ status: "canceled" })
-      .where(eq(order.id, alreadyCanceledOrderId));
+    await db.update(order).set({ status: "canceled" }).where(eq(order.id, alreadyCanceledOrderId));
   });
 
   async function createCheckoutOrder(
@@ -405,9 +402,7 @@ describe("order cancellation API (T053)", () => {
       .from(orderStatusHistory)
       .where(eq(orderStatusHistory.orderId, unpaidOrderId))
       .orderBy(desc(orderStatusHistory.createdAt));
-    const cancelEntry = history.find(
-      (h) => h.statusType === "status" && h.newValue === "canceled",
-    );
+    const cancelEntry = history.find((h) => h.statusType === "status" && h.newValue === "canceled");
     expect(cancelEntry).toBeDefined();
     expect(cancelEntry!.reason).toBe("Customer changed their mind");
     expect(cancelEntry!.actorAdminUserId).toBe(adminUserId);
@@ -466,9 +461,7 @@ describe("order cancellation API (T053)", () => {
       .from(orderStatusHistory)
       .where(eq(orderStatusHistory.orderId, paidOrderId))
       .orderBy(desc(orderStatusHistory.createdAt));
-    const cancelEntry = history.find(
-      (h) => h.statusType === "status" && h.newValue === "canceled",
-    );
+    const cancelEntry = history.find((h) => h.statusType === "status" && h.newValue === "canceled");
     expect(cancelEntry).toBeDefined();
     expect(cancelEntry!.reason).toBe("Order canceled by admin");
 
@@ -487,10 +480,7 @@ describe("order cancellation API (T053)", () => {
       .select()
       .from(adminAuditLog)
       .where(
-        and(
-          eq(adminAuditLog.entityId, paidOrderId),
-          eq(adminAuditLog.action, "order.cancel"),
-        ),
+        and(eq(adminAuditLog.entityId, paidOrderId), eq(adminAuditLog.action, "order.cancel")),
       );
 
     expect(auditEntries.length).toBeGreaterThanOrEqual(1);

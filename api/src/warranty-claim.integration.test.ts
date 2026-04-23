@@ -37,9 +37,8 @@ async function signUpUser(address: string, email: string, password: string): Pro
 
 async function verifyUserEmail(userId: string): Promise<void> {
   const { default: supertokens } = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -223,9 +222,7 @@ describe("warranty claim integration (T063, FR-055)", () => {
       await db.execute(sql`ALTER TABLE evidence_record DISABLE TRIGGER USER`);
       try {
         for (const ticketId of createdTicketIds) {
-          await db.execute(
-            sql`DELETE FROM evidence_record WHERE support_ticket_id = ${ticketId}`,
-          );
+          await db.execute(sql`DELETE FROM evidence_record WHERE support_ticket_id = ${ticketId}`);
           await db
             .delete(supportTicketStatusHistory)
             .where(eq(supportTicketStatusHistory.ticketId, ticketId));
@@ -244,9 +241,7 @@ describe("warranty claim integration (T063, FR-055)", () => {
           await db.delete(orderLine).where(eq(orderLine.orderId, orderId));
         }
         for (const orderId of createdOrderIds) {
-          await db.execute(
-            sql`DELETE FROM order_status_history WHERE order_id = ${orderId}`,
-          );
+          await db.execute(sql`DELETE FROM order_status_history WHERE order_id = ${orderId}`);
           await db.delete(order).where(eq(order.id, orderId));
         }
         // Clean up product/variant
@@ -395,7 +390,8 @@ describe("warranty claim integration (T063, FR-055)", () => {
       body: JSON.stringify({
         order_id: testOrderId,
         order_line_id: testOrderLineId,
-        description: "The case warped and deformed after I left it on my car dashboard in the heat.",
+        description:
+          "The case warped and deformed after I left it on my car dashboard in the heat.",
       }),
     });
 

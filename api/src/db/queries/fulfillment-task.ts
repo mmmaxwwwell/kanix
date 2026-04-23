@@ -1,4 +1,4 @@
-import { eq, and, desc, lt, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, lt, inArray } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { fulfillmentTask } from "../schema/fulfillment.js";
 import { order, orderLine } from "../schema/order.js";

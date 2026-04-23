@@ -159,9 +159,7 @@ const CHECKOUT_POLICY_TYPES = [
  * Validate that all required checkout policy snapshots exist.
  * Returns an array of missing policy type names, or empty if all present.
  */
-export async function validateCheckoutPolicies(
-  db: PostgresJsDatabase,
-): Promise<string[]> {
+export async function validateCheckoutPolicies(db: PostgresJsDatabase): Promise<string[]> {
   const missing: string[] = [];
   for (const policyType of CHECKOUT_POLICY_TYPES) {
     const currentPolicy = await findCurrentPolicyByType(db, policyType);

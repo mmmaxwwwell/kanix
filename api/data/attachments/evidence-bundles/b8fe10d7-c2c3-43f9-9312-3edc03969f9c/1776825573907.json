@@ -1,0 +1,150 @@
+{
+  "disputeId": "b8fe10d7-c2c3-43f9-9312-3edc03969f9c",
+  "orderId": "97c40627-b474-496e-ac25-4a7250356f90",
+  "generatedAt": "2026-04-22T02:39:33.907Z",
+  "evidenceCount": 9,
+  "readiness": {
+    "tracking_history_present": true,
+    "delivery_proof_present": true,
+    "customer_communication_present": true,
+    "policy_acceptance_present": true,
+    "payment_receipt_present": true,
+    "complete": true,
+    "missing_types": []
+  },
+  "evidence": [
+    {
+      "id": "6431291c-e7fb-4323-bde8-815201c25afb",
+      "type": "payment_receipt",
+      "createdAt": "2026-04-22T02:39:33.736Z",
+      "textContent": {
+        "paymentEventId": "813ccd16-03fd-42ff-83ce-ef3a45e7ef76",
+        "eventType": "payment_intent.succeeded",
+        "providerEventId": "evt_bnd_test_1776825572979"
+      },
+      "storageKey": null,
+      "metadataJson": {
+        "paymentEventId": "813ccd16-03fd-42ff-83ce-ef3a45e7ef76"
+      }
+    },
+    {
+      "id": "5db370f6-4245-4ad1-9fad-cfea8e4c2ebd",
+      "type": "tracking_history",
+      "createdAt": "2026-04-22T02:39:33.748Z",
+      "textContent": {
+        "providerEventId": "trk_bnd_transit_1776825572979",
+        "status": "in_transit",
+        "description": "Package in transit",
+        "occurredAt": "2026-04-22T02:39:33.744Z"
+      },
+      "storageKey": null,
+      "metadataJson": {
+        "shipmentEventId": "36cb4712-d060-46f6-a636-5f3bc9d6dd4b"
+      }
+    },
+    {
+      "id": "c1aad25c-fb51-48d6-88c6-ef4475f72f6b",
+      "type": "tracking_history",
+      "createdAt": "2026-04-22T02:39:33.752Z",
+      "textContent": {
+        "providerEventId": "trk_bnd_delivered_1776825572979",
+        "status": "delivered",
+        "description": "Package delivered",
+        "occurredAt": "2026-04-22T02:39:33.749Z"
+      },
+      "storageKey": null,
+      "metadataJson": {
+        "shipmentEventId": "c39cc4fe-6f61-4292-8dcf-7b900e3c933a"
+      }
+    },
+    {
+      "id": "f78ce749-c4a2-4d8f-a773-61f41ddb84e2",
+      "type": "delivery_proof",
+      "createdAt": "2026-04-22T02:39:33.754Z",
+      "textContent": {
+        "deliveredAt": "2026-04-22T02:39:33.749Z",
+        "providerEventId": "trk_bnd_delivered_1776825572979",
+        "description": "Package delivered"
+      },
+      "storageKey": null,
+      "metadataJson": {
+        "shipmentEventId": "c39cc4fe-6f61-4292-8dcf-7b900e3c933a"
+      }
+    },
+    {
+      "id": "49ca0fdb-8874-43a9-bd2f-7e15f453b2c5",
+      "type": "customer_communication",
+      "createdAt": "2026-04-22T02:39:33.764Z",
+      "textContent": {
+        "messageId": "33cdf7f4-3da8-48a0-97a6-ae9a345198b9",
+        "authorType": "customer",
+        "body": "Question about my order for bundle test",
+        "createdAt": "2026-04-22T02:39:33.760Z"
+      },
+      "storageKey": null,
+      "metadataJson": {
+        "messageId": "33cdf7f4-3da8-48a0-97a6-ae9a345198b9"
+      }
+    },
+    {
+      "id": "c890b4f5-70a9-44e8-8aa7-ffbbfcca15a3",
+      "type": "policy_acceptance",
+      "createdAt": "2026-04-22T02:39:33.771Z",
+      "textContent": {
+        "acknowledgmentId": "09281a71-ec21-490d-9273-3a7fb204a7bb",
+        "policySnapshotId": "28d21daa-2cfa-4811-9828-e1d8f20c19bc",
+        "acknowledgedAt": "2026-04-22T02:39:33.768Z"
+      },
+      "storageKey": null,
+      "metadataJson": {
+        "acknowledgmentId": "09281a71-ec21-490d-9273-3a7fb204a7bb",
+        "policySnapshotId": "28d21daa-2cfa-4811-9828-e1d8f20c19bc"
+      }
+    },
+    {
+      "id": "0d963daa-5f82-4158-af9d-17f053f916cc",
+      "type": "policy_acceptance",
+      "createdAt": "2026-04-22T02:39:33.776Z",
+      "textContent": {
+        "acknowledgmentId": "36c86672-3c91-400e-b901-f3f1353790c9",
+        "policySnapshotId": "31850f80-9bd0-4046-81f2-f64249332dbe",
+        "acknowledgedAt": "2026-04-22T02:39:33.774Z"
+      },
+      "storageKey": null,
+      "metadataJson": {
+        "acknowledgmentId": "36c86672-3c91-400e-b901-f3f1353790c9",
+        "policySnapshotId": "31850f80-9bd0-4046-81f2-f64249332dbe"
+      }
+    },
+    {
+      "id": "85e601be-0ddf-4241-80e2-108a4b05fce0",
+      "type": "policy_acceptance",
+      "createdAt": "2026-04-22T02:39:33.780Z",
+      "textContent": {
+        "acknowledgmentId": "bb6315f8-6e7e-4bfb-8cfe-771275abae38",
+        "policySnapshotId": "a006ddfc-7450-498e-8054-16d6da265261",
+        "acknowledgedAt": "2026-04-22T02:39:33.779Z"
+      },
+      "storageKey": null,
+      "metadataJson": {
+        "acknowledgmentId": "bb6315f8-6e7e-4bfb-8cfe-771275abae38",
+        "policySnapshotId": "a006ddfc-7450-498e-8054-16d6da265261"
+      }
+    },
+    {
+      "id": "bd59dd1b-8a98-4f61-b4f1-3e921dc9d53a",
+      "type": "policy_acceptance",
+      "createdAt": "2026-04-22T02:39:33.785Z",
+      "textContent": {
+        "acknowledgmentId": "571dc250-0953-43ac-b33e-9959d0756f3c",
+        "policySnapshotId": "203b78ac-c9ba-4b48-903e-33b8946434e0",
+        "acknowledgedAt": "2026-04-22T02:39:33.783Z"
+      },
+      "storageKey": null,
+      "metadataJson": {
+        "acknowledgmentId": "571dc250-0953-43ac-b33e-9959d0756f3c",
+        "policySnapshotId": "203b78ac-c9ba-4b48-903e-33b8946434e0"
+      }
+    }
+  ]
+}

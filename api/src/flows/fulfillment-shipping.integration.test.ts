@@ -165,9 +165,8 @@ async function signUpUser(
 
 async function verifyEmail(userId: string): Promise<void> {
   const { default: supertokens } = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -352,11 +351,11 @@ describe("fulfillment + shipping flow (T263, mirrors T099/SC-005/SC-006)", () =>
 
         // Clean shipment-related data
         if (shipmentId) {
-          await db.execute(
-            sql`DELETE FROM evidence_record WHERE shipment_id = ${shipmentId}`,
-          );
+          await db.execute(sql`DELETE FROM evidence_record WHERE shipment_id = ${shipmentId}`);
           await db.delete(shipmentEvent).where(eq(shipmentEvent.shipmentId, shipmentId));
-          await db.delete(shippingLabelPurchase).where(eq(shippingLabelPurchase.shipmentId, shipmentId));
+          await db
+            .delete(shippingLabelPurchase)
+            .where(eq(shippingLabelPurchase.shipmentId, shipmentId));
           await db.delete(shipmentLine).where(eq(shipmentLine.shipmentId, shipmentId));
           await db.delete(shipmentPackage).where(eq(shipmentPackage.shipmentId, shipmentId));
           await db.delete(shipment).where(eq(shipment.id, shipmentId));
@@ -369,11 +368,14 @@ describe("fulfillment + shipping flow (T263, mirrors T099/SC-005/SC-006)", () =>
 
         // Clean order-related data
         if (orderId) {
+          await db.execute(sql`DELETE FROM evidence_record WHERE order_id = ${orderId}`);
+          await db
+            .delete(paymentEvent)
+            .where(eq(paymentEvent.paymentId, orderId))
+            .catch(() => {});
           await db.execute(
-            sql`DELETE FROM evidence_record WHERE order_id = ${orderId}`,
+            sql`DELETE FROM payment_event WHERE payment_id IN (SELECT id FROM payment WHERE order_id = ${orderId})`,
           );
-          await db.delete(paymentEvent).where(eq(paymentEvent.paymentId, orderId)).catch(() => {});
-          await db.execute(sql`DELETE FROM payment_event WHERE payment_id IN (SELECT id FROM payment WHERE order_id = ${orderId})`);
           await db.delete(payment).where(eq(payment.orderId, orderId));
           await db.delete(inventoryReservation).where(eq(inventoryReservation.orderId, orderId));
           await db.delete(orderStatusHistory).where(eq(orderStatusHistory.orderId, orderId));
@@ -383,7 +385,9 @@ describe("fulfillment + shipping flow (T263, mirrors T099/SC-005/SC-006)", () =>
 
         // Clean inventory + product
         await db.delete(inventoryBalance).where(eq(inventoryBalance.variantId, variantId));
-        await db.delete(productClassMembership).where(eq(productClassMembership.productId, productId));
+        await db
+          .delete(productClassMembership)
+          .where(eq(productClassMembership.productId, productId));
         await db.delete(productClass).where(eq(productClass.id, classId));
         await db.delete(productVariant).where(eq(productVariant.productId, productId));
         await db.delete(product).where(eq(product.id, productId));
@@ -906,9 +910,7 @@ describe("fulfillment + shipping flow (T263, mirrors T099/SC-005/SC-006)", () =>
 
     // The order.placed event should have been published during checkout
     const orderPlacedEvents = buffer.filter(
-      (m) =>
-        m.message.type === "order.placed" &&
-        m.message.entityId === orderId,
+      (m) => m.message.type === "order.placed" && m.message.entityId === orderId,
     );
     expect(orderPlacedEvents.length).toBeGreaterThanOrEqual(1);
     expect(orderPlacedEvents[0].message.data.orderNumber).toBe(orderNumber);
@@ -924,9 +926,7 @@ describe("fulfillment + shipping flow (T263, mirrors T099/SC-005/SC-006)", () =>
     // Verify the customer channel received the order.placed event
     // (order.placed publishes with customerId to the customer channel)
     const customerChannelEvents = buffer.filter(
-      (m) =>
-        m.channel === `customer:${customerId}` &&
-        m.message.type === "order.placed",
+      (m) => m.channel === `customer:${customerId}` && m.message.type === "order.placed",
     );
     expect(customerChannelEvents.length).toBeGreaterThanOrEqual(1);
   });

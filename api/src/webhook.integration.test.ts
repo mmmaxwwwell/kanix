@@ -181,10 +181,7 @@ async function seedOrderWithPayment(
   const checkoutData = JSON.parse(checkoutRes.body);
   const orderId = checkoutData.order.id;
 
-  const [paymentRow] = await db
-    .select()
-    .from(payment)
-    .where(eq(payment.orderId, orderId));
+  const [paymentRow] = await db.select().from(payment).where(eq(payment.orderId, orderId));
 
   return {
     orderId,
@@ -823,10 +820,7 @@ describe("Stripe webhook — payment_failed (T236)", () => {
     expect(orderRow.paymentStatus).toBe("failed");
 
     // Verify payment record status
-    const [paymentRow] = await db
-      .select()
-      .from(payment)
-      .where(eq(payment.id, paymentRecordId));
+    const [paymentRow] = await db.select().from(payment).where(eq(payment.id, paymentRecordId));
     expect(paymentRow.status).toBe("failed");
 
     // Verify reservations released
@@ -924,10 +918,7 @@ describe("Stripe webhook — charge.refunded (T236)", () => {
     const chargeId = `ch_refund_${ts}`;
 
     // Get the actual payment amount so we can do a "full" refund
-    const [paymentRow] = await db
-      .select()
-      .from(payment)
-      .where(eq(payment.id, paymentRecordId));
+    const [paymentRow] = await db.select().from(payment).where(eq(payment.id, paymentRecordId));
     const fullAmount = paymentRow.amountMinor;
 
     const { body, signature } = generateWebhookPayload(
@@ -1047,10 +1038,7 @@ describe("Stripe webhook — partial refund (T236)", () => {
     const chargeId = `ch_partial_${ts}`;
 
     // Get the actual payment amount
-    const [paymentRow] = await db
-      .select()
-      .from(payment)
-      .where(eq(payment.id, paymentRecordId));
+    const [paymentRow] = await db.select().from(payment).where(eq(payment.id, paymentRecordId));
     const partialAmount = Math.floor(paymentRow.amountMinor / 2); // Refund half
 
     const { body, signature } = generateWebhookPayload(

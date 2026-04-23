@@ -23,7 +23,12 @@ export const ROYALTY_RATE = 0.1; // 10% of unit_price_minor
 export const VETERAN_RATE = 0.2; // 20% of unit_price_minor (500+ units)
 export const DONATION_RATE = 0.2; // 20% of unit_price_minor (2x for 501(c)(3) donation)
 
-export const MILESTONE_TYPES = ["accepted_pr", "royalty_activation", "starter_kit", "veteran"] as const;
+export const MILESTONE_TYPES = [
+  "accepted_pr",
+  "royalty_activation",
+  "starter_kit",
+  "veteran",
+] as const;
 export type MilestoneType = (typeof MILESTONE_TYPES)[number];
 
 export const TAX_DOCUMENT_TYPES = ["w9", "w8ben"] as const;

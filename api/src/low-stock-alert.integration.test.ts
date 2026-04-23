@@ -185,9 +185,7 @@ describe("low-stock alert (T043, FR-038, FR-085)", () => {
       await dbConn.db
         .delete(inventoryAdjustment)
         .where(eq(inventoryAdjustment.variantId, testVariantId));
-      await dbConn.db
-        .delete(inventoryBalance)
-        .where(eq(inventoryBalance.variantId, testVariantId));
+      await dbConn.db.delete(inventoryBalance).where(eq(inventoryBalance.variantId, testVariantId));
       await dbConn.db.delete(inventoryLocation).where(eq(inventoryLocation.id, testLocationId));
       await dbConn.db.delete(productVariant).where(eq(productVariant.id, testVariantId));
       await dbConn.db.delete(product).where(eq(product.id, testProductId));
@@ -197,9 +195,7 @@ describe("low-stock alert (T043, FR-038, FR-085)", () => {
       await dbConn.db.delete(adminUserRole).where(eq(adminUserRole.adminUserId, adminUserId));
       await dbConn.db.delete(adminUser).where(eq(adminUser.id, adminUserId));
       await dbConn.db.delete(adminRole).where(eq(adminRole.id, testRoleId));
-      await dbConn.db
-        .delete(adminAuditLog)
-        .where(eq(adminAuditLog.actorAdminUserId, adminUserId));
+      await dbConn.db.delete(adminAuditLog).where(eq(adminAuditLog.actorAdminUserId, adminUserId));
     } catch {
       // Best-effort cleanup
     }
@@ -233,10 +229,9 @@ describe("low-stock alert (T043, FR-038, FR-085)", () => {
   // Helper: get current available balance
   // -------------------------------------------------------------------------
   async function getCurrentAvailable(): Promise<number> {
-    const res = await fetch(
-      `${address}/api/admin/inventory/balances?variant_id=${testVariantId}`,
-      { headers: adminHeaders },
-    );
+    const res = await fetch(`${address}/api/admin/inventory/balances?variant_id=${testVariantId}`, {
+      headers: adminHeaders,
+    });
     const body = (await res.json()) as { balances: Array<{ available: number }> };
     return body.balances[0]?.available ?? 0;
   }
@@ -456,13 +451,16 @@ describe("low-stock alert (T043, FR-038, FR-085)", () => {
     expect(newLines.length).toBeGreaterThanOrEqual(1);
 
     // Find the email sent to our specific admin about this variant
-    const parsed = newLines.map((line) => JSON.parse(line) as {
-      to: string;
-      subject: string;
-      body: string;
-      templateId: string;
-      timestamp: string;
-    });
+    const parsed = newLines.map(
+      (line) =>
+        JSON.parse(line) as {
+          to: string;
+          subject: string;
+          body: string;
+          templateId: string;
+          timestamp: string;
+        },
+    );
     const matchingEntry = parsed.find(
       (entry) =>
         entry.templateId === "low_stock_alert" &&
@@ -504,9 +502,7 @@ describe("low-stock alert (T043, FR-038, FR-085)", () => {
     // are targets, so expect >= 1.
     const newEntries = wsManager!.messageBuffer.slice(bufLenBefore);
     const lowStockEvents = newEntries.filter(
-      (m) =>
-        m.message.type === "inventory.low_stock" &&
-        m.message.entityId === testVariantId,
+      (m) => m.message.type === "inventory.low_stock" && m.message.entityId === testVariantId,
     );
     expect(lowStockEvents.length).toBeGreaterThanOrEqual(1);
 

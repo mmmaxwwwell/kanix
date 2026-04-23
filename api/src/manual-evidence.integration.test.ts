@@ -96,12 +96,8 @@ describe("manual evidence attachment (T066a)", () => {
     const db = dbConn.db;
 
     // Re-enable immutability triggers in case a prior run crashed mid-cleanup
-    await db.execute(
-      sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_update`,
-    );
-    await db.execute(
-      sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_delete`,
-    );
+    await db.execute(sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_update`);
+    await db.execute(sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_delete`);
 
     // ----- Admin user with DISPUTES_MANAGE capability (super_admin) -----
     const authSubject = await signUpUser(address, adminEmail, adminPassword);
@@ -465,10 +461,9 @@ describe("manual evidence attachment (T066a)", () => {
   // -------------------------------------------------------------------------
 
   it("lists evidence by dispute via GET /api/admin/evidence", async () => {
-    const res = await fetch(
-      `${address}/api/admin/evidence?dispute_id=${disputeId}`,
-      { headers: adminHeaders },
-    );
+    const res = await fetch(`${address}/api/admin/evidence?dispute_id=${disputeId}`, {
+      headers: adminHeaders,
+    });
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
@@ -489,9 +484,7 @@ describe("manual evidence attachment (T066a)", () => {
     }
 
     // Manual records are present with correct tagging
-    const manualRecords = body.evidence.filter(
-      (r) => r.metadataJson?.source === "manual",
-    );
+    const manualRecords = body.evidence.filter((r) => r.metadataJson?.source === "manual");
     expect(manualRecords.length).toBeGreaterThanOrEqual(2);
 
     // Verify different types are present
@@ -602,10 +595,10 @@ describe("manual evidence attachment (T066a)", () => {
 
   it("returns 404 when removing non-existent evidence", async () => {
     const fakeId = "00000000-0000-0000-0000-000000000099";
-    const res = await fetch(
-      `${address}/api/admin/disputes/${disputeId}/evidence/${fakeId}`,
-      { method: "DELETE", headers: adminHeaders },
-    );
+    const res = await fetch(`${address}/api/admin/disputes/${disputeId}/evidence/${fakeId}`, {
+      method: "DELETE",
+      headers: adminHeaders,
+    });
 
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string };

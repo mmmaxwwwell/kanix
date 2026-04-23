@@ -129,12 +129,8 @@ describe("evidence bundle submission (T066)", () => {
     const db = dbConn.db;
 
     // Re-enable immutability triggers in case a prior run crashed mid-cleanup
-    await db.execute(
-      sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_update`,
-    );
-    await db.execute(
-      sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_delete`,
-    );
+    await db.execute(sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_update`);
+    await db.execute(sql`ALTER TABLE evidence_record ENABLE TRIGGER trg_evidence_record_no_delete`);
 
     // ----- Admin user with DISPUTES_MANAGE capability (super_admin) -----
     const authSubject = await signUpUser(address, adminEmail, adminPassword);
@@ -601,13 +597,10 @@ describe("evidence bundle submission (T066)", () => {
   });
 
   it("POST /api/admin/disputes/:id/submit-bundle returns 422 when no bundle exists", async () => {
-    const res = await fetch(
-      `${address}/api/admin/disputes/${incompleteDisputeId}/submit-bundle`,
-      {
-        method: "POST",
-        headers: adminHeaders,
-      },
-    );
+    const res = await fetch(`${address}/api/admin/disputes/${incompleteDisputeId}/submit-bundle`, {
+      method: "POST",
+      headers: adminHeaders,
+    });
     expect(res.status).toBe(422);
     const body = (await res.json()) as { error: string; message: string };
     expect(body.error).toBe("ERR_NO_BUNDLE");
@@ -637,10 +630,7 @@ describe("evidence bundle submission (T066)", () => {
     await db.delete(evidenceBundle).where(eq(evidenceBundle.disputeId, disputeId));
 
     // Reset dispute status back to evidence_gathering
-    await db
-      .update(dispute)
-      .set({ status: "evidence_gathering" })
-      .where(eq(dispute.id, disputeId));
+    await db.update(dispute).set({ status: "evidence_gathering" }).where(eq(dispute.id, disputeId));
 
     // Re-generate bundle
     const genRes = await fetch(`${address}/api/admin/disputes/${disputeId}/generate-bundle`, {

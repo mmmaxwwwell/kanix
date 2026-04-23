@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import type { File as VitestFile } from "vitest";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -30,8 +31,25 @@ describe("SpecKitReporter", () => {
     const mod = await import("./test-reporter.js");
     const reporter = new mod.default();
 
+    // Synthesize a minimal File shape that triggers the summary write path.
+    // onFinished with empty files AND no prior results is treated as a
+    // spurious vitest callback and returns early (see comment in
+    // test-reporter.ts). Passing a File with a single passed test exercises
+    // the real write path without depending on the spurious-call behavior.
+    // The reporter only reads `filepath` and walks `tasks`, so the full
+    // vitest File type isn't needed — cast via unknown.
+    const fakeFile = {
+      filepath: "/tmp/synthetic.test.ts",
+      tasks: [
+        {
+          type: "test",
+          name: "synthetic",
+          result: { state: "pass", duration: 1 },
+        },
+      ],
+    } as unknown as VitestFile;
     reporter.onInit();
-    reporter.onFinished([]);
+    reporter.onFinished([fakeFile]);
 
     expect(existsSync(SUMMARY_PATH)).toBe(true);
 
@@ -52,10 +70,10 @@ describe("SpecKitReporter", () => {
     }
     expect(Array.isArray(summary.results)).toBe(true);
     expect(Array.isArray(summary.failures)).toBe(true);
-    expect(summary.total).toBe(0);
-    expect(summary.pass).toBe(0);
+    expect(summary.pass).toBe(1);
     expect(summary.fail).toBe(0);
     expect(summary.skip).toBe(0);
+    expect(summary.total).toBe(1);
   });
 
   afterEach(() => {

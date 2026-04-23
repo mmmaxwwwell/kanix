@@ -235,9 +235,7 @@ describe("guest checkout flow (T260, mirrors T096/SC-001)", () => {
     expect(body.products).toBeInstanceOf(Array);
 
     // Our product should be in the list (it has class membership + active status)
-    const found = body.products.find(
-      (p: { slug: string }) => p.slug === `gflow-prod-${run}`,
-    );
+    const found = body.products.find((p: { slug: string }) => p.slug === `gflow-prod-${run}`);
     expect(found).toBeDefined();
     expect(found.title).toBe(`Guest Flow Product ${run}`);
 
@@ -308,13 +306,9 @@ describe("guest checkout flow (T260, mirrors T096/SC-001)", () => {
     const cart = JSON.parse(getCartRes.body);
     expect(cart.cart.items.length).toBe(2);
 
-    const itemA = cart.cart.items.find(
-      (i: { variantId: string }) => i.variantId === variantAId,
-    );
+    const itemA = cart.cart.items.find((i: { variantId: string }) => i.variantId === variantAId);
     expect(itemA.quantity).toBe(2);
-    const itemB = cart.cart.items.find(
-      (i: { variantId: string }) => i.variantId === variantBId,
-    );
+    const itemB = cart.cart.items.find((i: { variantId: string }) => i.variantId === variantBId);
     expect(itemB.quantity).toBe(1);
   });
 

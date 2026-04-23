@@ -363,7 +363,13 @@ export async function listDisputes(
     })
     .from(dispute)
     .leftJoin(evidenceRecord, eq(evidenceRecord.disputeId, dispute.id))
-    .where(conditions.length === 1 ? conditions[0] : conditions.length > 1 ? and(...conditions) : undefined)
+    .where(
+      conditions.length === 1
+        ? conditions[0]
+        : conditions.length > 1
+          ? and(...conditions)
+          : undefined,
+    )
     .groupBy(
       dispute.id,
       dispute.paymentId,

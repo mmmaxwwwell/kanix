@@ -128,8 +128,14 @@ export async function createInventoryAdjustment(
 
     // Pre-check: reject if negative delta would drive balance below zero
     if (input.quantityDelta < 0) {
-      if (existingBalance.available + input.quantityDelta < 0 || existingBalance.onHand + input.quantityDelta < 0) {
-        throw { code: "ERR_INVENTORY_INSUFFICIENT", message: "Adjustment would result in negative inventory balance" };
+      if (
+        existingBalance.available + input.quantityDelta < 0 ||
+        existingBalance.onHand + input.quantityDelta < 0
+      ) {
+        throw {
+          code: "ERR_INVENTORY_INSUFFICIENT",
+          message: "Adjustment would result in negative inventory balance",
+        };
       }
     }
 

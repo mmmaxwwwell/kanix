@@ -66,9 +66,8 @@ async function signUpUser(address: string, email: string, password: string): Pro
 
 async function verifyEmail(userId: string): Promise<void> {
   const supertokens = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -155,7 +154,8 @@ function collectMessages(ws: WebSocket, count: number, timeoutMs = 5000): Promis
   return new Promise((resolve, reject) => {
     const messages: WsMessage[] = [];
     const timer = setTimeout(
-      () => reject(new Error(`Timed out waiting for ${count} WS messages (got ${messages.length})`)),
+      () =>
+        reject(new Error(`Timed out waiting for ${count} WS messages (got ${messages.length})`)),
       timeoutMs,
     );
     const handler = (data: Buffer | string) => {
@@ -643,10 +643,7 @@ describe("Notification dispatch service (T252)", () => {
     await Promise.all([waitForOpen(ws1), waitForOpen(ws2)]);
 
     // Consume welcome messages
-    const [welcome1, welcome2] = await Promise.all([
-      waitForMessage(ws1),
-      waitForMessage(ws2),
-    ]);
+    const [welcome1, welcome2] = await Promise.all([waitForMessage(ws1), waitForMessage(ws2)]);
     expect(welcome1.type).toBe("connected");
     expect(welcome2.type).toBe("connected");
 
@@ -1004,11 +1001,7 @@ describe("Notification dispatch service (T252)", () => {
   // -------------------------------------------------------------------------
 
   it("email-only admin does not produce WebSocket messages for alerts", async () => {
-    const emailToken = await signInAndGetAccessToken(
-      address,
-      emailAdminEmail,
-      emailAdminPassword,
-    );
+    const emailToken = await signInAndGetAccessToken(address, emailAdminEmail, emailAdminPassword);
     const ws = new WebSocket(`${wsAddress}/ws?token=${emailToken}`);
     await waitForOpen(ws);
     const welcome = await waitForMessage(ws);

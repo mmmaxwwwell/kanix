@@ -137,9 +137,8 @@ async function signUpUser(
 
 async function verifyEmail(userId: string): Promise<void> {
   const { default: supertokens } = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -391,11 +390,13 @@ describe("authenticated checkout flow (T261, mirrors T097/SC-001)", () => {
     });
     expect(catalogRes.status).toBe(200);
     const catalogBody = (await catalogRes.json()) as {
-      products: { slug: string; title: string; variants: { sku: string; priceMinor: number; inStock: boolean }[] }[];
+      products: {
+        slug: string;
+        title: string;
+        variants: { sku: string; priceMinor: number; inStock: boolean }[];
+      }[];
     };
-    const found = catalogBody.products.find(
-      (p) => p.slug === `aflow-prod-${run}`,
-    );
+    const found = catalogBody.products.find((p) => p.slug === `aflow-prod-${run}`);
     expect(found).toBeDefined();
     expect(found!.title).toBe(`Auth Flow Product ${run}`);
 

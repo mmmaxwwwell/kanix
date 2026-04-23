@@ -51,9 +51,8 @@ async function signUpUser(address: string, email: string, password: string): Pro
 
 async function verifyEmail(userId: string): Promise<void> {
   const supertokens = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -280,20 +279,39 @@ describe("contributor dashboard data (T248)", () => {
       const db = dbConn.db;
 
       // Clean contributor B
-      await db.delete(contributorPayout).where(eq(contributorPayout.contributorId, otherContributorId));
-      await db.delete(contributorTaxDocument).where(eq(contributorTaxDocument.contributorId, otherContributorId));
-      await db.delete(contributorMilestone).where(eq(contributorMilestone.contributorId, otherContributorId));
-      await db.delete(contributorRoyalty).where(eq(contributorRoyalty.contributorId, otherContributorId));
-      if (otherDesignId) await db.delete(contributorDesign).where(eq(contributorDesign.id, otherDesignId));
-      if (otherContributorId) await db.delete(contributor).where(eq(contributor.id, otherContributorId));
-      if (otherVariantId) await db.delete(productVariant).where(eq(productVariant.id, otherVariantId));
+      await db
+        .delete(contributorPayout)
+        .where(eq(contributorPayout.contributorId, otherContributorId));
+      await db
+        .delete(contributorTaxDocument)
+        .where(eq(contributorTaxDocument.contributorId, otherContributorId));
+      await db
+        .delete(contributorMilestone)
+        .where(eq(contributorMilestone.contributorId, otherContributorId));
+      await db
+        .delete(contributorRoyalty)
+        .where(eq(contributorRoyalty.contributorId, otherContributorId));
+      if (otherDesignId)
+        await db.delete(contributorDesign).where(eq(contributorDesign.id, otherDesignId));
+      if (otherContributorId)
+        await db.delete(contributor).where(eq(contributor.id, otherContributorId));
+      if (otherVariantId)
+        await db.delete(productVariant).where(eq(productVariant.id, otherVariantId));
       if (otherProductId) await db.delete(product).where(eq(product.id, otherProductId));
 
       // Clean contributor A
-      await db.delete(contributorPayout).where(eq(contributorPayout.contributorId, ownerContributorId));
-      await db.delete(contributorTaxDocument).where(eq(contributorTaxDocument.contributorId, ownerContributorId));
-      await db.delete(contributorMilestone).where(eq(contributorMilestone.contributorId, ownerContributorId));
-      await db.delete(contributorRoyalty).where(eq(contributorRoyalty.contributorId, ownerContributorId));
+      await db
+        .delete(contributorPayout)
+        .where(eq(contributorPayout.contributorId, ownerContributorId));
+      await db
+        .delete(contributorTaxDocument)
+        .where(eq(contributorTaxDocument.contributorId, ownerContributorId));
+      await db
+        .delete(contributorMilestone)
+        .where(eq(contributorMilestone.contributorId, ownerContributorId));
+      await db
+        .delete(contributorRoyalty)
+        .where(eq(contributorRoyalty.contributorId, ownerContributorId));
 
       for (const id of createdOrderLineIds) {
         await db.delete(orderLine).where(eq(orderLine.id, id));
@@ -303,9 +321,12 @@ describe("contributor dashboard data (T248)", () => {
         await db.delete(order).where(eq(order.id, id));
       }
 
-      if (ownerDesignId) await db.delete(contributorDesign).where(eq(contributorDesign.id, ownerDesignId));
-      if (ownerContributorId) await db.delete(contributor).where(eq(contributor.id, ownerContributorId));
-      if (ownerVariantId) await db.delete(productVariant).where(eq(productVariant.id, ownerVariantId));
+      if (ownerDesignId)
+        await db.delete(contributorDesign).where(eq(contributorDesign.id, ownerDesignId));
+      if (ownerContributorId)
+        await db.delete(contributor).where(eq(contributor.id, ownerContributorId));
+      if (ownerVariantId)
+        await db.delete(productVariant).where(eq(productVariant.id, ownerVariantId));
       if (ownerProductId) await db.delete(product).where(eq(product.id, ownerProductId));
     } catch {
       // Cleanup best-effort
@@ -502,10 +523,9 @@ describe("contributor dashboard data (T248)", () => {
   });
 
   it("invalid date in query param returns 400", async () => {
-    const res = await fetch(
-      `${address}/api/contributors/dashboard?from=not-a-date`,
-      { headers: ownerHeaders },
-    );
+    const res = await fetch(`${address}/api/contributors/dashboard?from=not-a-date`, {
+      headers: ownerHeaders,
+    });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("ERR_INVALID_DATE");

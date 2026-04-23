@@ -59,9 +59,8 @@ describe("guest order → account linking (T036, FR-066, T207)", () => {
   /** Helper: verify email via HTTP (fires the override that links orders) */
   async function verifyEmail(userId: string): Promise<void> {
     const { default: supertokens } = await import("supertokens-node");
-    const { default: EmailVerification } = await import(
-      "supertokens-node/recipe/emailverification/index.js"
-    );
+    const { default: EmailVerification } =
+      await import("supertokens-node/recipe/emailverification/index.js");
     const tokenRes = await EmailVerification.createEmailVerificationToken(
       "public",
       supertokens.convertToRecipeUserId(userId),

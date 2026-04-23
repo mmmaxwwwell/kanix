@@ -304,6 +304,10 @@
           exit 1
         '';
 
+        # Token-efficiency defaults (see parallel_runner.PlatformRuntime._default_mcp_env).
+        # Servers that don't recognize these flags ignore them; when they do recognize
+        # them, screenshots are no longer auto-attached to every tool response and
+        # the explore/verify agents stop burning ~2k tokens per navigate.
         mcp-android-config = pkgs.writeTextFile {
           name = "mcp-android-config";
           destination = "/mcp/android.json";
@@ -311,6 +315,10 @@
             mcpServers.mcp-android = {
               command = "${mcp-android}/bin/mcp-android";
               args = [];
+              env = {
+                MCP_PREFER_SNAPSHOT = "1";
+                MCP_ANDROID_DEFAULT_NO_VISION = "1";
+              };
             };
           };
         };
@@ -322,6 +330,10 @@
             mcpServers.mcp-browser = {
               command = "${mcp-browser}/bin/mcp-browser";
               args = [];
+              env = {
+                MCP_PREFER_SNAPSHOT = "1";
+                MCP_BROWSER_NO_AUTO_SCREENSHOT = "1";
+              };
             };
           };
         };

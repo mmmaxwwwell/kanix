@@ -14,10 +14,7 @@ import type { FastifyInstance } from "fastify";
 import { eq, sql } from "drizzle-orm";
 import { product, productVariant } from "../db/schema/catalog.js";
 import { productClass, productClassMembership } from "../db/schema/product-class.js";
-import {
-  inventoryBalance,
-  inventoryLocation,
-} from "../db/schema/inventory.js";
+import { inventoryBalance, inventoryLocation } from "../db/schema/inventory.js";
 import { order, orderLine, orderStatusHistory } from "../db/schema/order.js";
 import { payment, paymentEvent, dispute } from "../db/schema/payment.js";
 import {
@@ -173,9 +170,8 @@ async function signUpUser(
 
 async function verifyEmail(userId: string): Promise<void> {
   const { default: supertokens } = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -261,7 +257,7 @@ describe("dispute lifecycle flow (T264, mirrors T100/SC-005)", () => {
   let bundleId = "";
 
   // Policy snapshot IDs for cleanup
-  let policySnapshotIds: string[] = [];
+  const policySnapshotIds: string[] = [];
 
   beforeAll(async () => {
     ts_ = await createTestServer({
@@ -395,9 +391,7 @@ describe("dispute lifecycle flow (T264, mirrors T100/SC-005)", () => {
 
         // Clean evidence records
         if (orderId) {
-          await db.execute(
-            sql`DELETE FROM evidence_record WHERE order_id = ${orderId}`,
-          );
+          await db.execute(sql`DELETE FROM evidence_record WHERE order_id = ${orderId}`);
         }
 
         // Clean dispute
@@ -408,7 +402,9 @@ describe("dispute lifecycle flow (T264, mirrors T100/SC-005)", () => {
         // Clean shipment-related data
         if (shipmentId) {
           await db.delete(shipmentEvent).where(eq(shipmentEvent.shipmentId, shipmentId));
-          await db.delete(shippingLabelPurchase).where(eq(shippingLabelPurchase.shipmentId, shipmentId));
+          await db
+            .delete(shippingLabelPurchase)
+            .where(eq(shippingLabelPurchase.shipmentId, shipmentId));
           await db.delete(shipmentLine).where(eq(shipmentLine.shipmentId, shipmentId));
           await db.delete(shipmentPackage).where(eq(shipmentPackage.shipmentId, shipmentId));
           await db.delete(shipment).where(eq(shipment.id, shipmentId));
@@ -427,9 +423,7 @@ describe("dispute lifecycle flow (T264, mirrors T100/SC-005)", () => {
           await db.execute(
             sql`UPDATE support_ticket SET linked_ticket_id = NULL WHERE order_id = ${orderId}`,
           );
-          await db.execute(
-            sql`DELETE FROM support_ticket WHERE order_id = ${orderId}`,
-          );
+          await db.execute(sql`DELETE FROM support_ticket WHERE order_id = ${orderId}`);
         }
 
         // Clean policy acknowledgments
@@ -445,9 +439,7 @@ describe("dispute lifecycle flow (T264, mirrors T100/SC-005)", () => {
             sql`DELETE FROM payment_event WHERE payment_id IN (SELECT id FROM payment WHERE order_id = ${orderId})`,
           );
           await db.delete(payment).where(eq(payment.orderId, orderId));
-          await db.execute(
-            sql`DELETE FROM inventory_reservation WHERE order_id = ${orderId}`,
-          );
+          await db.execute(sql`DELETE FROM inventory_reservation WHERE order_id = ${orderId}`);
           await db.delete(orderStatusHistory).where(eq(orderStatusHistory.orderId, orderId));
           await db.delete(orderLine).where(eq(orderLine.orderId, orderId));
           await db.delete(order).where(eq(order.id, orderId));
@@ -455,12 +447,17 @@ describe("dispute lifecycle flow (T264, mirrors T100/SC-005)", () => {
 
         // Clean policy snapshots we created
         for (const psId of policySnapshotIds) {
-          await db.delete(policySnapshot).where(eq(policySnapshot.id, psId)).catch(() => {});
+          await db
+            .delete(policySnapshot)
+            .where(eq(policySnapshot.id, psId))
+            .catch(() => {});
         }
 
         // Clean inventory + product
         await db.delete(inventoryBalance).where(eq(inventoryBalance.variantId, variantId));
-        await db.delete(productClassMembership).where(eq(productClassMembership.productId, productId));
+        await db
+          .delete(productClassMembership)
+          .where(eq(productClassMembership.productId, productId));
         await db.delete(productClass).where(eq(productClass.id, classId));
         await db.delete(productVariant).where(eq(productVariant.productId, productId));
         await db.delete(product).where(eq(product.id, productId));
@@ -630,7 +627,10 @@ describe("dispute lifecycle flow (T264, mirrors T100/SC-005)", () => {
     await transitionFulfillmentTaskStatus(db, { taskId: fulfillmentTaskId, newStatus: "picked" });
     await transitionFulfillmentTaskStatus(db, { taskId: fulfillmentTaskId, newStatus: "packing" });
     await transitionFulfillmentTaskStatus(db, { taskId: fulfillmentTaskId, newStatus: "packed" });
-    await transitionFulfillmentTaskStatus(db, { taskId: fulfillmentTaskId, newStatus: "shipment_pending" });
+    await transitionFulfillmentTaskStatus(db, {
+      taskId: fulfillmentTaskId,
+      newStatus: "shipment_pending",
+    });
 
     // Create shipment + buy label
     const shipResult = await createShipment(db, {

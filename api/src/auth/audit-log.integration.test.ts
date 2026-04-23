@@ -288,9 +288,7 @@ describe("auth audit log (T208)", () => {
     const failedEvents = await dbConn.db
       .select()
       .from(authEventLog)
-      .where(
-        and(eq(authEventLog.actorId, adminEmail), eq(authEventLog.eventType, "failed_login")),
-      );
+      .where(and(eq(authEventLog.actorId, adminEmail), eq(authEventLog.eventType, "failed_login")));
 
     expect(failedEvents.length).toBeGreaterThanOrEqual(1);
     const entry = failedEvents[0];
@@ -504,10 +502,9 @@ describe("auth audit log (T208)", () => {
   it("GET /api/admin/audit-log filters by actor_id", async () => {
     const headers = await signInAndGetHeaders(address, adminEmail, adminPassword);
 
-    const res = await fetch(
-      `${address}/api/admin/audit-log?actor_id=${adminAuthSubject}`,
-      { headers },
-    );
+    const res = await fetch(`${address}/api/admin/audit-log?actor_id=${adminAuthSubject}`, {
+      headers,
+    });
     expect(res.status).toBe(200);
 
     const body = (await res.json()) as {
