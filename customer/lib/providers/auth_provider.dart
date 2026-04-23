@@ -67,7 +67,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       final response = await dio.get('/api/customer/me');
       if (response.statusCode == 200) {
         final user = CustomerUser.fromJson(
-            response.data['user'] as Map<String, dynamic>);
+            response.data['customer'] as Map<String, dynamic>);
         return AuthState(user: user);
       }
     } catch (_) {
@@ -138,7 +138,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
         final profileResponse = await dio.get('/api/customer/me');
         if (profileResponse.statusCode == 200) {
           final user = CustomerUser.fromJson(
-              profileResponse.data['user'] as Map<String, dynamic>);
+              profileResponse.data['customer'] as Map<String, dynamic>);
           if (!user.emailVerified) {
             state = const AsyncValue.data(
               AuthState(pendingVerification: true),
@@ -179,7 +179,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
         final profileResponse = await dio.get('/api/customer/me');
         if (profileResponse.statusCode == 200) {
           final user = CustomerUser.fromJson(
-              profileResponse.data['user'] as Map<String, dynamic>);
+              profileResponse.data['customer'] as Map<String, dynamic>);
           state = AsyncValue.data(AuthState(user: user));
           return;
         }
