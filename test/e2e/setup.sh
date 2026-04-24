@@ -384,26 +384,32 @@ if [ "${E2E_WANT_EMULATOR:-0}" = "1" ]; then
     log "Starting Android emulator (E2E_WANT_EMULATOR=1)..."
     if start-emulator 2>"$STATE_DIR/emulator.log"; then
       log "Android emulator ready."
-
-      # adb reverse: device localhost:N → host 127.0.0.1:N.
-      # Required for apps running on the emulator to reach host services
-      # (API on PORT_API, SuperTokens on PORT_SUPERTOKENS). adb reverse
-      # rules don't survive emulator restarts, so re-apply every setup run.
-      if command -v adb >/dev/null 2>&1; then
-        log "  Wiring adb reverse: ${PORT_API}, ${PORT_SUPERTOKENS}..."
-        adb -s emulator-5554 reverse --remove-all 2>/dev/null || true
-        adb -s emulator-5554 reverse "tcp:${PORT_API}" "tcp:${PORT_API}" \
-          2>>"$STATE_DIR/emulator.log" \
-          || log "  WARNING: adb reverse tcp:${PORT_API} failed"
-        adb -s emulator-5554 reverse "tcp:${PORT_SUPERTOKENS}" "tcp:${PORT_SUPERTOKENS}" \
-          2>>"$STATE_DIR/emulator.log" \
-          || log "  WARNING: adb reverse tcp:${PORT_SUPERTOKENS} failed"
-      else
-        log "  WARNING: adb not in PATH — device→host port forwards not configured"
-      fi
     else
       log "  WARNING: start-emulator exited $? — see $STATE_DIR/emulator.log"
     fi
+  fi
+
+  # adb reverse: device localhost:N → host 127.0.0.1:N.
+  # Required for apps running on the emulator to reach host services
+  # (API on PORT_API, SuperTokens on PORT_SUPERTOKENS). adb reverse
+  # rules don't survive emulator restarts, so re-apply every setup run.
+  # Applied unconditionally whenever the emulator is reachable — not only
+  # when start-emulator succeeded in this run (INFRA-adb-reverse-not-configured).
+  if command -v adb >/dev/null 2>&1; then
+    if adb -s emulator-5554 get-state >/dev/null 2>&1; then
+      log "  Wiring adb reverse: ${PORT_API}, ${PORT_SUPERTOKENS}..."
+      adb -s emulator-5554 reverse --remove-all 2>/dev/null || true
+      adb -s emulator-5554 reverse "tcp:${PORT_API}" "tcp:${PORT_API}" \
+        2>>"$STATE_DIR/emulator.log" \
+        || log "  WARNING: adb reverse tcp:${PORT_API} failed"
+      adb -s emulator-5554 reverse "tcp:${PORT_SUPERTOKENS}" "tcp:${PORT_SUPERTOKENS}" \
+        2>>"$STATE_DIR/emulator.log" \
+        || log "  WARNING: adb reverse tcp:${PORT_SUPERTOKENS} failed"
+    else
+      log "  WARNING: emulator-5554 not reachable via adb — port forwards not configured"
+    fi
+  else
+    log "  WARNING: adb not in PATH — device→host port forwards not configured"
   fi
 else
   log "Skipping Android emulator (E2E_WANT_EMULATOR not set)."
@@ -473,6 +479,32 @@ if [ "${E2E_WANT_EMULATOR:-0}" = "1" ] && command -v flutter >/dev/null 2>&1 && 
       fi
     fi
   done
+fi
+
+# -------------------------------------------------------------------
+# Step 6c: Build and install admin APK on the Android emulator
+# -------------------------------------------------------------------
+# The admin app (com.kanix.kanix_admin) must be installed for E2E tests
+# that exercise the admin Flutter interface. The APK is built from source
+# and installed on every setup run to ensure the emulator has the current
+# build (INFRA-admin-apk-not-installed).
+if [ "${E2E_WANT_EMULATOR:-0}" = "1" ] && command -v flutter >/dev/null 2>&1 && command -v adb >/dev/null 2>&1; then
+  if adb -s emulator-5554 get-state >/dev/null 2>&1; then
+    log "Building and installing admin APK (com.kanix.kanix_admin)..."
+    (cd "$PROJECT_ROOT/admin" && flutter pub get) >/dev/null 2>&1 || true
+    if (cd "$PROJECT_ROOT/admin" && flutter build apk --debug) \
+        > "$STATE_DIR/admin-build.log" 2>&1; then
+      adb -s emulator-5554 install -r \
+        "$PROJECT_ROOT/admin/build/app/outputs/flutter-apk/app-debug.apk" \
+        >> "$STATE_DIR/admin-build.log" 2>&1 \
+        && log "Admin APK installed (com.kanix.kanix_admin)." \
+        || log "  WARNING: adb install admin APK failed — see $STATE_DIR/admin-build.log"
+    else
+      log "  WARNING: flutter build apk (admin) failed — see $STATE_DIR/admin-build.log"
+    fi
+  else
+    log "Skipping admin APK install (emulator-5554 not reachable)."
+  fi
 fi
 
 # -------------------------------------------------------------------
