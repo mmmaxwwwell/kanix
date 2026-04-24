@@ -684,7 +684,7 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
   Prereq: `pnpm --dir api stripe:listen:start` before running (see [test/e2e/README.md](../../test/e2e/README.md)); tear down with `stripe:listen:stop` after.
   Done when: MCP agent drives customer app on Android emulator: login → browse catalog → add to cart → checkout with saved address → Stripe test pay → order appears in history with real-time status update; Patrol regression test exists; each fixed bug has its own Patrol test; (iOS coverage deferred)
 
-- [ ] T098 E2E: kit purchase [SC-010] [needs: mcp-browser, mcp-android, e2e-loop]
+- [x] T098 E2E: kit purchase [SC-010] [needs: mcp-browser, mcp-android, e2e-loop]
   Done when: MCP agent configures starter kit (2 plates + 3 modules + 1 belt) via kit builder on both Astro site and Flutter customer app → checkout → verify each component reserved individually in DB → payment → order with 6 line items; Playwright + Patrol regression tests exist for kit builder validation (incomplete kit rejected, out-of-stock swap)
 
 - [ ] T099 E2E: full fulfillment + shipping [SC-005, SC-006] [needs: mcp-android, e2e-loop]

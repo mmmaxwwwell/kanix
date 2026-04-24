@@ -184,6 +184,17 @@
 
           AVD_DIR="$ANDROID_AVD_HOME"
 
+          # Clean stale AVD lock files left by a previous emulator that
+          # died without cleanup.  The emulator refuses to start if
+          # multiinstance.lock or the running/ directory exist, even when
+          # no emulator process is alive.  We only reach this point after
+          # the idempotency check above confirmed no emulator is running.
+          if [ -d "$AVD_DIR/$AVD_NAME.avd" ]; then
+            rm -f "$AVD_DIR/$AVD_NAME.avd/multiinstance.lock" 2>/dev/null || true
+            rm -rf "$AVD_DIR/running" 2>/dev/null || true
+            echo "Cleaned stale AVD lock files (if any)."
+          fi
+
           if [ ! -d "$AVD_DIR/$AVD_NAME.avd" ]; then
             echo "Creating AVD: $AVD_NAME (API 34, x86_64, 2GB RAM)"
             SYS_IMG="$ANDROID_HOME/system-images/android-34/google_apis/x86_64"
@@ -436,6 +447,14 @@
           ANDROID_AVD_HOME = ".dev/android-user-home/avd";
 
           shellHook = crgHook + ''
+            # Unset PYTHONPATH that nix's buildPythonApplication setup-hooks
+            # leak into the shell (code-review-graph pulls python3.12 deps,
+            # mcp-android ships python3.13). Cross-ABI contamination crashes
+            # mcp-android at `import pydantic_core._pydantic_core`. Each Python
+            # app has its own wrapper with a pinned sys.path — they don't need
+            # PYTHONPATH, they only get hurt by it.
+            unset PYTHONPATH
+
             # Do NOT prepend ${androidHome}/emulator to PATH here — it would
             # shadow the emulator-wrapper (listed in packages above) which sets
             # ANDROID_USER_HOME so that `emulator -list-avds` can find AVDs

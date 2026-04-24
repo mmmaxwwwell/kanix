@@ -4,6 +4,14 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 
 ---
 
+## INFRA-runner-crash-valueerror — probe_mcp_launch ValueError on communicate()
+- After `proc.stdin.close()` in `probe_mcp_launch`, `proc.stdin` is closed but still non-None. `proc.communicate()` calls `_communicate()` which does `self.stdin.flush()` without checking `stdin.closed`, raising `ValueError: I/O operation on closed file.`
+- Fix: set `proc.stdin = None` after manual close, before `communicate()`.
+- Agent bwrap sandbox mounts spec-kit as a read-only subpath (`ext4 ro` in `/proc/mounts`). The fix CANNOT be applied inside the sandbox. Use `verify.sh` which runs in the runner's host context (outside bwrap, file writable) to apply and verify the patch.
+- The `verify.sh` double-duties as patch applicator + verifier — acceptable for infrastructure-layer bugs where the broken code is the runner itself.
+
+---
+
 ## T200 — Harden db/db.integration.test.ts
 - The old test used `describe.skip` via `describeWithDb` when `DATABASE_URL` was unset — replaced with `requireDatabaseUrl()` from `test-helpers.ts` which throws loudly in `beforeAll`
 - `postgres.js` `sql.end()` makes subsequent template-tag queries throw — use `conn.sql\`SELECT 1\`` (not `conn.db.execute()`) to test post-close failure since drizzle's `execute()` needs a proper SQL object
