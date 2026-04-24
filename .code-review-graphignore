@@ -5,6 +5,14 @@ logs/**
 validate/**
 attempts/**
 ci-debug/**
+admin/windows/**
+admin/linux/**
+admin/macos/**
+admin/ios/Runner/**
+customer/windows/**
+customer/linux/**
+customer/macos/**
+customer/ios/Runner/**
 # END code-review-graph managed
 
 # my custom extras

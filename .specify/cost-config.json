@@ -1,0 +1,17 @@
+{
+  "_comment": "Spec-kit E2E cost overrides for this project. See reference/cost-guardrails.md in the spec-kit skill. All keys optional; omitted values fall back to the skill defaults.",
+  "role_models": {
+    "fix": "sonnet",
+    "crash-fix": "sonnet",
+    "build-fix": "sonnet",
+    "verify": "sonnet"
+  },
+  "hang_budget_s": {
+    "default": 480,
+    "fix": 720,
+    "build-fix": 1200,
+    "crash-fix": 1200
+  },
+  "executor_step_cap": 4,
+  "executor_wall_cap_s": 600
+}

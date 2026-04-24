@@ -1,20 +1,30 @@
 === exit code: -2 ===
 === stdout ===
 [e2e-setup] Checking for orphan processes on known ports...
-[e2e-setup]   Killing orphan process(es) on port 5432: 124360
-124384
-124429
-124436
-124437
-124438
-124439
-124440
-124442
-124446
-124451
-124452
-[e2e-setup]   Killing orphan process(es) on port 3000: 124663
-[e2e-setup]   Killing orphan process(es) on port 4321: 124756
+[e2e-setup]   Killing orphan process(es) on port 5432: 363873
+367292
+367457
+367727
+368729
+368730
+368731
+368732
+368733
+368734
+368735
+368736
+368737
+371319
+371453
+371511
+371544
+371620
+372313
+372509
+372536
+372538
+372574
+[e2e-setup]   Killing orphan process(es) on port 4321: 366413
 [e2e-setup] Cleaning stale sockets...
 [e2e-setup] Starting PostgreSQL...
 waiting for server to start.... done
@@ -31,13 +41,7 @@ GRANT
 [e2e-setup] SuperTokens ready.
 [e2e-setup] Running database migrations...
 [e2e-setup] Starting API server...
-[e2e-setup]   Discarding stale api.pid=124661 (not our API or not bound to 3000)
 [e2e-setup]   Building API (tsc)...
-[e2e-setup]   Waiting for API server on port 3000 (timeout: 60s)...
-[e2e-setup]   API server is ready on port 3000
-[e2e-setup] API server ready.
-[e2e-setup] Starting Astro site...
-[e2e-setup]   Installing site dependencies...
 
 === stderr ===
 

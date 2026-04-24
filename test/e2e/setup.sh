@@ -8,6 +8,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 STATE_DIR="${STATE_DIR:-$PROJECT_ROOT/.dev/e2e-state}"
 
+# Load real third-party keys from root .env into the environment so the
+# API server is started with the caller's actual test-mode credentials
+# instead of the placeholder fallbacks below. Lines still containing
+# REPLACE_ME are skipped so the placeholder path remains the fallback.
+# Only keys that are not already set in the parent environment are loaded.
+if [ -f "$PROJECT_ROOT/.env" ]; then
+  while IFS='=' read -r key value; do
+    case "$key" in
+      STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|PUBLIC_STRIPE_PUBLISHABLE_KEY|EASYPOST_API_KEY|EASYPOST_WEBHOOK_SECRET|GITHUB_OAUTH_CLIENT_ID|GITHUB_OAUTH_CLIENT_SECRET)
+        # Strip surrounding quotes if present.
+        value="${value%\"}"; value="${value#\"}"
+        value="${value%\'}"; value="${value#\'}"
+        if [ -n "$value" ] && [ "${value#*REPLACE_ME}" = "$value" ] && [ -z "${!key:-}" ]; then
+          export "$key"="$value"
+        fi
+        ;;
+    esac
+  done < <(grep -E '^(STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|PUBLIC_STRIPE_PUBLISHABLE_KEY|EASYPOST_API_KEY|EASYPOST_WEBHOOK_SECRET|GITHUB_OAUTH_CLIENT_ID|GITHUB_OAUTH_CLIENT_SECRET)=' "$PROJECT_ROOT/.env")
+fi
+
 # Known service ports
 PORT_POSTGRES=5432
 PORT_SUPERTOKENS=3567
@@ -288,7 +308,9 @@ if [ "$api_already_running" = false ]; then
   # Export env vars for the API (used by both build and start).
   # Secret keys must be real env vars (config.ts ignores them from .env).
   # DATABASE_URL and SUPERTOKENS_API_KEY point at local services started above.
-  # Third-party keys use test-mode dummies — E2E tests don't call real APIs.
+  # Third-party keys: real test-mode values are loaded from root .env at
+  # the top of this script; the defaults below are placeholder strings
+  # that the API recognizes and routes to the stub adapters.
   export DATABASE_URL="postgresql://kanix:kanix@127.0.0.1:${PORT_POSTGRES}/kanix"
   export SUPERTOKENS_API_KEY="e2e-test-key"
   export STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-sk_test_e2e_placeholder_key}"
@@ -362,6 +384,23 @@ if [ "${E2E_WANT_EMULATOR:-0}" = "1" ]; then
     log "Starting Android emulator (E2E_WANT_EMULATOR=1)..."
     if start-emulator 2>"$STATE_DIR/emulator.log"; then
       log "Android emulator ready."
+
+      # adb reverse: device localhost:N → host 127.0.0.1:N.
+      # Required for apps running on the emulator to reach host services
+      # (API on PORT_API, SuperTokens on PORT_SUPERTOKENS). adb reverse
+      # rules don't survive emulator restarts, so re-apply every setup run.
+      if command -v adb >/dev/null 2>&1; then
+        log "  Wiring adb reverse: ${PORT_API}, ${PORT_SUPERTOKENS}..."
+        adb -s emulator-5554 reverse --remove-all 2>/dev/null || true
+        adb -s emulator-5554 reverse "tcp:${PORT_API}" "tcp:${PORT_API}" \
+          2>>"$STATE_DIR/emulator.log" \
+          || log "  WARNING: adb reverse tcp:${PORT_API} failed"
+        adb -s emulator-5554 reverse "tcp:${PORT_SUPERTOKENS}" "tcp:${PORT_SUPERTOKENS}" \
+          2>>"$STATE_DIR/emulator.log" \
+          || log "  WARNING: adb reverse tcp:${PORT_SUPERTOKENS} failed"
+      else
+        log "  WARNING: adb not in PATH — device→host port forwards not configured"
+      fi
     else
       log "  WARNING: start-emulator exited $? — see $STATE_DIR/emulator.log"
     fi

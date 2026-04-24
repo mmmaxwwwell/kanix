@@ -4,55 +4,6 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 
 ---
 
-## T090 — Implement SSG product catalog pages
-- Astro SSG product pages must gracefully handle missing API (`PUBLIC_API_URL` not set) — `fetchProducts()` returns `[]` so the build succeeds with an empty catalog and a "Coming Soon" placeholder
-- Product-to-module STL viewer matching uses slug substring matching (`product.slug.includes(mod.slug)`) since product slugs may contain the module slug plus a material suffix (e.g. `waste-bag-dispenser-tpu`)
-- OpenGraph meta tags added to `Base.astro` via optional props (`ogImage`, `ogType`, `canonicalUrl`) — all existing pages get default OG tags without changes since the new props have sensible defaults
-
-## T091 — Implement guest checkout as Astro islands
-- Astro checkout uses vanilla JS `<script>` tags (not React/Vue islands) since the project has no framework integration — Astro bundles these into separate JS files in `_astro/`, so integration tests checking for inline JS strings must also grep the bundled files
-- The API's `POST /api/checkout` combines shipping calc + tax calc + Stripe PaymentIntent creation in one call, returning `client_secret` — the checkout flow is: address form → checkout API → show totals → Stripe `confirmPayment()` → redirect to confirmation
-- Stripe.js loaded from CDN (`js.stripe.com/v3/`) with the Payment Element (not Card Element) for PCI compliance — uses `appearance: { theme: "night" }` to match the dark Kanix theme
-
-## T092 — Implement kit builder page
-- Kit builder uses the public `GET /api/kits` endpoint (from T085's `findActiveKitsWithDetails`) which returns kit definitions with nested requirements, product classes, products, and variant-level inventory — no auth required
-- Kit variant selection UI uses `data-class-id` attributes on buttons to scope selections per class, with CSS class toggling for selected state (`border-amber-500 bg-amber-500/10`) — savings calculated client-side as `sum(individual prices) - kit price`
-- The `POST /api/cart/kits` endpoint expects `{ kit_definition_id, selections: [{ product_class_id, variant_id }] }` and returns `{ kit, cart }` — the cart library's `addKitToCart` auto-creates a cart if no token exists (same pattern as `addToCart`)
-
-## T093 — Add contributions model page
-- Astro content pages (contributions, warranty, etc.) are pure static pages — no API data fetching needed, just use the Base layout with matching nav/footer patterns from index.astro
-- Royalty spec details are spread across FR-069 through FR-076 — the key numbers are: 10% royalty at 25-unit threshold (retroactive), 20% for 501(c)(3) donation option, 50-unit starter kit milestone
-
-## T094 — Add warranty, returns, and care instructions pages
-- Material temperature thresholds already defined in `MATERIAL_WARNINGS` in `site/src/data/products.ts` — reuse these values (TPU 60°C, TPC 130°C, PLA 50°C, PETG 80°C, ABS 100°C) for consistency across warranty and care pages
-- Footer links must be added to every page individually since there's no shared footer component — 10 pages total needed updating (7 existing + 3 new)
-
-## T095 — Update README with contributions model
-- T093 already added the full Contributions Model section to README (milestones table, contributions page link, CLA instructions) — T095 was redundant and required no code changes
-
-## T095a — Add nix-mcp-debugkit flake input + re-export packages + config writers
-- Config writers use `pkgs.writeTextFile` with `destination` to produce a directory containing `mcp/*.json` — `nix build .#mcp-android-config` outputs a store path with `mcp/android.json` inside it
-- MCP config JSON pins commands to Nix store paths via string interpolation (`"${mcp-android}/bin/mcp-android"`) so the config is reproducible and doesn't rely on PATH
-
-## T095b — Register MCP servers + required permissions in `.claude/settings.json`
-- MCP server registrations go in `.mcp.json` (project root), not in `.claude/settings.json` — the settings schema does not accept `mcpServers` directly
-- `enableAllProjectMcpServers: true` in settings.json auto-approves all servers from `.mcp.json` so agents don't get prompted
-
-## T095c — KVM + emulator prereq verification + backend setup/teardown scripts
-- `kvm-ok` is not always installed (not in the Nix devshell); the prereqs script falls back to checking `/dev/kvm` readability when `kvm-ok` is unavailable
-- Astro dev server default port is 4321 (not 3000) — setup.sh uses `--port 4321` explicitly to avoid conflicts with the API on port 3000
-- `pg_ctl start` is idempotent-safe (returns 0 even if already running) making the setup script re-runnable without killing existing services first
-
-## T095d — APK install + app launch scripts consumed by MCP runner
-- Flutter app package IDs follow `com.kanix.kanix_admin` / `com.kanix.kanix_customer` pattern (not `com.kanix.admin`) — defined in `android/app/build.gradle.kts` as `applicationId`
-- Debug APK output path is `build/app/outputs/flutter-apk/app-debug.apk` relative to each Flutter project root
-- `adb shell am force-stop` before `am start` ensures a cold start; idempotent since force-stop on an uninstalled package is a no-op
-
-## T095e — Set up Playwright + Patrol regression harnesses
-- Playwright JSON reporter configured via `PW_JSON_OUTPUT` env var — defaults to `../test-logs/e2e/playwright-results.json` relative to site dir; Patrol uses `flutter test --machine` to emit JSON
-- Patrol Android setup requires both `MainActivityTest.java` with `@RunWith(PatrolJUnitRunner.class)` in `androidTest/` AND `testInstrumentationRunner` in `build.gradle.kts` `defaultConfig`
-- Site uses pnpm (not npm) for dependency management — `pnpm add -D @playwright/test` installs correctly; CI workflow uses `npm ci` since `package-lock.json` may be expected by the workflow
-
 ## T200 — Harden db/db.integration.test.ts
 - The old test used `describe.skip` via `describeWithDb` when `DATABASE_URL` was unset — replaced with `requireDatabaseUrl()` from `test-helpers.ts` which throws loudly in `beforeAll`
 - `postgres.js` `sql.end()` makes subsequent template-tag queries throw — use `conn.sql\`SELECT 1\`` (not `conn.db.execute()`) to test post-close failure since drizzle's `execute()` needs a proper SQL object
@@ -381,3 +332,16 @@ Discoveries, gotchas, and decisions recorded by the implementation agent across 
 - `/api/admin/inventory` doesn't exist as a bare route — the inventory routes are all under `/api/admin/inventory/balances`, `/api/admin/inventory/adjustments`, etc. Tests must use specific sub-paths.
 - `product_class` has a unique constraint on `name` (`uq_product_class_name`). Tests must use unique names (e.g. append `Date.now()`) to avoid collisions across runs.
 - `propagateOrderFulfillmentStatus` considers all non-voided shipments at shipped/in_transit/delivered status as covering fulfillment — fulfillment is "fulfilled" once all lines have sufficient shipped-or-better quantity, regardless of whether all shipments are delivered.
+
+## T096 — Cost guardrails (post-mortem 2026-04-22)
+
+A single E2E cycle on T096 (guest-checkout) cost ~$27–33. Drivers (in order of dollars burned): oversized `browser_snapshot` responses going sticky in cache-read, a 316-turn verify agent doing log forensics by hand, Opus on mechanical fix work, a hung fix agent triggering a full planner+executor redo, and `code-review-graph` returning Flutter desktop-runner symbols instead of checkout/payment code for a checkout task.
+
+Countermeasures shipped — cross-cutting changes live in these places, keep them in sync:
+
+- **`.specify/cost-config.json`** (this project) overrides role models and hang budgets. Start with this file if you want to tune for this project specifically — don't edit the spec-kit defaults.
+- **`specs/admin/validate/e2e/page-manifest/`** holds stable-selector JSON for routes the executor touches (checkout, product-detail seeded). The runner injects a matching manifest into planner + executor prompts so they skip `browser_snapshot` for known pages. Update the manifest when the UI changes — stale manifests produce findings, not silent breakage.
+- **`specs/admin/validate/e2e/bugs/<BUG-ID>/verify.sh`** — fix agents must write this when closing a bug; the runner runs it before spawning a verify agent. See `.claude/skills/spec-kit/reference/fix-agent-playbook.md` § "Writing verify.sh".
+- **`flake.nix` `excludeDirs`** keeps `code-review-graph` from indexing Flutter desktop-runner scaffolding (`admin/windows`, `admin/linux`, etc.) — without this, the graph ranks `LRESULT` / `GetCommandLineArguments` above actual payment code in results and agents bypass it.
+
+Full rationale and contract details: `.claude/skills/spec-kit/reference/cost-guardrails.md`.

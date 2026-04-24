@@ -1,0 +1,484 @@
+### Page state
+- Page URL: http://127.0.0.1:4321/kanix/checkout/
+- Page Title: Checkout - Kanix™ Shop
+- Page Snapshot:
+```yaml
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - navigation [ref=e3]:
+    - generic [ref=e4]:
+      - link "KANIX™" [ref=e5] [cursor=pointer]:
+        - /url: /kanix/
+        - text: KANIX
+        - superscript [ref=e6]: ™
+      - generic [ref=e7]:
+        - link "Home" [ref=e8] [cursor=pointer]:
+          - /url: /kanix/
+        - link "Shop" [ref=e9] [cursor=pointer]:
+          - /url: /kanix/products/
+        - link "Kits" [ref=e10] [cursor=pointer]:
+          - /url: /kanix/kits/
+        - link "Cart" [ref=e11] [cursor=pointer]:
+          - /url: /kanix/checkout/
+  - main [ref=e12]:
+    - generic [ref=e13]:
+      - heading "Checkout" [level=1] [ref=e14]
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - generic [ref=e18]:
+            - heading "Cart" [level=2] [ref=e19]
+            - generic [ref=e21]:
+              - generic [ref=e22]:
+                - paragraph [ref=e23]: Starter Kit
+                - list [ref=e24]:
+                  - listitem [ref=e25]: "- Hinge Module (TPU)"
+                  - listitem [ref=e26]: "- Drive Belt GT2 (TPU)"
+                  - listitem [ref=e27]: "- Base Plate 100mm (TPU)"
+                - paragraph [ref=e28]: "Qty: 1"
+              - generic [ref=e29]:
+                - paragraph [ref=e30]: $49.99
+                - button "Remove" [ref=e31]
+          - generic [ref=e32]:
+            - heading "Shipping Information" [level=2] [ref=e33]
+            - generic [ref=e34]:
+              - generic [ref=e35]:
+                - generic [ref=e36]: Email
+                - textbox "Email" [disabled] [ref=e37]:
+                  - /placeholder: you@example.com
+                  - text: kit-test@example.com
+              - generic [ref=e38]:
+                - generic [ref=e39]: Full Name
+                - textbox "Full Name" [disabled] [ref=e40]:
+                  - /placeholder: Jane Doe
+                  - text: Kit Test User
+              - generic [ref=e41]:
+                - generic [ref=e42]: Address Line 1
+                - textbox "Address Line 1" [disabled] [ref=e43]:
+                  - /placeholder: 123 Main St
+                  - text: 123 Kit Builder Lane
+              - generic [ref=e44]:
+                - generic [ref=e45]: Address Line 2 (optional)
+                - textbox "Address Line 2 (optional)" [disabled] [ref=e46]:
+                  - /placeholder: Apt 4B
+              - generic [ref=e47]:
+                - generic [ref=e48]:
+                  - generic [ref=e49]: City
+                  - textbox "City" [disabled] [ref=e50]:
+                    - /placeholder: Austin
+                    - text: Austin
+                - generic [ref=e51]:
+                  - generic [ref=e52]: State
+                  - combobox "State" [disabled] [ref=e53]:
+                    - option "Select state"
+                    - option "Alabama"
+                    - option "Alaska"
+                    - option "Arizona"
+                    - option "Arkansas"
+                    - option "California"
+                    - option "Colorado"
+                    - option "Connecticut"
+                    - option "Delaware"
+                    - option "Florida"
+                    - option "Georgia"
+                    - option "Hawaii"
+                    - option "Idaho"
+                    - option "Illinois"
+                    - option "Indiana"
+                    - option "Iowa"
+                    - option "Kansas"
+                    - option "Kentucky"
+                    - option "Louisiana"
+                    - option "Maine"
+                    - option "Maryland"
+                    - option "Massachusetts"
+                    - option "Michigan"
+                    - option "Minnesota"
+                    - option "Mississippi"
+                    - option "Missouri"
+                    - option "Montana"
+                    - option "Nebraska"
+                    - option "Nevada"
+                    - option "New Hampshire"
+                    - option "New Jersey"
+                    - option "New Mexico"
+                    - option "New York"
+                    - option "North Carolina"
+                    - option "North Dakota"
+                    - option "Ohio"
+                    - option "Oklahoma"
+                    - option "Oregon"
+                    - option "Pennsylvania"
+                    - option "Rhode Island"
+                    - option "South Carolina"
+                    - option "South Dakota"
+                    - option "Tennessee"
+                    - option "Texas" [selected]
+                    - option "Utah"
+                    - option "Vermont"
+                    - option "Virginia"
+                    - option "Washington"
+                    - option "West Virginia"
+                    - option "Wisconsin"
+                    - option "Wyoming"
+                    - option "District of Columbia"
+              - generic [ref=e54]:
+                - generic [ref=e55]:
+                  - generic [ref=e56]: ZIP Code
+                  - textbox "ZIP Code" [disabled] [ref=e57]:
+                    - /placeholder: "78701"
+                    - text: "78701"
+                - generic [ref=e58]:
+                  - generic [ref=e59]: Country
+                  - textbox [disabled] [ref=e60]: United States
+                  - paragraph [ref=e61]: US shipping only
+          - generic [ref=e107]:
+            - heading "Payment" [level=2] [ref=e108]
+            - generic [ref=e111]:
+              - generic [ref=e112]:
+                - paragraph [ref=e113]: Standard Shipping
+                - paragraph [ref=e114]: "Estimated delivery: 5-7 business days"
+              - paragraph [ref=e115]: $5.99
+            - iframe [ref=e118]:
+              - generic [ref=f3e7]:
+                - tablist "Payment Methods" [ref=f3e8]:
+                  - tab "Card" [selected] [ref=f3e9]:
+                    - generic [ref=f3e12]: Card
+                  - tab "Affirm" [ref=f3e13] [cursor=pointer]:
+                    - img [ref=f3e15]
+                    - generic [ref=f3e19]: Affirm
+                  - tab "Cash App Pay" [ref=f3e20] [cursor=pointer]:
+                    - generic [ref=f3e22]: Cash App Pay
+                  - tab "Klarna" [ref=f3e23] [cursor=pointer]:
+                    - generic [ref=f3e28]: Klarna
+                  - combobox "Additional Payment Methods" [ref=f3e30] [cursor=pointer]:
+                    - option "Card" [disabled] [selected]
+                    - option "Amazon Pay"
+                - tabpanel "Card" [ref=f3e31]:
+                  - generic [ref=f3e34]:
+                    - generic [ref=f3e35]:
+                      - button "Secure, fast checkout with Link" [ref=f3e41] [cursor=pointer]:
+                        - img [ref=f3e42]
+                        - generic [ref=f3e44]: Secure, fast checkout with Link
+                      - generic [ref=f3e46]:
+                        - generic [ref=f3e47]:
+                          - generic [ref=f3e49]:
+                            - generic [ref=f3e50]: Card number
+                            - generic [ref=f3e52]:
+                              - textbox "Card number" [ref=f3e54]:
+                                - /placeholder: 1234 1234 1234 1234
+                              - generic:
+                                - option "Select card brand (optional)" [disabled] [selected]
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - paragraph: Supported cards include Visa, Mastercard, American Express, and Discover.
+                                    - generic:
+                                      - img
+                                    - generic:
+                                      - img
+                          - generic [ref=f3e56]:
+                            - generic [ref=f3e57]:
+                              - text: Expiration date
+                              - generic [ref=f3e58]: MM / YY
+                            - textbox "Expiration date MM / YY" [ref=f3e62]:
+                              - /placeholder: MM / YY
+                          - generic [ref=f3e64]:
+                            - generic [ref=f3e65]: Security code
+                            - generic [ref=f3e67]:
+                              - textbox "Security code" [ref=f3e69]:
+                                - /placeholder: CVC
+                              - generic:
+                                - generic: 3-digit code on back of card
+                                - generic:
+                                  - img
+                        - generic [ref=f3e72]:
+                          - generic [ref=f3e74]:
+                            - generic [ref=f3e75]: Country
+                            - combobox "Country" [ref=f3e78] [cursor=pointer]:
+                              - option "Select" [disabled]
+                              - option "Afghanistan"
+                              - option "Åland Islands"
+                              - option "Albania"
+                              - option "Algeria"
+                              - option "Andorra"
+                              - option "Angola"
+                              - option "Anguilla"
+                              - option "Antarctica"
+                              - option "Antigua & Barbuda"
+                              - option "Argentina"
+                              - option "Armenia"
+                              - option "Aruba"
+                              - option "Ascension Island"
+                              - option "Australia"
+                              - option "Austria"
+                              - option "Azerbaijan"
+                              - option "Bahamas"
+                              - option "Bahrain"
+                              - option "Bangladesh"
+                              - option "Barbados"
+                              - option "Belarus"
+                              - option "Belgium"
+                              - option "Belize"
+                              - option "Benin"
+                              - option "Bermuda"
+                              - option "Bhutan"
+                              - option "Bolivia"
+                              - option "Bosnia & Herzegovina"
+                              - option "Botswana"
+                              - option "Bouvet Island"
+                              - option "Brazil"
+                              - option "British Indian Ocean Territory"
+                              - option "British Virgin Islands"
+                              - option "Brunei"
+                              - option "Bulgaria"
+                              - option "Burkina Faso"
+                              - option "Burundi"
+                              - option "Cambodia"
+                              - option "Cameroon"
+                              - option "Canada"
+                              - option "Cape Verde"
+                              - option "Caribbean Netherlands"
+                              - option "Cayman Islands"
+                              - option "Central African Republic"
+                              - option "Chad"
+                              - option "Chile"
+                              - option "China"
+                              - option "Colombia"
+                              - option "Comoros"
+                              - option "Congo - Brazzaville"
+                              - option "Congo - Kinshasa"
+                              - option "Cook Islands"
+                              - option "Costa Rica"
+                              - option "Côte d’Ivoire"
+                              - option "Croatia"
+                              - option "Curaçao"
+                              - option "Cyprus"
+                              - option "Czechia"
+                              - option "Denmark"
+                              - option "Djibouti"
+                              - option "Dominica"
+                              - option "Dominican Republic"
+                              - option "Ecuador"
+                              - option "Egypt"
+                              - option "El Salvador"
+                              - option "Equatorial Guinea"
+                              - option "Eritrea"
+                              - option "Estonia"
+                              - option "Eswatini"
+                              - option "Ethiopia"
+                              - option "Falkland Islands"
+                              - option "Faroe Islands"
+                              - option "Fiji"
+                              - option "Finland"
+                              - option "France"
+                              - option "French Guiana"
+                              - option "French Polynesia"
+                              - option "French Southern Territories"
+                              - option "Gabon"
+                              - option "Gambia"
+                              - option "Georgia"
+                              - option "Germany"
+                              - option "Ghana"
+                              - option "Gibraltar"
+                              - option "Greece"
+                              - option "Greenland"
+                              - option "Grenada"
+                              - option "Guadeloupe"
+                              - option "Guam"
+                              - option "Guatemala"
+                              - option "Guernsey"
+                              - option "Guinea"
+                              - option "Guinea-Bissau"
+                              - option "Guyana"
+                              - option "Haiti"
+                              - option "Honduras"
+                              - option "Hong Kong SAR China"
+                              - option "Hungary"
+                              - option "Iceland"
+                              - option "India"
+                              - option "Indonesia"
+                              - option "Iraq"
+                              - option "Ireland"
+                              - option "Isle of Man"
+                              - option "Israel"
+                              - option "Italy"
+                              - option "Jamaica"
+                              - option "Japan"
+                              - option "Jersey"
+                              - option "Jordan"
+                              - option "Kazakhstan"
+                              - option "Kenya"
+                              - option "Kiribati"
+                              - option "Kosovo"
+                              - option "Kuwait"
+                              - option "Kyrgyzstan"
+                              - option "Laos"
+                              - option "Latvia"
+                              - option "Lebanon"
+                              - option "Lesotho"
+                              - option "Liberia"
+                              - option "Libya"
+                              - option "Liechtenstein"
+                              - option "Lithuania"
+                              - option "Luxembourg"
+                              - option "Macao SAR China"
+                              - option "Madagascar"
+                              - option "Malawi"
+                              - option "Malaysia"
+                              - option "Maldives"
+                              - option "Mali"
+                              - option "Malta"
+                              - option "Martinique"
+                              - option "Mauritania"
+                              - option "Mauritius"
+                              - option "Mayotte"
+                              - option "Mexico"
+                              - option "Moldova"
+                              - option "Monaco"
+                              - option "Mongolia"
+                              - option "Montenegro"
+                              - option "Montserrat"
+                              - option "Morocco"
+                              - option "Mozambique"
+                              - option "Myanmar (Burma)"
+                              - option "Namibia"
+                              - option "Nauru"
+                              - option "Nepal"
+                              - option "Netherlands"
+                              - option "New Caledonia"
+                              - option "New Zealand"
+                              - option "Nicaragua"
+                              - option "Niger"
+                              - option "Nigeria"
+                              - option "Niue"
+                              - option "North Macedonia"
+                              - option "Norway"
+                              - option "Oman"
+                              - option "Pakistan"
+                              - option "Palestinian Territories"
+                              - option "Panama"
+                              - option "Papua New Guinea"
+                              - option "Paraguay"
+                              - option "Peru"
+                              - option "Philippines"
+                              - option "Pitcairn Islands"
+                              - option "Poland"
+                              - option "Portugal"
+                              - option "Puerto Rico"
+                              - option "Qatar"
+                              - option "Réunion"
+                              - option "Romania"
+                              - option "Russia"
+                              - option "Rwanda"
+                              - option "Samoa"
+                              - option "San Marino"
+                              - option "São Tomé & Príncipe"
+                              - option "Saudi Arabia"
+                              - option "Senegal"
+                              - option "Serbia"
+                              - option "Seychelles"
+                              - option "Sierra Leone"
+                              - option "Singapore"
+                              - option "Sint Maarten"
+                              - option "Slovakia"
+                              - option "Slovenia"
+                              - option "Solomon Islands"
+                              - option "Somalia"
+                              - option "South Africa"
+                              - option "South Georgia & South Sandwich Islands"
+                              - option "South Korea"
+                              - option "South Sudan"
+                              - option "Spain"
+                              - option "Sri Lanka"
+                              - option "St. Barthélemy"
+                              - option "St. Helena"
+                              - option "St. Kitts & Nevis"
+                              - option "St. Lucia"
+                              - option "St. Martin"
+                              - option "St. Pierre & Miquelon"
+                              - option "St. Vincent & Grenadines"
+                              - option "Sudan"
+                              - option "Suriname"
+                              - option "Svalbard & Jan Mayen"
+                              - option "Sweden"
+                              - option "Switzerland"
+                              - option "Taiwan"
+                              - option "Tajikistan"
+                              - option "Tanzania"
+                              - option "Thailand"
+                              - option "Timor-Leste"
+                              - option "Togo"
+                              - option "Tokelau"
+                              - option "Tonga"
+                              - option "Trinidad & Tobago"
+                              - option "Tristan da Cunha"
+                              - option "Tunisia"
+                              - option "Türkiye"
+                              - option "Turkmenistan"
+                              - option "Turks & Caicos Islands"
+                              - option "Tuvalu"
+                              - option "Uganda"
+                              - option "Ukraine"
+                              - option "United Arab Emirates"
+                              - option "United Kingdom"
+                              - option "United States" [selected]
+                              - option "Uruguay"
+                              - option "Uzbekistan"
+                              - option "Vanuatu"
+                              - option "Vatican City"
+                              - option "Venezuela"
+                              - option "Vietnam"
+                              - option "Wallis & Futuna"
+                              - option "Western Sahara"
+                              - option "Yemen"
+                              - option "Zambia"
+                              - option "Zimbabwe"
+                          - generic [ref=f3e80]:
+                            - generic [ref=f3e81]: ZIP code
+                            - textbox "ZIP code" [ref=f3e84]:
+                              - /placeholder: "12345"
+                    - generic: 0123456789０１２３４５６７８９
+                    - button
+            - button "Pay Now" [disabled] [ref=e119]
+        - generic [ref=e64]:
+          - heading "Order Summary" [level=2] [ref=e65]
+          - generic [ref=e66]:
+            - generic [ref=e67]:
+              - generic [ref=e68]: Subtotal
+              - generic [ref=e69]: $49.99
+            - generic [ref=e120]:
+              - generic [ref=e121]: Shipping
+              - generic [ref=e122]: $5.99
+            - generic [ref=e123]:
+              - generic [ref=e124]: Tax
+              - generic [ref=e125]: $0.00
+            - generic [ref=e71]:
+              - generic [ref=e72]: Total
+              - generic [ref=e73]: $55.98
+  - contentinfo [ref=e74]:
+    - generic [ref=e75]:
+      - generic [ref=e76]:
+        - link "Warranty" [ref=e77] [cursor=pointer]:
+          - /url: /kanix/warranty/
+        - link "Returns" [ref=e78] [cursor=pointer]:
+          - /url: /kanix/returns/
+        - link "Care Instructions" [ref=e79] [cursor=pointer]:
+          - /url: /kanix/care/
+      - paragraph [ref=e80]: © 2026 mmmaxwwwell. All rights reserved. Kanix™ designs are original works by mmmaxwwwell.
+  - generic [ref=e83]:
+    - button "Menu" [ref=e84]:
+      - img [ref=e86]
+      - generic: Menu
+    - button "Inspect" [ref=e90]:
+      - img [ref=e92]
+      - generic: Inspect
+    - button "Audit" [ref=e94]:
+      - generic [ref=e95]:
+        - img [ref=e96]
+        - img [ref=e126]
+      - generic: Audit
+    - button "Settings" [ref=e102]:
+      - img [ref=e104]
+      - generic: Settings
+```

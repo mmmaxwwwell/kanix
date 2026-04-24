@@ -56,6 +56,20 @@
             "validate"     # spec-kit runner validation artifacts
             "attempts"     # spec-kit runner fix-attempt artifacts
             "ci-debug"     # CI diagnostic dumps
+            # Flutter-generated desktop runner scaffolding. Kanix ships
+            # web + Android only; these files are never edited by hand,
+            # but their dense cross-edges (LRESULT, GetCommandLineArguments,
+            # win32_window, my_application, etc) dominate the graph's
+            # relevance ranking and drown out actual product code when
+            # agents query for payment/checkout/shipping context.
+            "admin/windows"
+            "admin/linux"
+            "admin/macos"
+            "admin/ios/Runner"
+            "customer/windows"
+            "customer/linux"
+            "customer/macos"
+            "customer/ios/Runner"
           ];
         };
 
@@ -395,11 +409,25 @@
             # (interview/plan/tasks/implement/review) and kept fresh by
             # the watcher started from shellHook.
             crg
+
+            # Playwright browser bundle — chromium with NixOS-correct
+            # RPATHs. PLAYWRIGHT_BROWSERS_PATH below points at this.
+            playwright-driver.browsers
           ];
 
           inputsFrom = [ scadShell siteShell apiShell adminShell customerShell deployShell ];
           OPENSCADPATH = "${scad.packages.${system}.bosl2}";
           LIQUIBASE_CLASSPATH = "${pkgs.postgresql_jdbc}/share/java/postgresql-jdbc.jar";
+          # Playwright: pin @playwright/test in site/package.json to whatever
+          # version playwright-driver currently ships (1.58.2 / chromium 1208
+          # as of nixpkgs unstable 2026-04). Without these, npx playwright
+          # downloads its own chromium binary which links against system glib
+          # paths that don't exist on NixOS, exiting with libglib-2.0.so.0
+          # cannot open shared object file. inputsFrom does not propagate
+          # mkShell env vars, so these must be set on the root devshell to
+          # take effect inside `nix develop`.
+          PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
+          PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
           ANDROID_HOME = androidHome;
           ANDROID_SDK_ROOT = androidHome;
           # Keep AVD data inside the project tree so it's visible inside

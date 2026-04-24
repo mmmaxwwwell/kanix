@@ -39,6 +39,7 @@ module_offset = plate_size/2 + top_block_length + hinge_gap/2;
 side_locking_tab_depth = 5;
 rx_wall_width = 2;
 tx_tip_cutoff = 1.5;
+locking_tab_width = plate_size - side_locking_tab_depth*4 - hinge_gap * 2;
 
 module plate_body() {
     translate([0, 0, plate_thickness/2])
@@ -66,14 +67,32 @@ module mounting_plate() {
     }
 }
 
-module hinge_transform(){
+module latch_hinge_base_void(){
+    translate([0,plate_size/2 + bottom_block_length - plate_thickness/2,plate_thickness/2])
+    cube([locking_tab_width,plate_thickness,plate_thickness], center = true);
+}
+
+module latch_hinge_base(inner, angle = 0,cutout=false){
+    translate([0,plate_size/2 + bottom_block_length - plate_thickness/2,plate_thickness/2])
+    rotate([0,90,0])
+    rotate([0,0,angle])
+    hinge(
+        length = locking_tab_width,
+        outer_diam = plate_thickness,
+        segments = 7,
+        inner = inner,
+        cutout = cutout
+    );
+}
+
+module main_hinge_transform(){
     translate([0,-top_block_length/2,top_block_height/2])
     rotate([0, 90, 0])
     children();
 }
 
-module our_hinge(inner){
-    hinge_transform()
+module main_hinge(inner){
+    main_hinge_transform()
     hinge(
         length = plate_size,
         outer_diam = hinge_od,
@@ -83,7 +102,7 @@ module our_hinge(inner){
 }
 
 module our_hinge_cutout(inner){
-    hinge_transform()
+    main_hinge_transform()
     hinge(
         length = plate_size,
         outer_diam = hinge_od,
@@ -127,11 +146,11 @@ module top_block(inner = false){
                 translate([0, top_block_length/2, plate_thickness - top_block_height/2])
                 right_angle_fillet(diameter = fillet_d, length = plate_size);
                 difference() {
-                    hinge_transform()
+                    main_hinge_transform()
                     mounting_block();
                     our_hinge_cutout(inner);
                 }
-                our_hinge(inner);
+                main_hinge(inner);
             }
             // Chamfer the corner where the block meets the plate base
             translate([-plate_size/2 - 0.5, -top_block_length/2, -top_block_height/2])
@@ -171,7 +190,7 @@ module bottom_block(){
     
 }
 
-module back_cutout_feature(){
+module front_cutout_feature(){
     translate([plate_size/2 - side_locking_tab_depth*0.75 -side_locking_tab_depth * 2,0,plate_thickness/2]){
         hull(){
             cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
@@ -181,16 +200,25 @@ module back_cutout_feature(){
     }
 }
 
-module back_cutout(){
-    back_cutout_feature();
+module front_cutout(){
+    front_cutout_feature();
     mirror([1,0,0])
-    back_cutout_feature();
+    front_cutout_feature();
+    translate([0,plate_size/2 + bottom_block_length/2 + 6,plate_thickness/2]){
+        cube([17,15,plate_thickness],center = true);
+    }
+    translate([0,plate_size/2 + bottom_block_length/2,plate_thickness/2]){
+        rotate([45,0,0])
+        cube([17,15,plate_thickness],center = true);
+        translate([0,7,0])
+        rotate([45,0,0])
+        cube([17,15,plate_thickness],center = true);
+    }
 }
 
 module latch_block_rx(){
     translate([plate_size/2 - side_locking_tab_depth/2,plate_size/2 + bottom_block_length/2,plate_thickness+belt_thickness/2]){
         difference(){
-
             //outer block
             cube([
                     side_locking_tab_depth,
@@ -238,8 +266,13 @@ module front(){
             top_block();
             bottom_block();
         }
-        back_cutout();
+        front_cutout();
     }
+
+    // translate([0,plate_size/2 + bottom_block_length/2 + plate_thickness/2 ,plate_thickness/2]){
+    //     rotate([0,90,0])
+    //     cylinder(d = plate_thickness, h = locking_tab_width, center = true, $fn=32);
+    // }
 
     latch_block_tx();
     mirror([1,0,0])
@@ -249,10 +282,16 @@ module front(){
 module back(){
     mounting_plate();
     top_block(inner = true);
-    bottom_block();
+    difference(){
+        bottom_block();
+        latch_hinge_base_void();
+    }
     latch_block_rx();
     mirror([1,0,0])
     latch_block_rx();
+    latch_hinge_base(inner = true, angle = 315);
+    latch_hinge_base(inner = true, angle = 225);
+    // latch_hinge_base(inner = true,cutout = true);
 }
 
 

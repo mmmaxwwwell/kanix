@@ -138,8 +138,14 @@ export interface CreatePaymentAdapterOptions {
 }
 
 export function createPaymentAdapter(options: CreatePaymentAdapterOptions): PaymentAdapter {
-  if (options.stripeSecretKey && !options.stripeSecretKey.startsWith("sk_test_xxx")) {
-    return createStripePaymentAdapter(options.stripeSecretKey);
+  const key = options.stripeSecretKey;
+  const isPlaceholder =
+    !key ||
+    key.startsWith("sk_test_xxx") ||
+    key.includes("placeholder") ||
+    key.includes("REPLACE_ME");
+  if (!isPlaceholder) {
+    return createStripePaymentAdapter(key);
   }
   return createStubPaymentAdapter();
 }

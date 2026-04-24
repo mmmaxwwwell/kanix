@@ -12,7 +12,10 @@
       }
     },
     "mcp-browser": {
-      "command": "mcp-browser"
+      "command": "mcp-browser",
+      "args": [
+        "--headless"
+      ]
     },
     "code-review-graph": {
       "command": "code-review-graph",
