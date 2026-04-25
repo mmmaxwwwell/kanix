@@ -115,6 +115,7 @@ import { createTaxAdapter, type TaxAdapter } from "./services/tax-adapter.js";
 import { createShippingAdapter, type ShippingAdapter } from "./services/shipping-adapter.js";
 import { sql, eq } from "drizzle-orm";
 import { customer } from "./db/schema/customer.js";
+import { inventoryLocation, inventoryBalance } from "./db/schema/inventory.js";
 import { createPaymentAdapter, type PaymentAdapter } from "./services/payment-adapter.js";
 import { createCircuitBreaker, type CircuitBreaker } from "./services/circuit-breaker.js";
 import { generateOrderNumber, createCheckoutOrder } from "./db/queries/checkout.js";
@@ -6425,6 +6426,100 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           total_minor: newOrder.totalMinor,
         },
         client_secret: clientSecret,
+      });
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Test-only seed routes (unavailable in production)
+  // -------------------------------------------------------------------------
+
+  if (database && config.NODE_ENV !== "production") {
+    const db = database.db;
+
+    // POST /api/test/seed-paid-order
+    // Creates a product + variant + inventory + cart + confirmed paid order
+    // without touching the real Stripe API. Used by E2E executor to seed
+    // order state before testing fulfillment flows.
+    app.post("/api/test/seed-paid-order", async (_request, reply) => {
+      const ts = Date.now();
+
+      // 1. Product + variant
+      const prod = await insertProduct(db, {
+        slug: `seed-test-${ts}`,
+        title: `Seed Test Product ${ts}`,
+        status: "active",
+      });
+      const variant = await insertVariant(db, {
+        productId: prod.id,
+        sku: `SEED-${ts}`,
+        title: `Seed Test Variant ${ts}`,
+        priceMinor: 1500,
+        status: "active",
+        weight: "16",
+      });
+
+      // 2. Inventory: reuse an existing location if available
+      const existingBalances = await findInventoryBalances(db, {});
+      let locationId: string;
+      if (existingBalances.length > 0) {
+        locationId = existingBalances[0].locationId;
+      } else {
+        const [loc] = await db
+          .insert(inventoryLocation)
+          .values({ name: `Seed WH ${ts}`, code: `SEED-WH-${ts}`, type: "warehouse" })
+          .returning();
+        locationId = loc.id;
+      }
+      await db.insert(inventoryBalance).values({
+        variantId: variant.id,
+        locationId,
+        onHand: 50,
+        reserved: 0,
+        available: 50,
+      });
+
+      // 3. Cart → add item → get full cart with prices
+      const cartRecord = await createCart(db);
+      await addCartItem(db, cartRecord.id, variant.id, 1);
+      const cartWithItems = await getCartWithItems(db, cartRecord.id);
+      if (!cartWithItems) {
+        return reply.status(500).send({ error: "ERR_SEED_CART_BUILD_FAILED" });
+      }
+
+      // 4. Create order (fake PI — no Stripe call)
+      const fakePaymentIntentId = `pi_seed_test_${ts}`;
+      const orderNumber = await generateOrderNumber(db);
+      const newOrder = await createCheckoutOrder(db, {
+        orderNumber,
+        email: `seed-test-${ts}@example.com`,
+        cartWithItems,
+        shippingAddress: {
+          full_name: "Seed Test User",
+          line1: "123 Test St",
+          city: "Austin",
+          state: "TX",
+          postal_code: "78701",
+          country: "US",
+        },
+        subtotalMinor: cartWithItems.subtotalMinor,
+        taxMinor: 0,
+        shippingMinor: 0,
+        totalMinor: cartWithItems.subtotalMinor,
+        stripePaymentIntentId: fakePaymentIntentId,
+      });
+
+      // 5. Simulate payment_intent.succeeded → confirmed + paid
+      const paymentRecord = await findPaymentByIntentId(db, fakePaymentIntentId);
+      if (!paymentRecord) {
+        return reply.status(500).send({ error: "ERR_SEED_PAYMENT_RECORD_MISSING" });
+      }
+      await handlePaymentSucceeded(db, paymentRecord, undefined, adminAlertService);
+
+      return reply.status(201).send({
+        order_id: newOrder.id,
+        order_number: newOrder.orderNumber,
+        payment_status: "paid",
       });
     });
   }
