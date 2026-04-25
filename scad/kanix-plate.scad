@@ -138,9 +138,6 @@ fillet_d = 5;
 
 module top_block(inner = false){
     translate([0, -top_block_offset, top_block_height / 2]){
-        
-        tri_base = plate_thickness/2;
-
         difference() {
             union() {
                 translate([0, top_block_length/2, plate_thickness - top_block_height/2])
@@ -152,17 +149,11 @@ module top_block(inner = false){
                 }
                 main_hinge(inner);
             }
-            // Chamfer the corner where the block meets the plate base
-            translate([-plate_size/2 - 0.5, -top_block_length/2, -top_block_height/2])
-            rotate([90,0,0])
-            rotate([0, 90, 0])
-            linear_extrude(height = plate_size + 1)
-                polygon(points = [
-                    [0, 0],
-                    [tri_base, 0],
-                    [0, tri_base],
-                ]);
-            // Cut screw hole insets through fillet material on the back plate
+            translate([0,-top_block_length/2,-top_block_height/2])
+            rotate([0,0,90])
+            rotate([0,90,0])
+            front_edge_fillet_feature();
+            // // Cut screw hole insets through fillet material on the back plate
             if (inner)
                 for (col = [0 : hole_cols - 1])
                     for (row = [0 : hole_rows - 1])
@@ -191,11 +182,27 @@ module bottom_block(){
 }
 
 module front_cutout_feature(){
+    offset = 2;
     translate([plate_size/2 - side_locking_tab_depth*0.75 -side_locking_tab_depth * 2,0,plate_thickness/2]){
+        translate([offset/2,0,0])
         hull(){
-            cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
+            cylinder(d = side_locking_tab_depth * 1.5 - 2, h=plate_thickness + 1, center=true, $fn=32);
             translate([0,plate_size,0])
-            cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
+            cylinder(d = side_locking_tab_depth * 1.5 - 2, h=plate_thickness + 1, center=true, $fn=32);
+            
+        }
+        hull(){
+            translate([side_locking_tab_depth * 2.5/3,0,0]){
+                cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
+                translate([0,plate_size/2 - side_locking_tab_depth * 0.75,0])
+                cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
+            }
+
+            translate([offset,0,0]){
+                cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
+                    translate([0,plate_size/2 - side_locking_tab_depth * 0.75,0])
+                cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
+            }
         }
     }
 }
@@ -204,16 +211,6 @@ module front_cutout(){
     front_cutout_feature();
     mirror([1,0,0])
     front_cutout_feature();
-    translate([0,plate_size/2 + bottom_block_length/2 + 6,plate_thickness/2]){
-        cube([17,15,plate_thickness],center = true);
-    }
-    translate([0,plate_size/2 + bottom_block_length/2,plate_thickness/2]){
-        rotate([45,0,0])
-        cube([17,15,plate_thickness],center = true);
-        translate([0,7,0])
-        rotate([45,0,0])
-        cube([17,15,plate_thickness],center = true);
-    }
 }
 
 module latch_block_rx(){
@@ -259,6 +256,22 @@ module latch_block_tx(){
     }
 }
 
+module front_edge_fillet_feature(){
+    rotate([0, 0, 90])     
+    right_angle_fillet(diameter = plate_thickness/2, length = plate_size*2);
+}
+
+module front_edge_fillet(){
+    translate([plate_size/2,0,0])
+    front_edge_fillet_feature();
+    mirror([1,0,0])
+    translate([plate_size/2,0,0])
+    front_edge_fillet_feature();
+    translate([0,plate_size/2 + bottom_block_length,0])
+    rotate([0,0,90])
+    front_edge_fillet_feature();
+}
+
 module front(){
     difference(){
         union(){
@@ -267,6 +280,7 @@ module front(){
             bottom_block();
         }
         front_cutout();
+        front_edge_fillet();
     }
 
     // translate([0,plate_size/2 + bottom_block_length/2 + plate_thickness/2 ,plate_thickness/2]){
@@ -280,18 +294,17 @@ module front(){
 }
 
 module back(){
-    mounting_plate();
-    top_block(inner = true);
     difference(){
-        bottom_block();
-        latch_hinge_base_void();
+        union(){
+            mounting_plate();
+            top_block(inner = true);
+            bottom_block();
+        }
+        front_edge_fillet();
     }
     latch_block_rx();
     mirror([1,0,0])
     latch_block_rx();
-    latch_hinge_base(inner = true, angle = 315);
-    latch_hinge_base(inner = true, angle = 225);
-    // latch_hinge_base(inner = true,cutout = true);
 }
 
 
