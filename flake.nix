@@ -182,6 +182,19 @@
             fi
           fi
 
+          # Kill any stale emulator that is NOT in "device" state (e.g. offline,
+          # unauthorized, or disconnected after am force-stop).  Such a process
+          # may still hold ports 5554/5555, which prevents a fresh start.
+          # INFRA-emulator-offline: this is the root cause — the old process kept
+          # the ports and the new emulator failed to bind.
+          if adb devices 2>/dev/null | grep -q "emulator-5554"; then
+            echo "Stale non-device emulator found — killing before restart..."
+            adb -s emulator-5554 emu kill 2>/dev/null || true
+            sleep 2
+            # Belt-and-suspenders: kill any process still holding port 5554.
+            lsof -ti tcp:5554 2>/dev/null | xargs -r kill -9 2>/dev/null || true
+          fi
+
           AVD_DIR="$ANDROID_AVD_HOME"
 
           # Clean stale AVD lock files left by a previous emulator that
@@ -316,6 +329,18 @@
             BOOT_PROP=$(echo "$BOOT_PROP" | tr -d '[:space:]')
             if [ "$BOOT_PROP" = "1" ]; then
               echo "Emulator booted successfully in ''${ELAPSED}s."
+              # Re-apply adb reverse so the app on the emulator can reach host
+              # services.  These rules are lost on every emulator restart.
+              # INFRA-adb-reverse-not-persistent: apply here (inside start-emulator)
+              # so any caller (setup.sh or direct invocation) gets the tunnels.
+              _api_port="''${PORT:-3000}"
+              _st_port="''${PORT_SUPERTOKENS:-3567}"
+              adb -s emulator-5554 reverse --remove-all 2>/dev/null || true
+              adb -s emulator-5554 reverse "tcp:''${_api_port}" "tcp:''${_api_port}" 2>/dev/null \
+                || echo "Warning: adb reverse tcp:''${_api_port} failed" >&2
+              adb -s emulator-5554 reverse "tcp:''${_st_port}" "tcp:''${_st_port}" 2>/dev/null \
+                || echo "Warning: adb reverse tcp:''${_st_port} failed" >&2
+              echo "adb reverse: localhost:''${_api_port}→host, localhost:''${_st_port}→host"
               exit 0
             fi
             sleep "$INTERVAL"
