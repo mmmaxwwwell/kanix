@@ -88,6 +88,11 @@ const showCart = variant === "shop";
   const toggle = document.getElementById("nav-toggle");
   const mobileNav = document.getElementById("mobile-nav");
   if (toggle && mobileNav) {
+    const closeMobileNav = () => {
+      mobileNav.classList.add("hidden");
+      mobileNav.classList.remove("flex");
+      toggle.setAttribute("aria-expanded", "false");
+    };
     toggle.addEventListener("click", () => {
       const expanded = toggle.getAttribute("aria-expanded") === "true";
       toggle.setAttribute("aria-expanded", String(!expanded));
@@ -95,11 +100,14 @@ const showCart = variant === "shop";
       mobileNav.classList.toggle("flex");
     });
     mobileNav.querySelectorAll("a").forEach((link) => {
-      link.addEventListener("click", () => {
-        mobileNav.classList.add("hidden");
-        mobileNav.classList.remove("flex");
-        toggle.setAttribute("aria-expanded", "false");
-      });
+      link.addEventListener("click", closeMobileNav);
+    });
+    // Close when tapping outside the menu (and outside the toggle button)
+    document.addEventListener("click", (event) => {
+      if (toggle.getAttribute("aria-expanded") !== "true") return;
+      const target = event.target as Node;
+      if (mobileNav.contains(target) || toggle.contains(target)) return;
+      closeMobileNav();
     });
   }
 
