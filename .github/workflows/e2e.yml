@@ -84,7 +84,7 @@ jobs:
           script: |
             cd ${{ matrix.app }}
             mkdir -p ../test-logs/e2e
-            flutter test integration_test/smoke_test.dart --machine > ../test-logs/e2e/patrol-${{ matrix.app }}-results.json 2>&1 || true
+            flutter test integration_test/ --machine > ../test-logs/e2e/patrol-${{ matrix.app }}-results.json 2>&1 || true
 
       - name: Upload test results
         if: always()

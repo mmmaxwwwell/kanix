@@ -113,7 +113,7 @@ import { createAdminAlertService, type AdminAlertService } from "./services/admi
 import { createNotificationService, type NotificationService } from "./services/notification.js";
 import { createTaxAdapter, type TaxAdapter } from "./services/tax-adapter.js";
 import { createShippingAdapter, type ShippingAdapter } from "./services/shipping-adapter.js";
-import { sql, eq } from "drizzle-orm";
+import { sql, eq, and } from "drizzle-orm";
 import { customer } from "./db/schema/customer.js";
 import { inventoryLocation, inventoryBalance } from "./db/schema/inventory.js";
 import { createPaymentAdapter, type PaymentAdapter } from "./services/payment-adapter.js";
@@ -6520,6 +6520,92 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         order_id: newOrder.id,
         order_number: newOrder.orderNumber,
         payment_status: "paid",
+      });
+    });
+
+    // POST /api/test/seed-admin-user
+    // Creates (or finds) an EmailPassword user with super_admin capabilities.
+    // Idempotent: safe to call repeatedly. Used by E2E setup so admin app
+    // logins (T099 fulfillment flow, etc.) have a known credential pair.
+    app.post<{
+      Body?: { email?: string; password?: string; name?: string };
+    }>("/api/test/seed-admin-user", async (request, reply) => {
+      const email = (request.body?.email ?? "admin@kanix.test").toLowerCase();
+      const password = request.body?.password ?? "TestAdmin123!";
+      const displayName = request.body?.name ?? "E2E Admin";
+
+      const supertokensModule = (await import("supertokens-node")).default;
+      const EmailPasswordModule = (await import("supertokens-node/recipe/emailpassword/index.js"))
+        .default;
+
+      let authSubject: string;
+      const signUpResult = await EmailPasswordModule.signUp("public", email, password);
+      if (signUpResult.status === "OK") {
+        authSubject = signUpResult.user.id;
+      } else {
+        const existing = await supertokensModule.listUsersByAccountInfo("public", { email });
+        if (existing.length === 0) {
+          return reply.status(500).send({ error: "ERR_SEED_ADMIN_USER_LOOKUP_FAILED", email });
+        }
+        authSubject = existing[0].id;
+      }
+
+      const { adminUser, adminRole, adminUserRole } = await import("./db/schema/admin.js");
+      const { ROLE_CAPABILITIES } = await import("./auth/admin.js");
+
+      const existingAdmin = await db
+        .select({ id: adminUser.id })
+        .from(adminUser)
+        .where(eq(adminUser.authSubject, authSubject))
+        .limit(1);
+      let adminUserId: string;
+      if (existingAdmin.length > 0) {
+        adminUserId = existingAdmin[0].id;
+      } else {
+        const [created] = await db
+          .insert(adminUser)
+          .values({ authSubject, email, name: displayName, status: "active" })
+          .returning();
+        adminUserId = created.id;
+      }
+
+      const roleName = "e2e_super_admin";
+      const existingRole = await db
+        .select({ id: adminRole.id })
+        .from(adminRole)
+        .where(eq(adminRole.name, roleName))
+        .limit(1);
+      let roleId: string;
+      if (existingRole.length > 0) {
+        roleId = existingRole[0].id;
+      } else {
+        const [createdRole] = await db
+          .insert(adminRole)
+          .values({
+            name: roleName,
+            description: "E2E test super admin",
+            capabilitiesJson: ROLE_CAPABILITIES.super_admin,
+          })
+          .returning();
+        roleId = createdRole.id;
+      }
+
+      const existingLink = await db
+        .select({ adminUserId: adminUserRole.adminUserId })
+        .from(adminUserRole)
+        .where(
+          and(eq(adminUserRole.adminUserId, adminUserId), eq(adminUserRole.adminRoleId, roleId)),
+        )
+        .limit(1);
+      if (existingLink.length === 0) {
+        await db.insert(adminUserRole).values({ adminUserId, adminRoleId: roleId });
+      }
+
+      return reply.status(201).send({
+        admin_user_id: adminUserId,
+        auth_subject: authSubject,
+        email,
+        role: roleName,
       });
     });
   }

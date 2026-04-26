@@ -353,3 +353,8 @@ Countermeasures shipped — cross-cutting changes live in these places, keep the
 - **`flake.nix` `excludeDirs`** keeps `code-review-graph` from indexing Flutter desktop-runner scaffolding (`admin/windows`, `admin/linux`, etc.) — without this, the graph ranks `LRESULT` / `GetCommandLineArguments` above actual payment code in results and agents bypass it.
 
 Full rationale and contract details: `.claude/skills/spec-kit/reference/cost-guardrails.md`.
+
+## INFRA-mcp-android-not-connected (2026-04-26)
+
+- `ANDROID_BUILD_ROOT` in `.mcp.json` was set to `customer` — change to `admin` for admin E2E tests. This only affects APK/build-path resolution, not MCP connectivity.
+- The actual "no tools" failure: `parallel_runner.py` `ensure_runtime()` caches `_booted=True` from spawn N and skips re-checking if the Android emulator is still alive before spawning N+1. When the emulator goes offline between spawns, mcp-android starts against a dead emulator and the executor session sees zero `mcp__mcp-android__*` tools. Fix: add `_check_android_ready()` liveness gate before the early-return in `ensure_runtime`. This file is read-only in the agent sandbox; requires host-side patch to `parallel_runner.py`.

@@ -75,11 +75,34 @@ pids_on_port() {
 }
 
 # -------------------------------------------------------------------
-# Kill orphan processes on known ports
+# Check if a port's service is healthy (skip killing it if so)
+# -------------------------------------------------------------------
+port_is_healthy() {
+  local port=$1
+  case "$port" in
+    "$PORT_POSTGRES")
+      psql -h 127.0.0.1 -p "$port" -d postgres -c "SELECT 1" >/dev/null 2>&1 ;;
+    "$PORT_SUPERTOKENS")
+      curl -sf "http://127.0.0.1:${port}/hello" >/dev/null 2>&1 ;;
+    "$PORT_API")
+      curl -sf "http://127.0.0.1:${port}/health" >/dev/null 2>&1 ;;
+    "$PORT_ASTRO")
+      curl -so /dev/null -w '' "http://127.0.0.1:${port}/" 2>/dev/null ;;
+    *)
+      return 1 ;;
+  esac
+}
+
+# -------------------------------------------------------------------
+# Kill orphan processes on known ports (skip healthy services)
 # -------------------------------------------------------------------
 kill_orphans() {
   log "Checking for orphan processes on known ports..."
   for port in "${KNOWN_PORTS[@]}"; do
+    if port_is_healthy "$port"; then
+      log "  Port ${port} is healthy, keeping existing process"
+      continue
+    fi
     local pids
     pids=$(pids_on_port "$port")
     if [ -n "$pids" ]; then
@@ -222,6 +245,26 @@ wait_for_http "http://127.0.0.1:${PORT_SUPERTOKENS}/hello" "SuperTokens" 60
 log "SuperTokens ready."
 
 # -------------------------------------------------------------------
+# Step 2.5: Kick off Android emulator boot in background (parallel)
+# -------------------------------------------------------------------
+# The emulator takes ~25s to boot with KVM and is independent of the
+# API/Astro/migration steps. Starting it here (right after postgres +
+# supertokens) lets it boot in parallel with Steps 3–5, saving ~25s
+# of wall time and preventing setup.sh from being killed by the
+# runner's timeout before reaching the emulator step.
+_emu_bg_pid=""
+if [ "${E2E_WANT_EMULATOR:-0}" = "1" ] && command -v start-emulator >/dev/null 2>&1; then
+  # Only start if not already running
+  if ! adb devices 2>/dev/null | grep -q "emulator-5554.*device"; then
+    log "Starting Android emulator in background (parallel with Steps 3-5)..."
+    start-emulator 2>"$STATE_DIR/emulator.log" &
+    _emu_bg_pid=$!
+  else
+    log "Android emulator already running on emulator-5554."
+  fi
+fi
+
+# -------------------------------------------------------------------
 # Step 3: Run database migrations
 # -------------------------------------------------------------------
 log "Running database migrations..."
@@ -323,10 +366,21 @@ if [ "$api_already_running" = false ]; then
 
   # Pre-build TypeScript so the server starts from compiled JS (~1s)
   # instead of tsx watch (~30s cold-compile for the large server.ts).
-  log "  Building API (tsc)..."
-  (cd "$PROJECT_ROOT/api" && pnpm build) > "$STATE_DIR/api-build.log" 2>&1 || {
-    log "  WARNING: tsc build failed, falling back to tsx (no watch)"
-  }
+  # Skip rebuild if dist/index.js exists and no source file is newer.
+  _needs_build=true
+  if [ -f "$PROJECT_ROOT/api/dist/index.js" ]; then
+    _newer_src=$(find "$PROJECT_ROOT/api/src" -name '*.ts' -newer "$PROJECT_ROOT/api/dist/index.js" -print -quit 2>/dev/null)
+    if [ -z "$_newer_src" ]; then
+      _needs_build=false
+      log "  API dist/index.js is up-to-date, skipping tsc build"
+    fi
+  fi
+  if [ "$_needs_build" = true ]; then
+    log "  Building API (tsc)..."
+    (cd "$PROJECT_ROOT/api" && pnpm build) > "$STATE_DIR/api-build.log" 2>&1 || {
+      log "  WARNING: tsc build failed, falling back to tsx (no watch)"
+    }
+  fi
 
   (
     cd "$PROJECT_ROOT/api"
@@ -341,6 +395,18 @@ if [ "$api_already_running" = false ]; then
 fi
 wait_for_port "$PORT_API" "API server" 60
 log "API server ready."
+
+# Seed the E2E admin user (idempotent). T099 and other admin-driven specs
+# need a known credential pair; setup.sh and the spec keep the email and
+# password values in lockstep below.
+if curl -sf -X POST "http://127.0.0.1:${PORT_API}/api/test/seed-admin-user" \
+    -H "Content-Type: application/json" \
+    -d '{"email":"admin@kanix.test","password":"TestAdmin123!","name":"E2E Admin"}' \
+    > "$STATE_DIR/seed-admin.json" 2>/dev/null; then
+  log "Admin user seeded (admin@kanix.test)."
+else
+  log "  WARNING: seed-admin-user failed — see $STATE_DIR/seed-admin.json"
+fi
 
 # -------------------------------------------------------------------
 # Step 5: Astro site (dev server)
@@ -367,25 +433,32 @@ wait_for_port "$PORT_ASTRO" "Astro site" 60
 log "Astro site ready."
 
 # -------------------------------------------------------------------
-# Step 6: Android emulator (opt-in, gated by E2E_WANT_EMULATOR=1)
+# Step 6: Wait for Android emulator (started in Step 2.5)
 # -------------------------------------------------------------------
-# The emulator is a 3+GB qemu-system-x86 process and takes 25s+ to boot.
-# Integration-test tasks that only harden a single *.integration.test.ts
-# file do not need it — they only need postgres + supertokens + API.
-# Booting it unconditionally (and leaving it running between tasks)
-# accounted for ~3.2GB of resident memory that accumulated across many
-# serial agent runs and pushed total system memory to 95%.
-#
-# The runner's PlatformManager sets E2E_WANT_EMULATOR=1 only for tasks
-# tagged [needs: mcp-android].  E2E driver scripts that need an emulator
-# directly can also export E2E_WANT_EMULATOR=1 before calling setup.sh.
+# The emulator was kicked off in the background at Step 2.5 to run in
+# parallel with migrations, API build, and Astro start.  Now we wait
+# for it to finish booting before proceeding to APK build+install.
 if [ "${E2E_WANT_EMULATOR:-0}" = "1" ]; then
-  if command -v start-emulator >/dev/null 2>&1; then
-    log "Starting Android emulator (E2E_WANT_EMULATOR=1)..."
-    if start-emulator 2>"$STATE_DIR/emulator.log"; then
+  if [ -n "${_emu_bg_pid:-}" ]; then
+    log "Waiting for background emulator boot (pid $_emu_bg_pid)..."
+    if wait "$_emu_bg_pid"; then
       log "Android emulator ready."
     else
       log "  WARNING: start-emulator exited $? — see $STATE_DIR/emulator.log"
+    fi
+    _emu_bg_pid=""
+  elif adb devices 2>/dev/null | grep -q "emulator-5554.*device"; then
+    log "Android emulator already running."
+  else
+    # Fallback: start-emulator was not kicked off in Step 2.5 (e.g. adb
+    # was not in PATH at that point, or start-emulator missing).
+    if command -v start-emulator >/dev/null 2>&1; then
+      log "Starting Android emulator (fallback — missed parallel start)..."
+      if start-emulator 2>"$STATE_DIR/emulator.log"; then
+        log "Android emulator ready."
+      else
+        log "  WARNING: start-emulator exited $? — see $STATE_DIR/emulator.log"
+      fi
     fi
   fi
 
@@ -488,17 +561,55 @@ fi
 # that exercise the admin Flutter interface. The APK is built from source
 # and installed on every setup run to ensure the emulator has the current
 # build (INFRA-admin-apk-not-installed).
+# apk_is_cache_stale <app_dir>: returns 0 if a previously-built APK is older
+# than any source file under the app dir. Gradle's incremental cache will
+# silently reuse the pre-fix APK otherwise; `flutter clean` invalidates it.
+# See agent-framework reference/e2e-failure-patterns.md
+# § stale-android-apk-after-source-fix.
+apk_is_cache_stale() {
+  local app_dir="$1"
+  local apk="$app_dir/build/app/outputs/flutter-apk/app-debug.apk"
+  [ -f "$apk" ] || return 1
+  local newer
+  newer=$(find "$app_dir/lib" "$app_dir/android/app/src" \
+                "$app_dir/pubspec.yaml" "$app_dir/pubspec.lock" \
+                "$app_dir/android/app/build.gradle" \
+                "$app_dir/android/app/build.gradle.kts" \
+                "$app_dir/android/build.gradle" \
+                "$app_dir/android/build.gradle.kts" \
+            -type f \
+            \( -name '*.dart' -o -name '*.kt' -o -name '*.java' \
+               -o -name '*.xml' -o -name '*.gradle' -o -name '*.kts' \
+               -o -name '*.yaml' -o -name '*.lock' \) \
+            -newer "$apk" -print -quit 2>/dev/null)
+  [ -n "$newer" ]
+}
+
 if [ "${E2E_WANT_EMULATOR:-0}" = "1" ] && command -v flutter >/dev/null 2>&1 && command -v adb >/dev/null 2>&1; then
   if adb -s emulator-5554 get-state >/dev/null 2>&1; then
     log "Building and installing admin APK (com.kanix.kanix_admin)..."
     (cd "$PROJECT_ROOT/admin" && flutter pub get) >/dev/null 2>&1 || true
+    if apk_is_cache_stale "$PROJECT_ROOT/admin"; then
+      log "  Cache-stale APK detected — running flutter clean first."
+      (cd "$PROJECT_ROOT/admin" && flutter clean) \
+        >> "$STATE_DIR/admin-build.log" 2>&1 || true
+    fi
     if (cd "$PROJECT_ROOT/admin" && flutter build apk --debug) \
-        > "$STATE_DIR/admin-build.log" 2>&1; then
-      adb -s emulator-5554 install -r \
-        "$PROJECT_ROOT/admin/build/app/outputs/flutter-apk/app-debug.apk" \
-        >> "$STATE_DIR/admin-build.log" 2>&1 \
-        && log "Admin APK installed (com.kanix.kanix_admin)." \
-        || log "  WARNING: adb install admin APK failed — see $STATE_DIR/admin-build.log"
+        >> "$STATE_DIR/admin-build.log" 2>&1; then
+      if ! adb -s emulator-5554 install -r \
+          "$PROJECT_ROOT/admin/build/app/outputs/flutter-apk/app-debug.apk" \
+          >> "$STATE_DIR/admin-build.log" 2>&1; then
+        # Signature mismatch from a different build machine — uninstall first
+        log "  install -r failed, uninstalling old package and retrying..."
+        adb -s emulator-5554 uninstall com.kanix.kanix_admin >> "$STATE_DIR/admin-build.log" 2>&1 || true
+        adb -s emulator-5554 install \
+          "$PROJECT_ROOT/admin/build/app/outputs/flutter-apk/app-debug.apk" \
+          >> "$STATE_DIR/admin-build.log" 2>&1 \
+          && log "Admin APK installed (com.kanix.kanix_admin)." \
+          || log "  WARNING: adb install admin APK failed — see $STATE_DIR/admin-build.log"
+      else
+        log "Admin APK installed (com.kanix.kanix_admin)."
+      fi
     else
       log "  WARNING: flutter build apk (admin) failed — see $STATE_DIR/admin-build.log"
     fi

@@ -63,6 +63,7 @@ function createStripePaymentAdapter(stripeSecretKey: string): PaymentAdapter {
         amount: input.amountMinor,
         currency: input.currency,
         metadata: input.metadata,
+        automatic_payment_methods: { enabled: true, allow_redirects: "never" },
       });
       return {
         id: intent.id,

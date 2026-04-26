@@ -680,26 +680,30 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
   Prereq: `pnpm --dir api stripe:listen:start` before running (see [test/e2e/README.md](../../test/e2e/README.md)); tear down with `stripe:listen:stop` after.
   Done when: MCP agent drives live Astro site: navigate to product → select variant → add to cart → checkout with email + address → pay via Stripe test → order confirmation; completes in <3 minutes; order exists in DB with correct snapshots; Playwright regression test exists for the full flow; every bug found during exploration has its own Playwright regression test
 
-- [x] T097 E2E: authenticated checkout on Flutter customer app [SC-001] [needs: mcp-android, e2e-loop, stripe-listen]
+- [x] T097 E2E: authenticated checkout on Flutter customer app [SC-001] [needs: mcp-android, e2e-loop, stripe-listen] [android-app: customer]
   Prereq: `pnpm --dir api stripe:listen:start` before running (see [test/e2e/README.md](../../test/e2e/README.md)); tear down with `stripe:listen:stop` after.
   Done when: MCP agent drives customer app on Android emulator: login → browse catalog → add to cart → checkout with saved address → Stripe test pay → order appears in history with real-time status update; Patrol regression test exists; each fixed bug has its own Patrol test; (iOS coverage deferred)
 
-- [x] T098 E2E: kit purchase [SC-010] [needs: mcp-browser, mcp-android, e2e-loop]
+- [x] T098 E2E: kit purchase [SC-010] [needs: mcp-browser, mcp-android, e2e-loop] [android-app: customer]
   Done when: MCP agent configures starter kit (2 plates + 3 modules + 1 belt) via kit builder on both Astro site and Flutter customer app → checkout → verify each component reserved individually in DB → payment → order with 6 line items; Playwright + Patrol regression tests exist for kit builder validation (incomplete kit rejected, out-of-stock swap)
 
-- [ ] T099 E2E: full fulfillment + shipping [SC-005, SC-006] [needs: mcp-android, e2e-loop]
+- [x] T098b Backfill committed regression specs for T096 (Playwright) and T097 (Patrol) [needs: mcp-android, e2e-loop, stripe-listen] [android-app: customer]
+  Prereq: the runner brings up the backend stack (setup.sh), boots the Android emulator (mcp-android), and starts `stripe listen` automatically before spawning you — do NOT run these yourself. If any service is not reachable when you try the gate commands, that is a runner bug: write `BLOCKED.md` instead of committing unverified specs.
+  Done when: author deterministic regression specs directly from existing artifacts in specs/admin/validate/e2e/ (screenshots, findings.json, handoff docs) — do NOT re-run MCP exploration; T096 spec committed at site/tests/e2e/T096.spec.ts with first-line comment `// regression for T096` and stable selectors, `npx playwright test site/tests/e2e/T096.spec.ts` passes locally against the running backend stack; T097 spec committed at customer/integration_test/T097_test.dart or admin/integration_test/T097_test.dart (choose the app matching the T097 screenshots/findings target) with first-line comment `// regression for T097` and stable selectors, `flutter test integration_test/T097_test.dart` passes against the running emulator. Both gate commands must exit 0 before you write the completion claim.
+
+- [ ] T099 E2E: full fulfillment + shipping [SC-005, SC-006] [needs: mcp-android, e2e-loop] [android-app: admin]
   Done when: MCP agent drives Flutter admin app: receive paid order → open fulfillment queue → pick → pack → create shipment → buy label (EasyPost test) → mark shipped → simulate tracking events → delivered; verify evidence records exist for every step in DB; verify audit log complete; Patrol regression test for full admin fulfillment flow
 
-- [ ] T100 E2E: dispute lifecycle [SC-005] [needs: mcp-android, e2e-loop]
+- [ ] T100 E2E: dispute lifecycle [SC-005] [needs: mcp-android, e2e-loop] [android-app: admin]
   Done when: delivered order → simulate `charge.dispute.created` webhook → MCP agent opens admin Dispute detail screen → verify evidence readiness shows all 5 types present → generate bundle → submit → close; Patrol regression test for admin dispute screen + bundle generation
 
-- [ ] T101 E2E: contributor royalty [SC-011] [needs: mcp-browser, mcp-android, e2e-loop]
+- [ ] T101 E2E: contributor royalty [SC-011] [needs: mcp-browser, mcp-android, e2e-loop] [android-app: customer]
   Done when: create contributor → link design → MCP agent completes 25 orders on Astro site → verify retroactive royalty for units 1-25 in DB → MCP agent opens customer app contributor dashboard → verify dashboard shows correct totals + milestones → refund 1 order → verify clawback displayed → toggle donation option → verify 20% rate; Playwright + Patrol regression tests
 
 - [ ] T102 E2E: concurrent inventory [SC-003]
   Done when: scripted test (no MCP needed — API-level concurrency): 1 unit available → 10 concurrent checkout POSTs → exactly 1 succeeds → 9 fail with ERR_INVENTORY_INSUFFICIENT → available = 0; runs in CI
 
-- [ ] T103 E2E: WebSocket real-time [SC-007] [needs: mcp-android, e2e-loop]
+- [ ] T103 E2E: WebSocket real-time [SC-007] [needs: mcp-android, e2e-loop] [android-app: admin]
   Done when: MCP agent opens admin app (observes order list) and customer app (observes order detail) simultaneously; scripted actor creates order via API → admin app shows order.placed within 2 seconds (MCP verifies UI update); shipment status change → customer app shows update within 2 seconds; Patrol regression test asserts UI reacts to WebSocket events
 
 - [ ] T104 Security boundary tests [SC-008, SC-015]
@@ -708,24 +712,24 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [ ] T104a E2E: guest-order → account linking [FR-066] [needs: mcp-browser, e2e-loop]
   Done when: MCP agent completes 3 guest checkouts on Astro with email `jane@example.com` → signup with same email → MCP verifies verification email link (reads from `logs/emails.jsonl` stub) → verify → login → all 3 orders appear in customer order history with customer_id populated in DB; Playwright regression test
 
-- [ ] T104b E2E: warranty claim submission [FR-055] [needs: mcp-android, e2e-loop]
+- [ ] T104b E2E: warranty claim submission [FR-055] [needs: mcp-android, e2e-loop] [android-app: customer]
   Done when: MCP agent on Flutter customer app: login → order history → select delivered order within warranty window → file warranty claim (describe defect, upload 2 photos via MCP file-picker interaction) → verify support_ticket created with category=warranty_claim, priority=high, attachments accessible; MCP switches to admin app and verifies ticket in queue via WebSocket update; expired-warranty claim rejected with clear error (separate case); Patrol regression test
 
-- [ ] T104c E2E: admin refund (full + partial) through Stripe [FR-030] [needs: mcp-android, e2e-loop, stripe-listen]
+- [ ] T104c E2E: admin refund (full + partial) through Stripe [FR-030] [needs: mcp-android, e2e-loop, stripe-listen] [android-app: admin]
   Prereq: `pnpm --dir api stripe:listen:start` before running (see [test/e2e/README.md](../../test/e2e/README.md)); tear down with `stripe:listen:stop` after.
   Done when: MCP agent on admin app: open paid order → issue full refund → Stripe test refund processed → payment_status=refunded; MCP switches to customer app and verifies refund in order timeline via WebSocket; second test: partial refund → payment_status=partially_refunded; over-refund attempt rejected with ERR_REFUND_EXCEEDS_PAYMENT; audit log entries exist for both; Patrol regression tests for admin refund UI
 
 - [ ] T104d E2E: reservation expiry → late payment race [FR-E008]
   Done when: scripted test (no MCP): create checkout → reservation created (short TTL) → force expiry via cleanup cron → fire payment_intent.succeeded webhook → verify either (a) re-reservation succeeded + order confirmed, or (b) order flagged for manual review with admin alert delivered via WebSocket; both branches exercised with stock-available and stock-exhausted setups
 
-- [ ] T104e E2E: low-stock alert → notification delivery [FR-038, FR-085] [needs: mcp-android, e2e-loop]
+- [ ] T104e E2E: low-stock alert → notification delivery [FR-038, FR-085] [needs: mcp-android, e2e-loop] [android-app: admin]
   Done when: set variant safety_stock=10 → MCP agent opens admin app with email preference → scripted actor adjusts inventory so available drops below threshold → MCP verifies in-app notification appears in admin UI within 2s AND email logged to `logs/emails.jsonl` with correct variant SKU, product title, available count, threshold; Patrol regression test
 
 - [ ] T104f E2E: Stripe Tax calculation with live test key [FR-117, FR-118] [needs: mcp-browser, e2e-loop, stripe-listen]
   Prereq: `pnpm --dir api stripe:listen:start` before running (see [test/e2e/README.md](../../test/e2e/README.md)); tear down with `stripe:listen:stop` after.
   Done when: MCP agent drives Astro checkout with TX shipping address → verify Stripe Tax API called → non-zero tax displayed in UI → tax reflected in PaymentIntent metadata and order totals; separate MCP run with tax-exempt state → correct tax displayed; Playwright regression test. Preconditions (MUST all be live before the test starts; setup fails loudly if any is missing — no skip fallback): `STRIPE_TAX_ENABLED=true`, real Stripe test key in `STRIPE_SECRET_KEY`, Stripe webhook listener running. If credentials are not present in the runner environment, provision them or exclude this task from the run — never silently skip.
 
-- [ ] T104g E2E: cross-app real-time propagation [FR-081, FR-082] [needs: mcp-android, e2e-loop]
+- [ ] T104g E2E: cross-app real-time propagation [FR-081, FR-082] [needs: mcp-android, e2e-loop] [android-app: admin]
   Done when: MCP agent opens customer app (customer session) and admin app (admin session) simultaneously → MCP on admin creates shipment + buys label for customer's order → MCP verifies customer app receives shipment.created + tracking events in UI within 2s; MCP on customer posts support ticket message → MCP verifies admin app receives ticket.updated in UI within 2s; admin internal note NOT delivered to customer UI (MCP verifies absence); Patrol regression tests on both sides
 
 - [ ] T104h E2E: out-of-stock cart + kit rejection [FR-010, spec.md AS-2, AS-51] [needs: mcp-browser, e2e-loop]

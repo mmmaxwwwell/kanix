@@ -487,12 +487,14 @@
             # by the android-tools package.
             export ANDROID_USER_HOME="$PWD/.dev/android-user-home"
             export ANDROID_AVD_HOME="$PWD/.dev/android-user-home/avd"
-            # Disambiguate the Android build root for E2E tests — this repo has
-            # two Flutter apps (admin, customer) and the runner's build-detect
-            # phase fails with ambiguous_build_root without this hint.  The
-            # .mcp.json env block sets the same value for the MCP server process,
-            # but the runner reads its own shell env, not .mcp.json.
-            export ANDROID_BUILD_ROOT="''${ANDROID_BUILD_ROOT:-customer}"
+            # Intentionally do NOT set a default ANDROID_BUILD_ROOT here.
+            # This repo has two Flutter apps (admin, customer); a project-wide
+            # default would silently force every E2E task to one app and
+            # break the others.  The spec-kit runner picks the right app per
+            # task from the `[android-app: <dir>]` annotation in
+            # specs/admin/tasks.md.  Operators running ad-hoc Flutter
+            # commands outside the runner can `export ANDROID_BUILD_ROOT=admin`
+            # (or customer) in their own shell when needed.
             # Symlink so raw SDK emulator can also discover AVDs.
             mkdir -p "$HOME/.android" 2>/dev/null || true
             ln -sfn "$ANDROID_AVD_HOME" "$HOME/.android/avd" 2>/dev/null || true

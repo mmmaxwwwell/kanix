@@ -25,6 +25,31 @@ done
 ADMIN_APK="$ROOT_DIR/admin/build/app/outputs/flutter-apk/app-debug.apk"
 CUSTOMER_APK="$ROOT_DIR/customer/build/app/outputs/flutter-apk/app-debug.apk"
 
+# Returns 0 (true) if the existing APK is older than any source file under
+# $1 (the Flutter app dir). Used to decide whether to run `flutter clean`
+# before building. See agent-framework reference/e2e-failure-patterns.md
+# § stale-android-apk-after-source-fix.
+apk_is_cache_stale() {
+  local app_dir="$1"
+  local apk="$app_dir/build/app/outputs/flutter-apk/app-debug.apk"
+  [ -f "$apk" ] || return 1  # First build — nothing cached.
+  local apk_mtime
+  apk_mtime=$(stat -c %Y "$apk" 2>/dev/null) || return 1
+  local newer
+  newer=$(find "$app_dir/lib" "$app_dir/android/app/src" \
+                "$app_dir/pubspec.yaml" "$app_dir/pubspec.lock" \
+                "$app_dir/android/app/build.gradle" \
+                "$app_dir/android/app/build.gradle.kts" \
+                "$app_dir/android/build.gradle" \
+                "$app_dir/android/build.gradle.kts" \
+            -type f \
+            \( -name '*.dart' -o -name '*.kt' -o -name '*.java' \
+               -o -name '*.xml' -o -name '*.gradle' -o -name '*.kts' \
+               -o -name '*.yaml' -o -name '*.lock' \) \
+            -newer "$apk" -print -quit 2>/dev/null)
+  [ -n "$newer" ]
+}
+
 # Verify adb is available
 if ! command -v adb >/dev/null 2>&1; then
   echo "FAIL: adb not found in PATH."
@@ -49,13 +74,15 @@ echo ""
 
 # Build debug APKs
 if [ "$SKIP_BUILD" = false ]; then
-  echo "Building admin debug APK..."
-  (cd "$ROOT_DIR/admin" && flutter build apk --debug)
-  echo ""
-
-  echo "Building customer debug APK..."
-  (cd "$ROOT_DIR/customer" && flutter build apk --debug)
-  echo ""
+  for _app in admin customer; do
+    if apk_is_cache_stale "$ROOT_DIR/$_app"; then
+      echo "Cache-stale APK detected for $_app — running flutter clean first..."
+      (cd "$ROOT_DIR/$_app" && flutter clean) >/dev/null
+    fi
+    echo "Building $_app debug APK..."
+    (cd "$ROOT_DIR/$_app" && flutter build apk --debug)
+    echo ""
+  done
 else
   echo "Skipping build (--skip-build)."
   echo ""

@@ -26,7 +26,7 @@ hole_cols = 3;
 hole_rows = 3;
 
 hinge_od = belt_thickness;
-hinge_gap = 0.2;
+hinge_gap = 0.3;
 
 top_block_length = hinge_od/2 - hinge_gap/2;
 top_block_height = plate_thickness + belt_thickness / 2;
@@ -84,6 +84,7 @@ module latch_hinge_base(inner, angle = 0,cutout=false){
     rotate([0,90,0])
     rotate([0,0,angle])
     hinge(
+        gap = hinge_gap,
         length = locking_tab_width,
         outer_diam = plate_thickness,
         segments = 7,
@@ -101,6 +102,7 @@ module main_hinge_transform(){
 module main_hinge(inner){
     main_hinge_transform()
     hinge(
+        gap = hinge_gap,
         length = plate_size,
         outer_diam = hinge_od,
         segments = 7,
@@ -111,6 +113,7 @@ module main_hinge(inner){
 module our_hinge_cutout(inner){
     main_hinge_transform()
     hinge(
+        gap = hinge_gap,
         length = plate_size,
         outer_diam = hinge_od,
         segments = 7,
@@ -346,6 +349,7 @@ module middle_clip_front_hinge_front_translate(){
 
 module middle_clip_front_hinge(inner = true, cutout = false){
     hinge2(
+        gap = hinge_gap,
         length = locking_tab_width + hinge_gap * 2,
         outer_diam = plate_thickness,
         segments = 7,
@@ -356,6 +360,7 @@ module middle_clip_front_hinge(inner = true, cutout = false){
 
 module middle_clip_center_hinge(inner = true, cutout = false){
     hinge2(
+        gap = hinge_gap,
         length = locking_tab_width,
         outer_diam = plate_thickness,
         segments = 7,
@@ -488,16 +493,4 @@ if(view == "closed"){
 
     translate([0, plate_size/2 + bottom_block_length - plate_thickness/2 ,plate_thickness + belt_thickness])
     middle_clip_end_section();
-}
-
-if(view == "split"){
-    rotate([0,0,180])
-    translate([0, module_offset + 5 ,0])
-    back();
-
-    translate([0, module_offset + 5  ,0])
-    front();
-
-    translate([0, -5  ,0])
-    middle_clip_middle_section();
 }
