@@ -8,7 +8,7 @@
       "env": {
         "ANDROID_USER_HOME": ".dev/android-user-home",
         "ANDROID_AVD_HOME": ".dev/android-user-home/avd",
-        "ANDROID_BUILD_ROOT": "customer"
+        "ANDROID_BUILD_ROOT": "admin"
       }
     },
     "mcp-browser": {
