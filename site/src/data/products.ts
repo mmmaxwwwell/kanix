@@ -32,12 +32,9 @@ export interface CatalogProduct {
 }
 
 const MATERIAL_WARNINGS: Record<string, string> = {
-  TPU: "TPU is flexible and durable but may deform under sustained heat above 60\u00B0C (140\u00B0F). Do not leave in direct sunlight inside a hot vehicle for extended periods.",
-  TPC: "TPC offers excellent heat resistance up to 130\u00B0C (266\u00B0F) and superior chemical resistance. Suitable for demanding environments.",
-  PLA: "PLA is rigid and easy to print but has low heat resistance. May warp or deform above 50\u00B0C (122\u00B0F). Not recommended for high-temperature environments.",
-  PETG: "PETG offers good strength and moderate heat resistance up to 80\u00B0C (176\u00B0F). Good balance of durability and printability.",
-  ABS: "ABS is impact-resistant with heat tolerance up to 100\u00B0C (212\u00B0F). Requires enclosed printer and good ventilation during printing.",
-  PA11: "PA11 (Nylon 11) is a bio-based nylon with excellent impact resistance, chemical resistance, and flexibility. Heat resistant up to 180\u00B0C (356\u00B0F). Ideal for functional parts requiring durability and long-term performance.",
+  TPU: "FDM TPU is flexible and impact-absorbing but may deform under sustained heat above 60\u00B0C (140\u00B0F). Do not leave in direct sunlight inside a hot vehicle for extended periods.",
+  PA11: "FDM PA11 (Nylon 11) is a bio-based nylon with excellent impact resistance, chemical resistance, and a continuous service temperature up to ~130\u00B0C (266\u00B0F). FDM parts have anisotropic strength along layer lines.",
+  "PA11-SLS": "PA11 SLS is planned as a future premium variant \u2014 dense, isotropic PA11 parts without FDM layer-adhesion weaknesses. Not currently available.",
 };
 
 export function getMaterialWarning(material: string): string | null {

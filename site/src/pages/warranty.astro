@@ -36,13 +36,25 @@ import Footer from "../components/Footer.astro";
         <section>
           <h2 class="text-xl font-semibold text-white mb-4">Material-Specific Disclaimers</h2>
           <p class="text-neutral-400 mb-6">
-            Kanix™ will offer parts in <strong class="text-white">PA11 (nylon) SLS</strong> once designs are finalized. Until then, the modules are not sold pre-printed — you can print them at home yourself from the published source files. Self-printed parts are not covered by this warranty.
+            Kanix™ currently ships parts printed in-house via <strong class="text-white">FDM in PA11 (nylon) and TPU</strong>. <strong class="text-white">PA11 SLS</strong> is planned as a premium option in a future release. Self-printed parts produced from the published source files are not covered by this warranty.
           </p>
           <div class="space-y-4">
             <div class="bg-amber-500/5 border border-amber-500/20 rounded-lg p-5">
-              <h3 class="text-sm font-semibold text-amber-500 mb-2">PA11 SLS (Polyamide 11, Selective Laser Sintering)</h3>
+              <h3 class="text-sm font-semibold text-amber-500 mb-2">FDM PA11 (Polyamide 11, Fused Deposition Modeling)</h3>
               <p class="text-sm text-neutral-400 leading-relaxed">
-                PA11 is a tough, flexible bio-based nylon with excellent fatigue resistance, impact strength, and chemical resistance, with a <strong class="text-white">continuous service temperature up to ~130°C (266°F)</strong>. SLS produces dense, isotropic parts without the layer-adhesion weaknesses of FDM. Damage from impact, sustained loads, or chemical exposure beyond the material's published specifications is not covered.
+                PA11 is a tough, flexible bio-based nylon with excellent fatigue resistance, impact strength, and chemical resistance, with a <strong class="text-white">continuous service temperature up to ~130°C (266°F)</strong>. FDM-printed parts have anisotropic strength along layer lines — avoid sustained loads that pull directly across the print's Z-axis. Damage from impact, sustained loads, or chemical exposure beyond the material's published specifications is not covered.
+              </p>
+            </div>
+            <div class="bg-amber-500/5 border border-amber-500/20 rounded-lg p-5">
+              <h3 class="text-sm font-semibold text-amber-500 mb-2">FDM TPU (Thermoplastic Polyurethane, Fused Deposition Modeling)</h3>
+              <p class="text-sm text-neutral-400 leading-relaxed">
+                TPU is a flexible, impact-absorbing elastomer with good chemical resistance, with a <strong class="text-white">max service temperature of ~60°C (140°F)</strong>. Do not leave TPU parts in vehicles or direct sunlight in hot weather — interior temperatures regularly exceed this limit. Heat-induced deformation is not covered.
+              </p>
+            </div>
+            <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-5">
+              <h3 class="text-sm font-semibold text-neutral-300 mb-2">PA11 SLS — coming soon</h3>
+              <p class="text-sm text-neutral-500 leading-relaxed">
+                Selective Laser Sintering produces dense, isotropic PA11 parts without the layer-adhesion weaknesses of FDM. We plan to offer SLS as a premium variant once the catalog is finalized — sign up via the contact form to be notified.
               </p>
             </div>
           </div>

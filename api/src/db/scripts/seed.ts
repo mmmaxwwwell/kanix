@@ -64,9 +64,10 @@ async function seed() {
   console.log(`  Product classes: ${classes.length}`);
 
   // -----------------------------------------------------------------------
-  // 2. Products (5) with TPU/PA11/TPC variants
+  // 2. Products (5) with FDM TPU and FDM PA11 variants
+  //    (PA11 SLS is planned as a future premium variant.)
   // -----------------------------------------------------------------------
-  const materials = ["TPU", "PA11", "TPC"] as const;
+  const materials = ["TPU", "PA11"] as const;
 
   const productsData = [
     {
