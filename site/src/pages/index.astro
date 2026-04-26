@@ -1,5 +1,7 @@
 ---
 import Base from "../layouts/Base.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
 import { modules, comingSoonModules } from "../data/modules";
 
 const repoUrl = "https://github.com/mmmaxwwwell/kanix";
@@ -9,56 +11,17 @@ const repoUrl = "https://github.com/mmmaxwwwell/kanix";
   title="Kanix™ - Open-Source Modular Dog Handler Belt System"
   description="Kanix™ is a free, open-source modular belt system for dog handlers. Built for trainers, walkers, and everyday dog owners."
 >
-  <!-- Nav -->
-  <nav class="fixed top-0 w-full z-50 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800">
-    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-      <span class="text-xl font-extrabold tracking-tight">KANIX<sup class="text-[0.5em] align-super">™</sup></span>
-      <div class="hidden sm:flex items-center gap-6">
-        <a href={`${import.meta.env.BASE_URL}products/`} class="text-sm text-neutral-400 hover:text-white transition-colors">Shop</a>
-        <a href="#modules" class="text-sm text-neutral-400 hover:text-white transition-colors">Modules</a>
-        <a href="#the-belt" class="text-sm text-neutral-400 hover:text-white transition-colors">The Belt</a>
-        <a href="#how-it-works" class="text-sm text-neutral-400 hover:text-white transition-colors">How It Works</a>
-        <a
-          href={repoUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="text-sm text-neutral-400 hover:text-white transition-colors"
-        >
-          GitHub
-        </a>
-      </div>
-      <button
-        id="nav-toggle"
-        class="sm:hidden text-neutral-400 hover:text-white transition-colors"
-        aria-label="Toggle navigation menu"
-        aria-expanded="false"
-        aria-controls="mobile-nav"
-      >
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
-    </div>
-    <div id="mobile-nav" class="hidden sm:hidden border-t border-neutral-800 px-6 py-4 flex flex-col gap-4">
-      <a href={`${import.meta.env.BASE_URL}products/`} class="text-sm text-neutral-400 hover:text-white transition-colors">Shop</a>
-      <a href="#modules" class="text-sm text-neutral-400 hover:text-white transition-colors">Modules</a>
-      <a href="#the-belt" class="text-sm text-neutral-400 hover:text-white transition-colors">The Belt</a>
-      <a href="#how-it-works" class="text-sm text-neutral-400 hover:text-white transition-colors">How It Works</a>
-      <a
-        href={repoUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        class="text-sm text-neutral-400 hover:text-white transition-colors"
-      >
-        GitHub
-      </a>
-    </div>
-  </nav>
+  <Header showModulesAnchor />
 
   <main id="main">
   <!-- Hero -->
   <section id="hero" class="relative min-h-screen flex items-center justify-center px-6 pt-20 transition-[min-height] duration-100 ease-out">
     <div class="max-w-3xl text-center">
+      <img
+        src={`${import.meta.env.BASE_URL}logo1.svg`}
+        alt="Kanix logo"
+        class="w-32 sm:w-40 h-32 sm:h-40 mx-auto mb-6 logo-amber"
+      />
       <h1 class="text-5xl sm:text-7xl font-black tracking-tight leading-[1.05] mb-6">
         Your Belt.<br />Your Build.<br />Your Way.
       </h1>
@@ -95,22 +58,6 @@ const repoUrl = "https://github.com/mmmaxwwwell/kanix";
     }
 
     window.addEventListener("scroll", onScroll, { passive: true });
-
-    // Mobile nav toggle
-    const navToggle = document.getElementById("nav-toggle")!;
-    const mobileNav = document.getElementById("mobile-nav")!;
-
-    navToggle.addEventListener("click", () => {
-      const open = mobileNav.classList.toggle("hidden");
-      navToggle.setAttribute("aria-expanded", String(!open));
-    });
-
-    mobileNav.querySelectorAll("a").forEach((link) => {
-      link.addEventListener("click", () => {
-        mobileNav.classList.add("hidden");
-        navToggle.setAttribute("aria-expanded", "false");
-      });
-    });
   </script>
 
   <!-- Who it's for -->
@@ -368,10 +315,11 @@ const repoUrl = "https://github.com/mmmaxwwwell/kanix";
           </div>
           <h3 class="text-lg font-semibold mb-3 text-white">Personal Use</h3>
           <p class="text-neutral-400 leading-relaxed mb-4">
-            Kanix™ is licensed under <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:text-amber-400 transition-colors">CC BY-NC 4.0</a>.
-            You are free to download, print, modify, and share these designs for personal,
+            Kanix™ is licensed under <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:text-amber-400 transition-colors">CC BY-NC-ND 4.0</a>.
+            You are free to download, print, and share these designs for personal,
             non-commercial use. Print them for yourself, your friends, your dog walker, no
-            permission needed. Just give credit to the project.
+            permission needed. Just give credit to the project. Modified or derivative
+            designs may not be distributed without permission.
           </p>
           <ul class="text-neutral-400 text-sm space-y-2">
             <li>✓ Print for yourself</li>
@@ -423,17 +371,5 @@ const repoUrl = "https://github.com/mmmaxwwwell/kanix";
   </main>
 
   <!-- Footer -->
-  <footer class="py-12 px-6 border-t border-neutral-800">
-    <div class="max-w-6xl mx-auto text-center text-sm text-neutral-500 space-y-2">
-      <div class="flex flex-wrap justify-center gap-4 mb-4">
-        <a href={`${import.meta.env.BASE_URL}warranty/`} class="hover:text-white transition-colors">Warranty</a>
-        <a href={`${import.meta.env.BASE_URL}returns/`} class="hover:text-white transition-colors">Returns</a>
-        <a href={`${import.meta.env.BASE_URL}care/`} class="hover:text-white transition-colors">Care Instructions</a>
-      </div>
-      <p>
-        Licensed under <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener noreferrer" class="underline hover:text-white transition-colors">CC BY-NC 4.0</a>. Free for personal use. <a href={`${repoUrl}#commercial-licensing`} class="underline hover:text-white transition-colors">Commercial licensing available</a>.
-      </p>
-      <p>&copy; 2026 mmmaxwwwell. All rights reserved. Kanix™ designs are original works by mmmaxwwwell.</p>
-    </div>
-  </footer>
+  <Footer />
 </Base>

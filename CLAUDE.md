@@ -135,7 +135,7 @@ See [test/e2e/README.md](test/e2e/README.md) for the full agent workflow.
 
 ## Adding a New Module Checklist
 
-1. Create the `.scad` file in `scad/` with the CC BY-NC 4.0 license header
+1. Create the `.scad` file in `scad/` with the CC BY-NC-ND 4.0 license header
 2. Add the module entry to `site/src/data/modules.ts` (slug, name, description, scadFile, stlFile, optional products)
 3. Add a row to the "Available Modules" table in `README.md`
 4. Render STLs: `cd site && npm run render`

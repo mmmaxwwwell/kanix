@@ -1,5 +1,5 @@
 // Copyright (c) 2026 mmmaxwwwell
-// Licensed under CC BY-NC 4.0, https://creativecommons.org/licenses/by-nc/4.0/
+// Licensed under CC BY-NC-ND 4.0, https://creativecommons.org/licenses/by-nc-nd/4.0/
 // Free for personal use. Commercial use requires a separate license.
 //
 // Wuben G5 Flashlight Holster - Kanix Belt Mount

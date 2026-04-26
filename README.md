@@ -83,4 +83,4 @@ These designs are provided "as is" without warranty of any kind. The creator ass
 
 ## License
 
-Licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/). Free for personal use. For commercial licensing, contact the project maintainer.
+Licensed under [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/). Free for personal use. No derivative works may be distributed. For commercial licensing or permission to distribute derivatives, contact the project maintainer.

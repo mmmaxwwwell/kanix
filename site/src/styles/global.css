@@ -1,1 +1,14 @@
 @import "tailwindcss";
+
+/* Single source of truth for the Kanix amber accent.
+   Matches Tailwind's `text-amber-500` (#f59e0b). */
+:root {
+  --kanix-amber: #f59e0b;
+}
+
+/* Recolors a black-on-transparent raster/SVG to --kanix-amber.
+   Generated to match #f59e0b from pure black. */
+.logo-amber {
+  filter: brightness(0) saturate(100%) invert(60%) sepia(89%) saturate(2614%)
+    hue-rotate(7deg) brightness(102%) contrast(98%);
+}

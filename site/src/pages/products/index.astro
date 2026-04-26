@@ -1,5 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
+import Header from "../../components/Header.astro";
+import Footer from "../../components/Footer.astro";
 import { fetchProducts, formatPriceRange, getMaterialsFromVariants } from "../../data/products";
 
 const products = await fetchProducts();
@@ -7,28 +9,16 @@ const products = await fetchProducts();
 
 <Base
   title="Shop - Kanix™"
-  description="Browse pre-printed Kanix™ modules. Professional-grade 3D-printed belt modules for dog handlers, trainers, and walkers."
+  description="Browse professionally manufactured Kanix™ modules. Belt modules for dog handlers, trainers, and walkers."
 >
-  <nav class="fixed top-0 w-full z-50 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800">
-    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-      <a href={import.meta.env.BASE_URL} class="text-xl font-extrabold tracking-tight hover:text-neutral-300 transition-colors">KANIX<sup class="text-[0.5em] align-super">™</sup></a>
-      <div class="hidden sm:flex items-center gap-6">
-        <a href={import.meta.env.BASE_URL} class="text-sm text-neutral-400 hover:text-white transition-colors">Home</a>
-        <a href={`${import.meta.env.BASE_URL}products/`} class="text-sm text-white font-medium">Shop</a>
-        <a href={`${import.meta.env.BASE_URL}kits/`} class="text-sm text-neutral-400 hover:text-white transition-colors">Kits</a>
-        <a href={`${import.meta.env.BASE_URL}checkout/`} class="text-sm text-neutral-400 hover:text-white transition-colors" id="cart-link">
-          Cart <span id="cart-count" class="hidden ml-1 px-1.5 py-0.5 bg-amber-500 text-neutral-950 text-xs font-bold rounded-full"></span>
-        </a>
-      </div>
-    </div>
-  </nav>
+  <Header variant="shop" activePath="products" />
 
   <main id="main" class="pt-20 pb-16 px-4 sm:px-6">
     <div class="max-w-6xl mx-auto">
       <div class="text-center mb-12 pt-8">
         <h1 class="text-3xl sm:text-5xl font-bold tracking-tight mb-4">Shop Kanix™ Modules</h1>
         <p class="text-neutral-400 text-lg max-w-2xl mx-auto">
-          Pre-printed, ready-to-mount belt modules. Each module is professionally 3D-printed and ships directly to you.
+          Ready-to-mount belt modules. Each module is professionally manufactured and ships directly to you.
         </p>
       </div>
 
@@ -107,33 +97,5 @@ const products = await fetchProducts();
     </div>
   </main>
 
-  <footer class="py-12 px-6 border-t border-neutral-800">
-    <div class="max-w-6xl mx-auto text-center text-sm text-neutral-500 space-y-2">
-      <div class="flex flex-wrap justify-center gap-4 mb-4">
-        <a href={`${import.meta.env.BASE_URL}warranty/`} class="hover:text-white transition-colors">Warranty</a>
-        <a href={`${import.meta.env.BASE_URL}returns/`} class="hover:text-white transition-colors">Returns</a>
-        <a href={`${import.meta.env.BASE_URL}care/`} class="hover:text-white transition-colors">Care Instructions</a>
-      </div>
-      <p>&copy; 2026 mmmaxwwwell. All rights reserved. Kanix™ designs are original works by mmmaxwwwell.</p>
-    </div>
-  </footer>
+  <Footer />
 </Base>
-
-<script>
-  import { getCart } from "../../lib/cart";
-
-  const cartCountEl = document.getElementById("cart-count");
-
-  async function updateCartBadge() {
-    try {
-      const cart = await getCart();
-      if (cart && cart.itemCount > 0 && cartCountEl) {
-        cartCountEl.textContent = String(cart.itemCount);
-        cartCountEl.classList.remove("hidden");
-      }
-    } catch {
-      // ignore — page still works without badge
-    }
-  }
-  updateCartBadge();
-</script>

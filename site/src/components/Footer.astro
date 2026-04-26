@@ -1,0 +1,20 @@
+---
+const base = import.meta.env.BASE_URL;
+const repoUrl = "https://github.com/mmmaxwwwell/kanix";
+---
+
+<footer class="py-12 px-6 border-t border-neutral-800">
+  <div class="max-w-6xl mx-auto text-center text-sm text-neutral-500 space-y-2">
+    <div class="flex flex-wrap justify-center gap-4 mb-4">
+      <a href={`${base}warranty/`} class="hover:text-white transition-colors">Warranty</a>
+      <a href={`${base}returns/`} class="hover:text-white transition-colors">Returns</a>
+      <a href={`${base}care/`} class="hover:text-white transition-colors">Care Instructions</a>
+      <a href={`${base}contributions/`} class="hover:text-white transition-colors">Contributing</a>
+      <a href={repoUrl} target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">GitHub</a>
+    </div>
+    <p>
+      Licensed under <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/" target="_blank" rel="noopener noreferrer" class="underline hover:text-white transition-colors">CC BY-NC-ND 4.0</a>. Free for personal use, no derivatives. <a href={`${repoUrl}#commercial-licensing`} class="underline hover:text-white transition-colors">Commercial licensing available</a>.
+    </p>
+    <p>&copy; 2026 mmmaxwwwell. All rights reserved. Kanix™ designs are original works by mmmaxwwwell.</p>
+  </div>
+</footer>

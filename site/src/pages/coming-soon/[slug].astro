@@ -1,5 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
+import Header from "../../components/Header.astro";
+import Footer from "../../components/Footer.astro";
 import { comingSoonModules } from "../../data/modules";
 
 export function getStaticPaths() {
@@ -13,12 +15,7 @@ const { name, description, products } = Astro.props;
 ---
 
 <Base title={`${name} - Coming Soon - Kanix™`} description={description}>
-  <nav class="fixed top-0 w-full z-50 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800">
-    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-      <a href={import.meta.env.BASE_URL} class="text-xl font-extrabold tracking-tight hover:text-neutral-300 transition-colors">KANIX<sup class="text-[0.5em] align-super">™</sup></a>
-      <span class="text-sm text-amber-500 font-semibold uppercase tracking-wider">Coming Soon</span>
-    </div>
-  </nav>
+  <Header />
 
   <main id="main" class="pt-20 pb-16 px-4 sm:px-6">
     <div class="max-w-4xl mx-auto">
@@ -87,4 +84,6 @@ const { name, description, products } = Astro.props;
       </div>
     </div>
   </main>
+
+  <Footer />
 </Base>

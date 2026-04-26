@@ -1,0 +1,127 @@
+---
+interface Props {
+  variant?: "marketing" | "shop";
+  showModulesAnchor?: boolean;
+  activePath?: string;
+}
+
+const { variant = "marketing", showModulesAnchor = false, activePath } = Astro.props;
+const base = import.meta.env.BASE_URL;
+
+const baseLinks = [
+  { href: `${base}products/`, label: "Shop", path: "products" },
+  { href: `${base}warranty/`, label: "Warranty", path: "warranty" },
+  { href: `${base}returns/`, label: "Returns", path: "returns" },
+  { href: `${base}contributions/`, label: "Contributing", path: "contributions" },
+];
+
+const links = variant === "shop"
+  ? [
+      { href: `${base}products/`, label: "Shop", path: "products" },
+      { href: `${base}kits/`, label: "Kits", path: "kits" },
+      { href: `${base}warranty/`, label: "Warranty", path: "warranty" },
+      { href: `${base}returns/`, label: "Returns", path: "returns" },
+      { href: `${base}contributions/`, label: "Contributing", path: "contributions" },
+    ]
+  : baseLinks;
+
+const showCart = variant === "shop";
+---
+
+<nav class="fixed top-0 w-full z-50 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800">
+  <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <a href={base} class="flex items-center gap-2 text-xl font-extrabold tracking-tight hover:opacity-80 transition-opacity">
+      <img src={`${base}logo1.svg`} alt="" aria-hidden="true" class="w-7 h-7 logo-amber" />
+      <span><span class="text-amber-500">K</span>ANIX<sup class="text-[0.5em] align-super">™</sup></span>
+    </a>
+    <div class="hidden sm:flex items-center gap-6">
+      {showModulesAnchor && (
+        <a href="#modules" class="text-sm text-neutral-400 hover:text-white transition-colors">Modules</a>
+      )}
+      {links.map(({ href, label, path }) => (
+        <a
+          href={href}
+          class={`text-sm transition-colors ${activePath === path ? "text-white font-medium" : "text-neutral-400 hover:text-white"}`}
+        >
+          {label}
+        </a>
+      ))}
+      {showCart && (
+        <a
+          href={`${base}checkout/`}
+          class={`text-sm transition-colors ${activePath === "checkout" ? "text-white font-medium" : "text-neutral-400 hover:text-white"}`}
+          id="cart-link"
+        >
+          Cart <span id="cart-count" class="hidden ml-1 px-1.5 py-0.5 bg-amber-500 text-neutral-950 text-xs font-bold rounded-full"></span>
+        </a>
+      )}
+    </div>
+    <button
+      id="nav-toggle"
+      class="sm:hidden text-neutral-400 hover:text-white transition-colors"
+      aria-label="Toggle navigation menu"
+      aria-expanded="false"
+      aria-controls="mobile-nav"
+    >
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+  </div>
+  <div id="mobile-nav" class="hidden sm:hidden border-t border-neutral-800 px-6 py-4 flex-col gap-4">
+    {showModulesAnchor && (
+      <a href="#modules" class="text-sm text-neutral-400 hover:text-white transition-colors">Modules</a>
+    )}
+    {links.map(({ href, label }) => (
+      <a href={href} class="text-sm text-neutral-400 hover:text-white transition-colors">{label}</a>
+    ))}
+    {showCart && (
+      <a href={`${base}checkout/`} class="text-sm text-neutral-400 hover:text-white transition-colors">
+        Cart <span id="cart-count-mobile" class="hidden ml-1 px-1.5 py-0.5 bg-amber-500 text-neutral-950 text-xs font-bold rounded-full"></span>
+      </a>
+    )}
+  </div>
+</nav>
+
+<script>
+  // Mobile menu toggle
+  const toggle = document.getElementById("nav-toggle");
+  const mobileNav = document.getElementById("mobile-nav");
+  if (toggle && mobileNav) {
+    toggle.addEventListener("click", () => {
+      const expanded = toggle.getAttribute("aria-expanded") === "true";
+      toggle.setAttribute("aria-expanded", String(!expanded));
+      mobileNav.classList.toggle("hidden");
+      mobileNav.classList.toggle("flex");
+    });
+    mobileNav.querySelectorAll("a").forEach((link) => {
+      link.addEventListener("click", () => {
+        mobileNav.classList.add("hidden");
+        mobileNav.classList.remove("flex");
+        toggle.setAttribute("aria-expanded", "false");
+      });
+    });
+  }
+
+  // Cart badge — only present on shop variant; harmless if elements are absent
+  import { getCart } from "../lib/cart";
+  async function updateCartBadge() {
+    const els = [
+      document.getElementById("cart-count"),
+      document.getElementById("cart-count-mobile"),
+    ].filter(Boolean) as HTMLElement[];
+    if (els.length === 0) return;
+    try {
+      const cart = await getCart();
+      if (!cart || cart.itemCount <= 0) return;
+      for (const el of els) {
+        el.textContent = String(cart.itemCount);
+        el.classList.remove("hidden");
+      }
+    } catch {
+      // ignore — page still works without badge
+    }
+  }
+  updateCartBadge();
+  window.addEventListener("kanix:cart-update", updateCartBadge);
+</script>
