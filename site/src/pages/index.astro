@@ -296,6 +296,18 @@ const repoUrl = "https://github.com/mmmaxwwwell/kanix";
         Each module mounts to a standard 3x3 Kanix™ bolt pattern with M5 hardware. Mix, match, and rearrange to suit your needs.
       </p>
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {modules.map(({ slug, name, description }) => (
+          <a
+            href={`${import.meta.env.BASE_URL}modules/${slug}/`}
+            class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col hover:border-neutral-600 transition-colors group"
+          >
+            <h3 class="text-lg font-semibold mb-2 text-white group-hover:text-amber-500 transition-colors">{name}</h3>
+            <p class="text-neutral-400 leading-relaxed mb-4 flex-1">{description}</p>
+            <span class="text-sm text-amber-500 group-hover:text-amber-400 transition-colors font-medium">
+              View 3D Model &rarr;
+            </span>
+          </a>
+        ))}
         {comingSoonModules.map(({ slug, name, description }) => (
           <a
             href={`${import.meta.env.BASE_URL}coming-soon/${slug}/`}
@@ -308,18 +320,6 @@ const repoUrl = "https://github.com/mmmaxwwwell/kanix";
             <p class="text-neutral-400 leading-relaxed mb-4 flex-1">{description}</p>
             <span class="text-sm text-amber-500 group-hover:text-amber-400 transition-colors font-medium">
               View Details &rarr;
-            </span>
-          </a>
-        ))}
-        {modules.map(({ slug, name, description }) => (
-          <a
-            href={`${import.meta.env.BASE_URL}modules/${slug}/`}
-            class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col hover:border-neutral-600 transition-colors group"
-          >
-            <h3 class="text-lg font-semibold mb-2 text-white group-hover:text-amber-500 transition-colors">{name}</h3>
-            <p class="text-neutral-400 leading-relaxed mb-4 flex-1">{description}</p>
-            <span class="text-sm text-amber-500 group-hover:text-amber-400 transition-colors font-medium">
-              View 3D Model &rarr;
             </span>
           </a>
         ))}

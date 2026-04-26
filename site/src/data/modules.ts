@@ -21,6 +21,14 @@ export interface ComingSoonModule {
 
 export const modules: Module[] = [
   {
+    slug: "kanix-plate",
+    name: "Kanix™ Plate",
+    description:
+      "The universal mounting plate. 3x3 bolt pattern with integrated hinge mechanism. The foundation every module attaches to.",
+    scadFile: "scad/kanix-plate.scad",
+    stlFile: "kanix-plate.stl",
+  },
+  {
     slug: "waste-bag-dispenser",
     name: "Waste Bag Dispenser",
     description:
@@ -135,12 +143,6 @@ export const modules: Module[] = [
 ];
 
 export const comingSoonModules: ComingSoonModule[] = [
-  {
-    slug: "kanix-plate",
-    name: "Kanix™ Plate",
-    description:
-      "The universal mounting plate. 3x3 bolt pattern with integrated hinge mechanism. The foundation every module attaches to.",
-  },
   {
     slug: "dogtra-200c-202c-arc-holder",
     name: "E-Collar Holder (Dogtra 200C/202C/ARC)",

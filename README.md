@@ -14,6 +14,7 @@ Whether you're a professional trainer, a dog walker, or an everyday owner, Kanix
 
 | Module | Description | Compatible Product |
 |--------|-------------|-------------------|
+| **Kanix™ Plate** | Universal mounting plate with 3x3 bolt pattern and integrated hinge | |
 | **Waste Bag Dispenser** | Holds a standard roll of waste bags with a screw-in cap and front dispensing slit | [Earth Rated Dog Waste Bags](https://www.amazon.com/Earth-Rated-Leak-Proof-Extra-Thick-Unscented/dp/B0CS8GCYS1) |
 | **First Aid Kit Mount** | Mounting plate with center cutout for strap pass-through | [Individual First Aid Kit](https://www.amazon.com/dp/B0F311WTPC) |
 | **MK3 Canister Holder** | Holder for an MK-3 pepper spray canister | [Sabre Protector Dog Spray](https://www.amazon.com/dp/B00AU6J68Q) |
@@ -22,7 +23,6 @@ Whether you're a professional trainer, a dog walker, or an everyday owner, Kanix
 | **Flashlight Holster (Wuben C3)** | Holster for the Wuben C3 flashlight | [Wuben C3](https://www.amazon.com/dp/B086WJBB7K) |
 | **Flashlight Holster (Wuben G5)** | Holster for the Wuben G5 EDC flashlight | [Wuben G5](https://www.amazon.com/dp/B0DT6SS412) |
 | **Pepper Spray Holster (Dual)** | Side-by-side holster for two compact pepper spray canisters | [Guard Dog Security Pepper Spray](https://www.amazon.com/Guard-Dog-Security-Pepper-Spray/dp/B0CCZ1D6YQ) |
-| **Kanix™ Plate** *(coming soon)* | Universal mounting plate with 3x3 bolt pattern and integrated hinge | |
 | **E-Collar Holder (Dogtra 200C/202C/ARC)** *(coming soon)* | Holder for Dogtra 200C/202C/ARC series e-collar receivers | [Dogtra 200C](https://www.amazon.com/Dogtra-200C-Remote-Training-Collar/dp/B07FSG5V8C), [Dogtra 202C](https://www.amazon.com/Dogtra-202C-Remote-Training-Collar/dp/B07FSKBQ1L), [Dogtra ARC](https://www.amazon.com/Dogtra-ARC-Remote-Training-Collar/dp/B00NXYXVU6) |
 | **E-Collar Holder (Dogtra 280X/ARC-X)** *(coming soon)* | Holder for Dogtra 280X and ARC-X e-collar receivers | [Dogtra 280X](https://www.amazon.com/Dogtra-280X-Stubborn-Waterproof-Vibration/dp/B0DBMW4YN9), [Dogtra ARC-X](https://www.amazon.com/Dogtra-ARC-X-Collar-Dog-Training/dp/B0FC1LN2VW) |
 | **E-Collar Holder (Mini Educator)** *(coming soon)* | Holder for Mini Educator ET-300 e-collar receiver | [Mini Educator ET-300](https://www.amazon.com/Mini-Educator-Dog-Training-Collar/dp/B0190P0NG6), [Educator ET-400](https://www.amazon.com/Educator-Collar-Training-Collar-System/dp/B07WXSMKGQ) |
