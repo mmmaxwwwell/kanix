@@ -76,7 +76,7 @@ export function registerErrorHandler(app: FastifyInstance): void {
       // statusCode set by Fastify itself.  They must NOT fall through to the 500 catch-all.
       if (typeof (error as FastifyError).statusCode === "number") {
         const fastifyError = error as FastifyError;
-        const status = fastifyError.statusCode;
+        const status = fastifyError.statusCode!;
 
         log.warn(
           { errorCode: fastifyError.code ?? "ERR_REQUEST", err: error },
