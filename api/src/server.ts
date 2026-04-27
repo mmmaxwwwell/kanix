@@ -1486,13 +1486,19 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           status?: string;
           priority?: string;
           assigned_admin_user_id?: string;
+          limit?: string;
+          offset?: string;
         };
+        const limit = query.limit ? Math.min(parseInt(query.limit, 10) || 100, 500) : 100;
+        const offset = query.offset ? (parseInt(query.offset, 10) || 0) : 0;
         const tasks = await listFulfillmentTasks(database.db, {
           status: query.status,
           priority: query.priority,
           assignedAdminUserId: query.assigned_admin_user_id,
+          limit,
+          offset,
         });
-        return { tasks };
+        return { tasks, limit, offset };
       },
     );
 

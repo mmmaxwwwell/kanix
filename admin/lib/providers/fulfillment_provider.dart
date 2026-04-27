@@ -6,7 +6,11 @@ import '../models/fulfillment.dart';
 final fulfillmentListProvider =
     FutureProvider.autoDispose<List<FulfillmentTask>>((ref) async {
   final dio = ref.watch(dioProvider);
-  final response = await dio.get('/api/admin/fulfillment-tasks');
+  // Limit to 100 tasks per page to prevent Dart VM OOM when the queue is large.
+  final response = await dio.get(
+    '/api/admin/fulfillment-tasks',
+    queryParameters: {'limit': 100, 'offset': 0},
+  );
   final data = response.data as Map<String, dynamic>;
   final tasks = data['tasks'] as List<dynamic>;
   return tasks

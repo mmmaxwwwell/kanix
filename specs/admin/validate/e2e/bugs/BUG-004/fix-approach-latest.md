@@ -1,7 +1,1 @@
-Changed `childAspectRatio` from `2.5` to `1.8` in the `_DashboardGrid` widget in
-`admin/lib/screens/dashboard_screen.dart`. The previous ratio made cards too flat
-(only ~83px tall for a ~207px-wide card in a 3-column grid) to accommodate the
-`headlineMedium` count text (28sp) plus 12px padding on all sides, icon row, and
-label — resulting in "BOTTOM OVERFLOWED" and "RIGHT OVERFLOWED" Flutter rendering
-errors visible as yellow/black stripe patterns. Ratio 1.8 gives ~115px of card
-height, which is sufficient for all stat cards at typical admin screen widths.
+Added pagination to the fulfillment queue by: (1) adding `limit` (default 100, max 500) and `offset` parameters to `listFulfillmentTasks` in `api/src/db/queries/fulfillment-task.ts` using Drizzle's `.limit().offset()` chain; (2) exposing `limit` and `offset` query params on `GET /api/admin/fulfillment-tasks` in `api/src/server.ts`; (3) updating `fulfillmentListProvider` in `admin/lib/providers/fulfillment_provider.dart` to request `?limit=100&offset=0` instead of fetching all rows; (4) showing a "Showing first 100 tasks" notice in `_FulfillmentTaskTable` when the result is at the limit. This caps the initial page at 100 tasks, preventing the Dart VM from OOM-crashing when the queue has thousands of rows.

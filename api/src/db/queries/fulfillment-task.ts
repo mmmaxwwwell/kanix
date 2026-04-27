@@ -614,6 +614,8 @@ export async function listFulfillmentTasks(
     status?: string;
     priority?: string;
     assignedAdminUserId?: string;
+    limit?: number;
+    offset?: number;
   },
 ): Promise<
   {
@@ -640,6 +642,9 @@ export async function listFulfillmentTasks(
     conditions.push(eq(fulfillmentTask.assignedAdminUserId, filters.assignedAdminUserId));
   }
 
+  const pageLimit = Math.min(filters?.limit ?? 100, 500);
+  const pageOffset = filters?.offset ?? 0;
+
   const query = db
     .select({
       id: fulfillmentTask.id,
@@ -654,7 +659,9 @@ export async function listFulfillmentTasks(
       updatedAt: fulfillmentTask.updatedAt,
     })
     .from(fulfillmentTask)
-    .orderBy(desc(fulfillmentTask.createdAt));
+    .orderBy(desc(fulfillmentTask.createdAt))
+    .limit(pageLimit)
+    .offset(pageOffset);
 
   if (conditions.length > 0) {
     return query.where(and(...conditions));

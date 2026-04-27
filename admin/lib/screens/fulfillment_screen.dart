@@ -69,7 +69,7 @@ class FulfillmentScreen extends ConsumerWidget {
               ),
               data: (tasks) => tasks.isEmpty
                   ? const Center(child: Text('No fulfillment tasks'))
-                  : _FulfillmentTaskTable(tasks: tasks),
+                  : _FulfillmentTaskTable(tasks: tasks, isPageLimited: tasks.length >= 100),
             ),
           ),
         ],
@@ -80,13 +80,27 @@ class FulfillmentScreen extends ConsumerWidget {
 
 class _FulfillmentTaskTable extends StatelessWidget {
   final List<FulfillmentTask> tasks;
+  final bool isPageLimited;
 
-  const _FulfillmentTaskTable({required this.tasks});
+  const _FulfillmentTaskTable({required this.tasks, this.isPageLimited = false});
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      child: DataTable(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isPageLimited)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Showing first 100 tasks. Use filters to narrow results.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.orange,
+                    ),
+              ),
+            ),
+          DataTable(
         showCheckboxColumn: false,
         columns: const [
           DataColumn(label: Text('Order #')),
@@ -111,6 +125,8 @@ class _FulfillmentTaskTable extends StatelessWidget {
             ],
           );
         }).toList(),
+      ),
+        ],
       ),
     );
   }
