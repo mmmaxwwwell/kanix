@@ -1,1 +1,8 @@
-The source code fix (`admin/lib/providers/fulfillment_provider.dart` using `/api/admin/fulfillment-tasks`) was already committed in dadef4a. The APK on the device was never rebuilt from the fixed source because prior build attempts hit the Gradle incremental cache and reused the pre-fix artifact (APK mtime 20:34 UTC predated the fix commit at 20:57 UTC). This iteration ran `flutter clean` in `admin/` to invalidate the Gradle cache, then `flutter build apk --debug` to produce a fresh APK from the corrected source (completed successfully with `✓ Built build/app/outputs/flutter-apk/app-debug.apk`), then `adb uninstall com.kanix.kanix_admin && adb install` (uninstall was required due to debug signing key mismatch). The installed APK's `kernel_blob.bin` now contains `/api/admin/fulfillment-tasks` (correct URL) and the device `lastUpdateTime` updated from `16:35:01` to `18:39:40`.
+Replaced all six occurrences of `/api/admin/fulfillment/${task.id}/transition` and
+`/api/admin/fulfillment/${task.id}/assign` in `admin/lib/screens/fulfillment_screen.dart`
+with the correct `/api/admin/fulfillment-tasks/${task.id}/...` paths. The API only
+defines routes under `/api/admin/fulfillment-tasks` — the screen's inline Dio calls
+had the wrong base path (missing the `-tasks` segment), causing 404s on every
+workflow action (assign, start-picking, mark-picked, start-packing, mark-packed,
+block, unblock, cancel). Previous fix attempts addressed only the provider's list/detail
+endpoints; the screen's six inline call sites were never touched.

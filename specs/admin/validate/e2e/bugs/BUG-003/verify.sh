@@ -1,21 +1,25 @@
 #!/usr/bin/env bash
-# Verifies BUG-003 — POST /api/test/seed-paid-order returns 201 with a paid order.
+# Verifies BUG-003 — shipments_screen.dart sends {new_status} not {status} to transition
 set -eu
-API_URL="${API_URL:-http://127.0.0.1:3000}"
-CODE=$(curl -s -o /tmp/seed-paid.out -w '%{http_code}' \
-  -X POST "${API_URL}/api/test/seed-paid-order" \
-  -H 'content-type: application/json')
-if [ "$CODE" = "201" ]; then
-  PAYMENT_STATUS=$(cat /tmp/seed-paid.out | grep -o '"payment_status":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
-  ORDER_ID=$(cat /tmp/seed-paid.out | grep -o '"order_id":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
-  echo "STATUS: FIXED"
-  echo "EVIDENCE: POST /api/test/seed-paid-order returned 201 with payment_status=${PAYMENT_STATUS} order_id=${ORDER_ID}"
-  echo "COMMAND: curl -X POST ${API_URL}/api/test/seed-paid-order"
-  exit 0
-else
+
+SCREEN="admin/lib/screens/shipments_screen.dart"
+
+# Check the _markShipped method sends 'new_status', not 'status'
+if grep -q "'status': 'shipped'" "$SCREEN" 2>/dev/null; then
   echo "STATUS: STILL_BROKEN"
-  echo "EVIDENCE: POST /api/test/seed-paid-order returned ${CODE}"
-  echo "COMMAND: curl -X POST ${API_URL}/api/test/seed-paid-order"
-  cat /tmp/seed-paid.out
+  echo "EVIDENCE: $SCREEN still sends {'status': 'shipped'} (API expects {'new_status': 'shipped'})"
+  echo "COMMAND: grep -n status $SCREEN"
   exit 1
 fi
+
+if grep -q "'new_status': 'shipped'" "$SCREEN" 2>/dev/null; then
+  echo "STATUS: FIXED"
+  echo "EVIDENCE: $SCREEN sends {'new_status': 'shipped'} matching API schema"
+  echo "COMMAND: grep new_status $SCREEN"
+  exit 0
+fi
+
+echo "STATUS: STILL_BROKEN"
+echo "EVIDENCE: $SCREEN does not contain expected new_status field for shipped transition"
+echo "COMMAND: grep -n shipped $SCREEN"
+exit 1

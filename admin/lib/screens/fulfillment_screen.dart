@@ -205,7 +205,7 @@ class _QuickActions extends ConsumerWidget {
     try {
       final dio = ref.read(dioProvider);
       await dio.post(
-        '/api/admin/fulfillment/${task.id}/transition',
+        '/api/admin/fulfillment-tasks/${task.id}/transition',
         data: {'status': next},
       );
       ref.invalidate(fulfillmentListProvider);
@@ -397,7 +397,7 @@ class _WorkflowActions extends ConsumerWidget {
     try {
       final dio = ref.read(dioProvider);
       await dio.post(
-        '/api/admin/fulfillment/${task.id}/transition',
+        '/api/admin/fulfillment-tasks/${task.id}/transition',
         data: {'status': newStatus},
       );
       ref.invalidate(fulfillmentDetailProvider(task.id));
@@ -461,7 +461,7 @@ class _WorkflowActions extends ConsumerWidget {
       try {
         final dio = ref.read(dioProvider);
         await dio.post(
-          '/api/admin/fulfillment/${task.id}/transition',
+          '/api/admin/fulfillment-tasks/${task.id}/transition',
           data: {
             'status': 'blocked',
             'reason': reasonController.text,
@@ -488,7 +488,7 @@ class _WorkflowActions extends ConsumerWidget {
     try {
       final dio = ref.read(dioProvider);
       await dio.post(
-        '/api/admin/fulfillment/${task.id}/transition',
+        '/api/admin/fulfillment-tasks/${task.id}/transition',
         data: {'status': 'assigned'},
       );
       ref.invalidate(fulfillmentDetailProvider(task.id));
@@ -535,7 +535,7 @@ class _WorkflowActions extends ConsumerWidget {
       try {
         final dio = ref.read(dioProvider);
         await dio.post(
-          '/api/admin/fulfillment/${task.id}/transition',
+          '/api/admin/fulfillment-tasks/${task.id}/transition',
           data: {'status': 'canceled'},
         );
         ref.invalidate(fulfillmentDetailProvider(task.id));
@@ -599,7 +599,7 @@ class _WorkflowActions extends ConsumerWidget {
       try {
         final dio = ref.read(dioProvider);
         await dio.post(
-          '/api/admin/fulfillment/${task.id}/assign',
+          '/api/admin/fulfillment-tasks/${task.id}/assign',
           data: {'adminUserId': adminIdController.text},
         );
         ref.invalidate(fulfillmentDetailProvider(task.id));

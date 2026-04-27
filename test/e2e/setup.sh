@@ -253,7 +253,7 @@ log "SuperTokens ready."
 # of wall time and preventing setup.sh from being killed by the
 # runner's timeout before reaching the emulator step.
 _emu_bg_pid=""
-if [ "${E2E_WANT_EMULATOR:-0}" = "1" ] && command -v start-emulator >/dev/null 2>&1; then
+if command -v start-emulator >/dev/null 2>&1 && command -v adb >/dev/null 2>&1; then
   # Only start if not already running
   if ! adb devices 2>/dev/null | grep -q "emulator-5554.*device"; then
     log "Starting Android emulator in background (parallel with Steps 3-5)..."
@@ -438,54 +438,48 @@ log "Astro site ready."
 # The emulator was kicked off in the background at Step 2.5 to run in
 # parallel with migrations, API build, and Astro start.  Now we wait
 # for it to finish booting before proceeding to APK build+install.
-if [ "${E2E_WANT_EMULATOR:-0}" = "1" ]; then
-  if [ -n "${_emu_bg_pid:-}" ]; then
-    log "Waiting for background emulator boot (pid $_emu_bg_pid)..."
-    if wait "$_emu_bg_pid"; then
-      log "Android emulator ready."
-    else
-      log "  WARNING: start-emulator exited $? — see $STATE_DIR/emulator.log"
-    fi
-    _emu_bg_pid=""
-  elif adb devices 2>/dev/null | grep -q "emulator-5554.*device"; then
-    log "Android emulator already running."
+if [ -n "${_emu_bg_pid:-}" ]; then
+  log "Waiting for background emulator boot (pid $_emu_bg_pid)..."
+  if wait "$_emu_bg_pid"; then
+    log "Android emulator ready."
   else
-    # Fallback: start-emulator was not kicked off in Step 2.5 (e.g. adb
-    # was not in PATH at that point, or start-emulator missing).
-    if command -v start-emulator >/dev/null 2>&1; then
-      log "Starting Android emulator (fallback — missed parallel start)..."
-      if start-emulator 2>"$STATE_DIR/emulator.log"; then
-        log "Android emulator ready."
-      else
-        log "  WARNING: start-emulator exited $? — see $STATE_DIR/emulator.log"
-      fi
-    fi
+    log "  WARNING: start-emulator exited $? — see $STATE_DIR/emulator.log"
   fi
-
-  # adb reverse: device localhost:N → host 127.0.0.1:N.
-  # Required for apps running on the emulator to reach host services
-  # (API on PORT_API, SuperTokens on PORT_SUPERTOKENS). adb reverse
-  # rules don't survive emulator restarts, so re-apply every setup run.
-  # Applied unconditionally whenever the emulator is reachable — not only
-  # when start-emulator succeeded in this run (INFRA-adb-reverse-not-configured).
-  if command -v adb >/dev/null 2>&1; then
-    if adb -s emulator-5554 get-state >/dev/null 2>&1; then
-      log "  Wiring adb reverse: ${PORT_API}, ${PORT_SUPERTOKENS}..."
-      adb -s emulator-5554 reverse --remove-all 2>/dev/null || true
-      adb -s emulator-5554 reverse "tcp:${PORT_API}" "tcp:${PORT_API}" \
-        2>>"$STATE_DIR/emulator.log" \
-        || log "  WARNING: adb reverse tcp:${PORT_API} failed"
-      adb -s emulator-5554 reverse "tcp:${PORT_SUPERTOKENS}" "tcp:${PORT_SUPERTOKENS}" \
-        2>>"$STATE_DIR/emulator.log" \
-        || log "  WARNING: adb reverse tcp:${PORT_SUPERTOKENS} failed"
-    else
-      log "  WARNING: emulator-5554 not reachable via adb — port forwards not configured"
-    fi
+  _emu_bg_pid=""
+elif adb devices 2>/dev/null | grep -q "emulator-5554.*device"; then
+  log "Android emulator already running."
+elif command -v start-emulator >/dev/null 2>&1; then
+  # Fallback: start-emulator was not kicked off in Step 2.5 (e.g. adb
+  # was not in PATH at that point, or start-emulator missing).
+  log "Starting Android emulator (fallback — missed parallel start)..."
+  if start-emulator 2>"$STATE_DIR/emulator.log"; then
+    log "Android emulator ready."
   else
-    log "  WARNING: adb not in PATH — device→host port forwards not configured"
+    log "  WARNING: start-emulator exited $? — see $STATE_DIR/emulator.log"
   fi
 else
-  log "Skipping Android emulator (E2E_WANT_EMULATOR not set)."
+  log "Skipping Android emulator (start-emulator not in PATH)."
+fi
+
+# adb reverse: device localhost:N → host 127.0.0.1:N.
+# Required for apps running on the emulator to reach host services
+# (API on PORT_API, SuperTokens on PORT_SUPERTOKENS). adb reverse
+# rules don't survive emulator restarts, so re-apply every setup run.
+# Applied unconditionally whenever the emulator is reachable — not only
+# when start-emulator succeeded in this run (INFRA-adb-reverse-not-configured).
+if command -v adb >/dev/null 2>&1; then
+  if adb -s emulator-5554 get-state >/dev/null 2>&1; then
+    log "  Wiring adb reverse: ${PORT_API}, ${PORT_SUPERTOKENS}..."
+    adb -s emulator-5554 reverse --remove-all 2>/dev/null || true
+    adb -s emulator-5554 reverse "tcp:${PORT_API}" "tcp:${PORT_API}" \
+      2>>"$STATE_DIR/emulator.log" \
+      || log "  WARNING: adb reverse tcp:${PORT_API} failed"
+    adb -s emulator-5554 reverse "tcp:${PORT_SUPERTOKENS}" "tcp:${PORT_SUPERTOKENS}" \
+      2>>"$STATE_DIR/emulator.log" \
+      || log "  WARNING: adb reverse tcp:${PORT_SUPERTOKENS} failed"
+  else
+    log "  WARNING: emulator-5554 not reachable via adb — port forwards not configured"
+  fi
 fi
 
 # -------------------------------------------------------------------
@@ -615,6 +609,44 @@ if [ "${E2E_WANT_EMULATOR:-0}" = "1" ] && command -v flutter >/dev/null 2>&1 && 
     fi
   else
     log "Skipping admin APK install (emulator-5554 not reachable)."
+  fi
+fi
+
+# -------------------------------------------------------------------
+# Step 6d: Reset UIAutomator2 server (INFRA-uia2-futex-deadlock)
+# -------------------------------------------------------------------
+# After a kill/restart cycle the UiAutomationManager holds a stale lock
+# from the previous session, causing all app_process u2 server restarts to
+# enter futex_wait indefinitely. Fix: kill every app_process on the device,
+# then re-launch the u2 server from a clean state before the MCP server
+# tries to connect. This is idempotent — safe to run even when u2 was never
+# started (the kill is a no-op in that case).
+if [ "${E2E_WANT_EMULATOR:-0}" = "1" ] && command -v adb >/dev/null 2>&1; then
+  if adb -s emulator-5554 get-state >/dev/null 2>&1; then
+    log "Resetting UIAutomator2 server on emulator (INFRA-uia2-futex-deadlock)..."
+    # Kill all app_process instances (u2 server + any prior sessions).
+    adb -s emulator-5554 shell 'pkill -f "app_process.*com.wetest.uia2" 2>/dev/null; pkill -f "app_process.*uia2" 2>/dev/null' 2>/dev/null || true
+    adb -s emulator-5554 shell 'am kill-all 2>/dev/null' 2>/dev/null || true
+    sleep 2
+    # Re-launch the u2 server in the background.
+    if adb -s emulator-5554 shell 'ls /data/local/tmp/u2.jar' >/dev/null 2>&1; then
+      adb -s emulator-5554 shell \
+        'CLASSPATH=/data/local/tmp/u2.jar app_process / com.wetest.uia2.Main &' \
+        >/dev/null 2>&1 || true
+      sleep 5
+      # Verify u2 server responds on /jsonrpc/0 (adb forward required).
+      adb -s emulator-5554 forward tcp:9008 tcp:9008 >/dev/null 2>&1 || true
+      if curl -sf --max-time 5 http://127.0.0.1:9008/jsonrpc/0 \
+          -X POST -H 'Content-Type: application/json' \
+          -d '{"jsonrpc":"2.0","id":1,"method":"deviceInfo","params":[]}' \
+          > "$STATE_DIR/u2-verify.json" 2>/dev/null; then
+        log "  UIAutomator2 server responding (deadlock cleared)."
+      else
+        log "  WARNING: UIAutomator2 server did not respond after reset — MCP may retry."
+      fi
+    else
+      log "  u2.jar not present on device; UIAutomator2 server will be installed on first MCP use."
+    fi
   fi
 fi
 

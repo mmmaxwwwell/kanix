@@ -1,1 +1,5 @@
-The admin APK install was added to `test/e2e/setup.sh` as Step 6c in commit 71f261a. When `E2E_WANT_EMULATOR=1` and emulator-5554 is reachable, setup.sh now runs `flutter pub get` and `flutter build apk --debug` in the `admin/` directory, then installs the resulting APK via `adb -s emulator-5554 install -r`. This ensures `com.kanix.kanix_admin` is installed on every setup run without requiring manual intervention.
+Fixed the `_purchaseLabel` method in `admin/lib/screens/shipments_screen.dart` to call
+`/api/admin/shipments/${shipment.id}/buy-label` instead of the wrong
+`/api/admin/shipments/${shipment.id}/purchase-label`. The API route is defined as
+`/api/admin/shipments/:id/buy-label` (server.ts line 1995); the Flutter screen had
+`purchase-label` which caused a 404 on every label purchase attempt.

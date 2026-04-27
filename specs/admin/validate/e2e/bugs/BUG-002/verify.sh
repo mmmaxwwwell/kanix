@@ -1,17 +1,24 @@
 #!/usr/bin/env bash
-# Verifies BUG-002 — setup.sh contains admin APK install step.
+# Verifies BUG-002 — shipments_screen.dart uses /buy-label not /purchase-label
 set -eu
-FILE="test/e2e/setup.sh"
-if grep -q "flutter build apk --debug" "$FILE" \
-   && grep -q "kanix_admin" "$FILE" \
-   && grep -q "adb.*install" "$FILE"; then
-  echo "STATUS: FIXED"
-  echo "EVIDENCE: setup.sh contains admin APK build+install step (Step 6c)"
-  echo "COMMAND: grep -c 'kanix_admin' test/e2e/setup.sh"
-  exit 0
-else
+
+SCREEN="admin/lib/screens/shipments_screen.dart"
+
+if grep -q "purchase-label" "$SCREEN" 2>/dev/null; then
   echo "STATUS: STILL_BROKEN"
-  echo "EVIDENCE: setup.sh missing admin APK install step"
-  echo "COMMAND: grep 'kanix_admin\\|flutter build apk' test/e2e/setup.sh"
+  echo "EVIDENCE: $SCREEN still contains /purchase-label (should be /buy-label)"
+  echo "COMMAND: grep purchase-label $SCREEN"
   exit 1
 fi
+
+if grep -q "buy-label" "$SCREEN" 2>/dev/null; then
+  echo "STATUS: FIXED"
+  echo "EVIDENCE: $SCREEN contains /buy-label (correct API endpoint)"
+  echo "COMMAND: grep buy-label $SCREEN"
+  exit 0
+fi
+
+echo "STATUS: STILL_BROKEN"
+echo "EVIDENCE: $SCREEN does not contain /buy-label"
+echo "COMMAND: grep -n label $SCREEN"
+exit 1

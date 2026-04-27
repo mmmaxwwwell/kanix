@@ -97,7 +97,7 @@ class _DashboardGrid extends StatelessWidget {
         crossAxisCount: 3,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 2.5,
+        childAspectRatio: 1.8,
         children: cards,
       ),
     );

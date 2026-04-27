@@ -352,7 +352,7 @@ class _ShipmentActions extends ConsumerWidget {
     try {
       final dio = ref.read(dioProvider);
       await dio.post(
-          '/api/admin/shipments/${shipment.id}/purchase-label');
+          '/api/admin/shipments/${shipment.id}/buy-label');
       ref.invalidate(shipmentDetailProvider(shipment.id));
       ref.invalidate(shipmentListProvider);
       if (context.mounted) {
@@ -375,7 +375,7 @@ class _ShipmentActions extends ConsumerWidget {
       final dio = ref.read(dioProvider);
       await dio.post(
         '/api/admin/shipments/${shipment.id}/transition',
-        data: {'status': 'shipped'},
+        data: {'new_status': 'shipped'},
       );
       ref.invalidate(shipmentDetailProvider(shipment.id));
       ref.invalidate(shipmentListProvider);
