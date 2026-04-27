@@ -71,6 +71,24 @@ export function registerErrorHandler(app: FastifyInstance): void {
         return reply.status(error.httpStatus).send(response);
       }
 
+      // --- Fastify framework errors (body parser, content-type, etc.) ---
+      // FastifyError instances (e.g. FST_ERR_CTP_INVALID_JSON_BODY) carry a numeric
+      // statusCode set by Fastify itself.  They must NOT fall through to the 500 catch-all.
+      if (typeof (error as FastifyError).statusCode === "number") {
+        const fastifyError = error as FastifyError;
+        const status = fastifyError.statusCode;
+
+        log.warn(
+          { errorCode: fastifyError.code ?? "ERR_REQUEST", err: error },
+          fastifyError.message,
+        );
+
+        return reply.status(status).send({
+          error: fastifyError.code ?? "ERR_REQUEST",
+          message: fastifyError.message,
+        });
+      }
+
       // --- Unknown / unexpected errors ---
       log.error(
         {

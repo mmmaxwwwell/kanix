@@ -256,6 +256,14 @@ _emu_bg_pid=""
 if command -v start-emulator >/dev/null 2>&1 && command -v adb >/dev/null 2>&1; then
   # Only start if not already running
   if ! adb devices 2>/dev/null | grep -q "emulator-5554.*device"; then
+    # Kill any stale/crashed emulator processes before starting fresh.
+    # After a mid-session crash (INFRA-emulator-crash) the qemu process may
+    # have exited but not fully cleaned up, causing the new instance to fail
+    # to bind its ports or find the AVD.
+    if pkill -f "qemu-system-x86_64.*@" 2>/dev/null; then
+      log "  Killed stale emulator (qemu) process(es) before restarting."
+      sleep 1
+    fi
     log "Starting Android emulator in background (parallel with Steps 3-5)..."
     start-emulator 2>"$STATE_DIR/emulator.log" &
     _emu_bg_pid=$!

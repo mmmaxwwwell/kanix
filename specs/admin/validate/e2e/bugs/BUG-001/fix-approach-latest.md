@@ -1,8 +1,1 @@
-Replaced all six occurrences of `/api/admin/fulfillment/${task.id}/transition` and
-`/api/admin/fulfillment/${task.id}/assign` in `admin/lib/screens/fulfillment_screen.dart`
-with the correct `/api/admin/fulfillment-tasks/${task.id}/...` paths. The API only
-defines routes under `/api/admin/fulfillment-tasks` — the screen's inline Dio calls
-had the wrong base path (missing the `-tasks` segment), causing 404s on every
-workflow action (assign, start-picking, mark-picked, start-packing, mark-packed,
-block, unblock, cancel). Previous fix attempts addressed only the provider's list/detail
-endpoints; the screen's six inline call sites were never touched.
+Added a new branch in `api/src/error-handler.ts` (between the `AppError` check and the catch-all 500 branch) that detects Fastify framework errors by checking for a numeric `statusCode` property. These errors — such as `FST_ERR_CTP_INVALID_JSON_BODY` thrown by the JSON body parser when the request body is not valid JSON — were previously falling through to the `ERR_INTERNAL` / 500 catch-all even though the error already carried the correct HTTP status (400). The fix preserves the original `statusCode` from the FastifyError and logs at `warn` level rather than `error`. The endpoint itself (`POST /auth/signin`) is handled by the SuperTokens Fastify plugin's global preHandler and works correctly when the body is valid JSON; the bug only manifested when shell history expansion caused `curl` to send `\!` (an invalid JSON escape), producing a 400-level parse error that was incorrectly promoted to 500.
