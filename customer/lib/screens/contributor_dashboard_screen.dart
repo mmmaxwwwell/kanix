@@ -106,6 +106,14 @@ class _DashboardBody extends StatelessWidget {
                     ?.copyWith(color: theme.colorScheme.outline))
           else
             ...data.payouts.map((p) => _PayoutRow(payout: p)),
+          const SizedBox(height: 24),
+
+          // Donation section
+          Text('Donation',
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          _DonationSection(data: data),
         ],
       ),
     );
@@ -143,6 +151,12 @@ class _SummaryRow extends StatelessWidget {
           value: data.formattedTotalPaidOut,
           icon: Icons.payments,
         ),
+        if (data.clawedBackMinor > 0)
+          _SummaryCard(
+            label: 'Clawed Back',
+            value: data.formattedClawBack,
+            icon: Icons.money_off,
+          ),
       ],
     );
   }
@@ -374,5 +388,58 @@ class _PayoutStatusBadge extends StatelessWidget {
       default:
         return (scheme.surfaceContainerHighest, scheme.onSurface);
     }
+  }
+}
+
+class _DonationSection extends StatelessWidget {
+  final ContributorDashboardData data;
+
+  const _DonationSection({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Donate royalties to charity',
+                    style: theme.textTheme.bodyMedium),
+                Switch(
+                  value: data.donationEnabled,
+                  onChanged: null, // read-only display
+                ),
+              ],
+            ),
+            if (data.donationEnabled && data.charityName != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Charity: ${data.charityName}',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.outline),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Royalty rate: 20% (donation enabled)',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.outline),
+              ),
+            ] else ...[
+              const SizedBox(height: 4),
+              Text(
+                'Royalty rate: 10% (standard)',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.outline),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }

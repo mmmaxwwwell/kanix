@@ -164,6 +164,9 @@ class ContributorDashboardData {
   final int totalSales;
   final int totalRoyaltyAccruedCents;
   final int totalPaidOutCents;
+  final int clawedBackMinor;
+  final bool donationEnabled;
+  final String? charityName;
   final List<ContributorDesign> designs;
   final List<ContributorMilestone> milestones;
   final List<ContributorPayout> payouts;
@@ -173,6 +176,9 @@ class ContributorDashboardData {
     required this.totalSales,
     required this.totalRoyaltyAccruedCents,
     required this.totalPaidOutCents,
+    this.clawedBackMinor = 0,
+    this.donationEnabled = false,
+    this.charityName,
     required this.designs,
     required this.milestones,
     required this.payouts,
@@ -187,6 +193,12 @@ class ContributorDashboardData {
   String get formattedTotalPaidOut {
     final dollars = totalPaidOutCents ~/ 100;
     final cents = (totalPaidOutCents % 100).toString().padLeft(2, '0');
+    return '\$$dollars.$cents';
+  }
+
+  String get formattedClawBack {
+    final dollars = clawedBackMinor ~/ 100;
+    final cents = (clawedBackMinor % 100).toString().padLeft(2, '0');
     return '\$$dollars.$cents';
   }
 
@@ -213,14 +225,27 @@ class ContributorDashboardData {
             as int;
     final totalPaidOutCents =
         (royaltySummary?['paidMinor'] ?? json['totalPaidOutCents'] ?? 0) as int;
+    final clawedBackMinor =
+        (royaltySummary?['clawedBackMinor'] ?? 0) as int;
     final totalSales = json['totalSales'] as int? ??
         designList.fold<int>(0, (sum, d) => sum + d.totalSales);
+
+    // donationEnabled is injected by the API route handler; fall back to
+    // inferring it from the contributor sub-object if absent.
+    final contributorObj = json['contributor'] as Map<String, dynamic>?;
+    final donationEnabled = (json['donationEnabled'] as bool?) ??
+        (contributorObj?['charityName'] != null &&
+            contributorObj?['charityEin'] != null);
+    final charityName = contributorObj?['charityName'] as String?;
 
     return ContributorDashboardData(
       totalDesigns: json['totalDesigns'] as int? ?? designList.length,
       totalSales: totalSales,
       totalRoyaltyAccruedCents: totalRoyaltyAccruedCents,
       totalPaidOutCents: totalPaidOutCents,
+      clawedBackMinor: clawedBackMinor,
+      donationEnabled: donationEnabled,
+      charityName: charityName,
       designs: designList,
       milestones: milestoneList,
       payouts: payoutList,

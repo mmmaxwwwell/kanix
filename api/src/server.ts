@@ -7593,7 +7593,14 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           });
         }
 
-        return { dashboard };
+        return {
+          dashboard: {
+            ...dashboard,
+            donationEnabled: !!(
+              dashboard.contributor.charityName && dashboard.contributor.charityEin
+            ),
+          },
+        };
       },
     );
 
