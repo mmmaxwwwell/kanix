@@ -32,17 +32,19 @@ class Dispute {
       id: json['id'] as String,
       orderId: json['orderId'] as String,
       orderNumber: json['orderNumber'] as String?,
-      stripeDisputeId: json['stripeDisputeId'] as String,
-      reason: json['reason'] as String,
+      stripeDisputeId: json['providerDisputeId'] as String,
+      reason: json['reason'] as String? ?? '',
       status: json['status'] as String,
       amountMinor: json['amountMinor'] as int? ?? 0,
       currency: json['currency'] as String? ?? 'USD',
-      evidenceDueBy: json['evidenceDueBy'] != null
-          ? DateTime.parse(json['evidenceDueBy'] as String)
+      evidenceDueBy: json['dueBy'] != null
+          ? DateTime.parse(json['dueBy'] as String)
           : null,
-      evidenceSubmitted: json['evidenceSubmitted'] as bool? ?? false,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      evidenceSubmitted: (json['evidenceCount'] as int? ?? 0) > 0,
+      createdAt: DateTime.parse(json['openedAt'] as String),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : DateTime.parse(json['openedAt'] as String),
     );
   }
 

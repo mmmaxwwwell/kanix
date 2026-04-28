@@ -1,0 +1,1 @@
+Same fix as BUG-021: updated `Dispute.fromJson` in `admin/lib/models/dispute.dart` to use correct API field names (`providerDisputeId`, `openedAt`, `dueBy`, `evidenceCount`). See BUG-021/fix-approach-latest.md.

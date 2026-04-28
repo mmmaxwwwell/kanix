@@ -285,7 +285,7 @@ export async function generateEvidenceBundle(
       id: r.id,
       type: r.type,
       createdAt: r.createdAt.toISOString(),
-      textContent: r.textContent ? JSON.parse(r.textContent) : null,
+      textContent: r.textContent,
       storageKey: r.storageKey,
       metadataJson: r.metadataJson,
     })),

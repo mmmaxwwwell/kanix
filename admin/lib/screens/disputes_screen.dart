@@ -284,13 +284,21 @@ class _DisputeDetailContent extends ConsumerWidget {
                   style: Theme.of(context).textTheme.titleLarge),
               const Spacer(),
               if (!dispute.evidenceSubmitted &&
-                  dispute.status == 'needs_response')
+                  dispute.status == 'needs_response') ...[
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.send),
+                  label: const Text('Submit Bundle'),
+                  onPressed: () =>
+                      _submitBundle(context, ref, dispute.id),
+                ),
+                const SizedBox(width: 8),
                 FilledButton.icon(
                   icon: const Icon(Icons.archive),
                   label: const Text('Generate Bundle'),
                   onPressed: () =>
                       _generateBundle(context, ref, dispute.id),
                 ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -308,6 +316,50 @@ class _DisputeDetailContent extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _submitBundle(
+      BuildContext context, WidgetRef ref, String disputeId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Submit Evidence Bundle'),
+        content: const Text(
+          'This will submit the generated evidence bundle to Stripe. This action cannot be undone. Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      try {
+        final dio = ref.read(dioProvider);
+        await dio.post('/api/admin/disputes/$disputeId/submit-bundle');
+        ref.invalidate(disputeDetailProvider(disputeId));
+        ref.invalidate(disputeEvidenceProvider(disputeId));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Evidence bundle submitted to Stripe')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Bundle submission failed: $e')),
+          );
+        }
+      }
+    }
   }
 
   Future<void> _generateBundle(
