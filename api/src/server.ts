@@ -3345,6 +3345,44 @@ export async function createServer(options: CreateServerOptions): Promise<Server
       },
     );
 
+    // GET /api/admin/disputes/:id/evidence — list evidence records for a dispute
+    app.get(
+      "/api/admin/disputes/:id/evidence",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.DISPUTES_READ)],
+      },
+      async (request, reply) => {
+        const { id: disputeId } = request.params as { id: string };
+
+        const disputeRow = await findDisputeById(database.db, disputeId);
+        if (!disputeRow) {
+          return reply.status(404).send({
+            error: "ERR_DISPUTE_NOT_FOUND",
+            message: `Dispute ${disputeId} not found`,
+          });
+        }
+
+        const records = await listEvidence(database.db, { disputeId });
+
+        const evidence = records.map((r) => ({
+          id: r.id,
+          disputeId,
+          category: r.type,
+          fileName:
+            r.metadataJson != null &&
+            typeof r.metadataJson === "object" &&
+            "fileName" in (r.metadataJson as Record<string, unknown>)
+              ? ((r.metadataJson as Record<string, unknown>).fileName as string)
+              : null,
+          content: r.textContent,
+          status: "active",
+          createdAt: r.createdAt.toISOString(),
+        }));
+
+        return { evidence };
+      },
+    );
+
     // -----------------------------------------------------------------------
     // Dispute Evidence Bundle (T066 — FR-060, FR-061)
     // -----------------------------------------------------------------------
