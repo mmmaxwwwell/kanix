@@ -1,0 +1,1 @@
+Same fix as BUG-032 — removed githubLinked gate from contributor_dashboard_screen.dart. Access is now determined by the contributorDashboardProvider (API call to /api/contributors/dashboard), which uses DB contributor-customer link, not GitHub OAuth status.

@@ -7,6 +7,7 @@ final contributorDashboardProvider =
     FutureProvider.autoDispose<ContributorDashboardData>((ref) async {
   final dio = ref.read(dioProvider);
   final response = await dio.get('/api/contributors/dashboard');
-  return ContributorDashboardData.fromJson(
-      response.data as Map<String, dynamic>);
+  final outer = response.data as Map<String, dynamic>;
+  final dashboard = outer['dashboard'] as Map<String, dynamic>;
+  return ContributorDashboardData.fromJson(dashboard);
 });

@@ -1,0 +1,1 @@
+No code fix applied — REGRESSION-NEEDED is a tracking item for the executor to run steps 4-11 of the contributor dashboard validation plan after BUG-031/032/033 are fixed and the APK rebuilt. The verify.sh exits 2 (inconclusive) to signal that a full verify agent spawn is required.

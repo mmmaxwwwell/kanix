@@ -1,0 +1,1 @@
+Same fix as BUG-033 — updated contributor_provider.dart to unwrap the dashboard wrapper and updated all ContributorDashboardData, ContributorDesign, ContributorMilestone, ContributorPayout fromJson methods to map from actual API field names.

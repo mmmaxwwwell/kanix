@@ -1,8 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/contributor.dart';
-import '../providers/auth_provider.dart';
 import '../providers/contributor_provider.dart';
 
 class ContributorDashboardScreen extends ConsumerWidget {
@@ -10,54 +10,42 @@ class ContributorDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authStateProvider);
-    final githubLinked = authState.value?.user?.githubLinked;
-
-    if (githubLinked == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Contributor Dashboard')),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.code_off,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.outline),
-                const SizedBox(height: 16),
-                const Text('GitHub account not linked'),
-                const SizedBox(height: 8),
-                Text(
-                  'Link your GitHub account in Account settings to access the contributor dashboard.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: Theme.of(context).colorScheme.outline),
-                ),
-                const SizedBox(height: 24),
-                FilledButton.tonal(
-                  onPressed: () {
-                    ref.read(authStateProvider.notifier).linkGitHub();
-                  },
-                  child: const Text('Link GitHub Account'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
     final dashboardAsync = ref.watch(contributorDashboardProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Contributor Dashboard')),
       body: dashboardAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) =>
-            Center(child: Text('Failed to load dashboard: $err')),
+        error: (err, _) {
+          final is404 = err is DioException && err.response?.statusCode == 404;
+          if (is404) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.person_off,
+                        size: 64,
+                        color: Theme.of(context).colorScheme.outline),
+                    const SizedBox(height: 16),
+                    const Text('Not a contributor account'),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Your account is not linked to a contributor record.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(color: Theme.of(context).colorScheme.outline),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          return Center(child: Text('Failed to load dashboard: $err'));
+        },
         data: (data) => _DashboardBody(data: data),
       ),
     );

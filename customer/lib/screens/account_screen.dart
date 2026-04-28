@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/auth_provider.dart';
+import '../providers/contributor_provider.dart';
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
@@ -77,6 +79,29 @@ class AccountScreen extends ConsumerWidget {
             ),
           ),
         ),
+        const SizedBox(height: 16),
+        if (ref.watch(contributorDashboardProvider).hasValue)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Contributor',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  ListTile(
+                    leading: const Icon(Icons.dashboard),
+                    title: const Text('Contributor Dashboard'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.go('/contributor'),
+                  ),
+                ],
+              ),
+            ),
+          ),
         const SizedBox(height: 16),
         FilledButton.tonal(
           onPressed: () {

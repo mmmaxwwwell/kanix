@@ -1,0 +1,1 @@
+Same fix as BUG-031 — added Contributor Dashboard ListTile to account_screen.dart, conditionally visible when contributorDashboardProvider has data. This was the infrastructure blocker preventing navigation to /contributor.

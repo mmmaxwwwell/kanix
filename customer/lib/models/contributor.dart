@@ -24,11 +24,12 @@ class ContributorDesign {
   factory ContributorDesign.fromJson(Map<String, dynamic> json) {
     return ContributorDesign(
       id: json['id'] as String,
-      name: json['name'] as String,
-      slug: json['slug'] as String,
-      totalSales: json['totalSales'] as int? ?? 0,
-      royaltyAccruedCents: json['royaltyAccruedCents'] as int? ?? 0,
-      status: json['status'] as String? ?? 'active',
+      name: (json['productTitle'] ?? json['name'] ?? '') as String,
+      slug: (json['productSlug'] ?? json['slug'] ?? '') as String,
+      totalSales: (json['salesCount'] ?? json['totalSales'] ?? 0) as int,
+      royaltyAccruedCents:
+          (json['royaltyAccruedCents'] ?? 0) as int,
+      status: (json['status'] ?? 'active') as String,
     );
   }
 }
@@ -61,15 +62,51 @@ class ContributorMilestone {
     return '\$$dollars.$cents';
   }
 
+  static String _milestoneTypeName(String? milestoneType) {
+    switch (milestoneType) {
+      case 'royalty_activation':
+        return 'Royalty Activation';
+      case 'starter_kit':
+        return 'Starter Kit';
+      case 'veteran':
+        return 'Veteran';
+      case 'accepted_pr':
+        return 'Accepted PR';
+      default:
+        return milestoneType ?? 'Milestone';
+    }
+  }
+
+  static int _milestoneTargetSales(String? milestoneType) {
+    switch (milestoneType) {
+      case 'royalty_activation':
+        return 25;
+      case 'starter_kit':
+        return 50;
+      case 'veteran':
+        return 500;
+      default:
+        return 0;
+    }
+  }
+
   factory ContributorMilestone.fromJson(Map<String, dynamic> json) {
+    final milestoneType = json['milestoneType'] as String?;
+    final isAchieved = json['reachedAt'] != null || json['achieved'] == true;
+    final targetSales = json['targetSales'] as int? ??
+        _milestoneTargetSales(milestoneType);
     return ContributorMilestone(
       id: json['id'] as String,
-      name: json['name'] as String,
-      description: json['description'] as String? ?? '',
-      targetSales: json['targetSales'] as int? ?? 0,
-      currentSales: json['currentSales'] as int? ?? 0,
+      name: (json['name'] as String?) ?? _milestoneTypeName(milestoneType),
+      description: (json['description'] as String?) ??
+          (json['notes'] as String?) ??
+          '',
+      targetSales: targetSales,
+      currentSales: isAchieved
+          ? targetSales
+          : (json['currentSales'] as int? ?? 0),
       bonusCents: json['bonusCents'] as int? ?? 0,
-      achieved: json['achieved'] as bool? ?? false,
+      achieved: isAchieved,
     );
   }
 }
@@ -111,11 +148,12 @@ class ContributorPayout {
   }
 
   factory ContributorPayout.fromJson(Map<String, dynamic> json) {
+    final paidAtStr = (json['completedAt'] ?? json['paidAt'] ?? json['initiatedAt']) as String?;
     return ContributorPayout(
       id: json['id'] as String,
-      amountCents: json['amountCents'] as int? ?? 0,
-      status: json['status'] as String? ?? 'pending',
-      paidAt: DateTime.parse(json['paidAt'] as String),
+      amountCents: (json['amountMinor'] ?? json['amountCents'] ?? 0) as int,
+      status: (json['status'] as String?) ?? 'pending',
+      paidAt: paidAtStr != null ? DateTime.parse(paidAtStr) : DateTime.now(),
       payoutMethod: json['payoutMethod'] as String?,
     );
   }
@@ -153,26 +191,39 @@ class ContributorDashboardData {
   }
 
   factory ContributorDashboardData.fromJson(Map<String, dynamic> json) {
+    final designList = (json['designs'] as List<dynamic>?)
+            ?.map((d) => ContributorDesign.fromJson(d as Map<String, dynamic>))
+            .toList() ??
+        [];
+    final milestoneList = (json['milestones'] as List<dynamic>?)
+            ?.map((m) =>
+                ContributorMilestone.fromJson(m as Map<String, dynamic>))
+            .toList() ??
+        [];
+    final payoutList = (json['payouts'] as List<dynamic>?)
+            ?.map((p) => ContributorPayout.fromJson(p as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    // API returns royaltySummary object; flat fields (totalDesigns etc.) are
+    // not present — compute them from the nested structure.
+    final royaltySummary = json['royaltySummary'] as Map<String, dynamic>?;
+    final totalRoyaltyAccruedCents =
+        (royaltySummary?['totalMinor'] ?? json['totalRoyaltyAccruedCents'] ?? 0)
+            as int;
+    final totalPaidOutCents =
+        (royaltySummary?['paidMinor'] ?? json['totalPaidOutCents'] ?? 0) as int;
+    final totalSales = json['totalSales'] as int? ??
+        designList.fold<int>(0, (sum, d) => sum + d.totalSales);
+
     return ContributorDashboardData(
-      totalDesigns: json['totalDesigns'] as int? ?? 0,
-      totalSales: json['totalSales'] as int? ?? 0,
-      totalRoyaltyAccruedCents: json['totalRoyaltyAccruedCents'] as int? ?? 0,
-      totalPaidOutCents: json['totalPaidOutCents'] as int? ?? 0,
-      designs: (json['designs'] as List<dynamic>?)
-              ?.map((d) =>
-                  ContributorDesign.fromJson(d as Map<String, dynamic>))
-              .toList() ??
-          [],
-      milestones: (json['milestones'] as List<dynamic>?)
-              ?.map((m) =>
-                  ContributorMilestone.fromJson(m as Map<String, dynamic>))
-              .toList() ??
-          [],
-      payouts: (json['payouts'] as List<dynamic>?)
-              ?.map((p) =>
-                  ContributorPayout.fromJson(p as Map<String, dynamic>))
-              .toList() ??
-          [],
+      totalDesigns: json['totalDesigns'] as int? ?? designList.length,
+      totalSales: totalSales,
+      totalRoyaltyAccruedCents: totalRoyaltyAccruedCents,
+      totalPaidOutCents: totalPaidOutCents,
+      designs: designList,
+      milestones: milestoneList,
+      payouts: payoutList,
     );
   }
 }
