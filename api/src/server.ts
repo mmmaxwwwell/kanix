@@ -203,6 +203,7 @@ import {
   createEvidenceRecord,
   listEvidence,
   listDisputes,
+  getDisputeDetail,
 } from "./db/queries/evidence.js";
 import { transitionDisputeStatus } from "./db/queries/dispute.js";
 import { evidenceBundle } from "./db/schema/evidence.js";
@@ -1490,7 +1491,7 @@ export async function createServer(options: CreateServerOptions): Promise<Server
           offset?: string;
         };
         const limit = query.limit ? Math.min(parseInt(query.limit, 10) || 100, 500) : 100;
-        const offset = query.offset ? (parseInt(query.offset, 10) || 0) : 0;
+        const offset = query.offset ? parseInt(query.offset, 10) || 0 : 0;
         const tasks = await listFulfillmentTasks(database.db, {
           status: query.status,
           priority: query.priority,
@@ -3316,11 +3317,31 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.DISPUTES_READ)],
       },
       async (request) => {
-        const query = request.query as { status?: string };
+        const query = request.query as { status?: string; search?: string };
         const disputes = await listDisputes(database.db, {
           status: query.status,
+          search: query.search,
         });
         return { disputes, total: disputes.length };
+      },
+    );
+
+    // GET /api/admin/disputes/:id — get single dispute detail
+    app.get(
+      "/api/admin/disputes/:id",
+      {
+        preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.DISPUTES_READ)],
+      },
+      async (request, reply) => {
+        const { id: disputeId } = request.params as { id: string };
+        const disputeRow = await getDisputeDetail(database.db, disputeId);
+        if (!disputeRow) {
+          return reply.status(404).send({
+            error: "ERR_DISPUTE_NOT_FOUND",
+            message: `Dispute ${disputeId} not found`,
+          });
+        }
+        return { dispute: disputeRow };
       },
     );
 
