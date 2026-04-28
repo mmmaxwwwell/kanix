@@ -77,6 +77,7 @@ export interface ContributorDesignRow {
   createdAt: Date;
   productTitle: string | null;
   productSlug: string | null;
+  salesCount: number;
 }
 
 export interface LinkDesignInput {
@@ -226,6 +227,7 @@ export async function listDesignsByContributor(
       createdAt: contributorDesign.createdAt,
       productTitle: product.title,
       productSlug: product.slug,
+      salesCount: contributorDesign.salesCount,
     })
     .from(contributorDesign)
     .leftJoin(product, eq(contributorDesign.productId, product.id))

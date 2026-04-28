@@ -1,4 +1,4 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, desc } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { order } from "../schema/order.js";
 
@@ -47,4 +47,36 @@ export async function findOrdersByCustomerId(
     })
     .from(order)
     .where(eq(order.customerId, customerId));
+}
+
+/**
+ * Lists all orders in the system for admin use.
+ */
+export async function listAllOrders(db: PostgresJsDatabase): Promise<
+  {
+    id: string;
+    orderNumber: string;
+    email: string;
+    status: string;
+    paymentStatus: string;
+    fulfillmentStatus: string;
+    totalMinor: number;
+    placedAt: Date | null;
+    createdAt: Date;
+  }[]
+> {
+  return db
+    .select({
+      id: order.id,
+      orderNumber: order.orderNumber,
+      email: order.email,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      fulfillmentStatus: order.fulfillmentStatus,
+      totalMinor: order.totalMinor,
+      placedAt: order.placedAt,
+      createdAt: order.createdAt,
+    })
+    .from(order)
+    .orderBy(desc(order.createdAt));
 }

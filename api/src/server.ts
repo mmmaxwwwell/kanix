@@ -9,6 +9,7 @@ import { createShutdownManager, isShuttingDown, type ShutdownManager } from "./s
 import { ajvOptions } from "./validation.js";
 import {
   initSuperTokens,
+  isEmailVerified,
   registerAuthMiddleware,
   verifySession,
   requireVerifiedEmail,
@@ -44,7 +45,7 @@ import {
   removeProductFromCollection,
   findProductsByCollectionId,
 } from "./db/queries/product.js";
-import { findOrdersByCustomerId } from "./db/queries/order.js";
+import { findOrdersByCustomerId, listAllOrders } from "./db/queries/order.js";
 import {
   insertVariant,
   findVariantById,
@@ -539,7 +540,8 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         });
       }
 
-      return { customer: cust };
+      const emailVerified = await isEmailVerified(userId);
+      return { customer: { ...cust, emailVerified } };
     },
   );
 
@@ -1124,8 +1126,8 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.ORDERS_READ)],
       },
       async () => {
-        // Placeholder — will be expanded later
-        return { orders: [] };
+        const orders = await listAllOrders(database.db);
+        return { orders };
       },
     );
 

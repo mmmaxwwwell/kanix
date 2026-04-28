@@ -1,0 +1,1 @@
+Added `salesCount: number` to the `ContributorDesignRow` interface in `api/src/db/queries/contributor.ts`, and added `salesCount: contributorDesign.salesCount` to the `.select()` call in `listDesignsByContributor`. The column `sales_count` already exists in the DB and is mapped in the drizzle schema; it was simply omitted from the query projection.

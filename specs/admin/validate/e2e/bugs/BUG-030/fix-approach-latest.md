@@ -1,0 +1,1 @@
+Changed the path in `customer/lib/providers/contributor_provider.dart` from `/api/contributor/dashboard` (singular, wrong) to `/api/contributors/dashboard` (plural, correct). The server registers the route at the plural path per FR-075; the provider had a typo. One character change — added the missing `s`.
