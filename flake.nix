@@ -220,6 +220,15 @@
               sed -i 's/vm\.heapSize *= *576/vm.heapSize=768/' "$_cfg"
               echo "Patched AVD vm.heapSize from 576 to 768 MB."
             fi
+            # INFRA-emulator-crash-on-login-tap: swiftshader_indirect + KVM
+            # causes the emulator process to crash mid-session during Flutter's
+            # GPU rendering phase.  Switch to -gpu off (pure CPU path, no
+            # swiftshader subprocess) which is slower but stable for headless CI.
+            if [ -f "$_cfg" ] && grep -q 'hw\.gpu\.mode *= *swiftshader_indirect' "$_cfg" 2>/dev/null; then
+              sed -i 's/hw\.gpu\.mode *= *swiftshader_indirect/hw.gpu.mode=off/' "$_cfg"
+              sed -i 's/hw\.gpu\.enabled *= *yes/hw.gpu.enabled=no/' "$_cfg"
+              echo "Patched AVD gpu: swiftshader_indirect -> off (prevents crash on login tap)."
+            fi
           fi
 
           if [ ! -d "$AVD_DIR/$AVD_NAME.avd" ]; then
@@ -254,8 +263,8 @@
           hw.accelerator.isAccelerated=yes
           hw.cpu.arch=x86_64
           hw.cpu.ncore=2
-          hw.gpu.enabled=yes
-          hw.gpu.mode=swiftshader_indirect
+          hw.gpu.enabled=no
+          hw.gpu.mode=off
           hw.keyboard=yes
           hw.lcd.density=420
           hw.lcd.height=2400
@@ -292,7 +301,7 @@
           echo "Starting emulator: $AVD_NAME"
           emulator @"$AVD_NAME" \
             -no-window -no-audio -no-boot-anim \
-            -gpu swiftshader_indirect \
+            -gpu off \
             $KVM_FLAG -memory 3072 -no-snapshot \
             $WIPE_FLAG -verbose \
             &>"''${TMPDIR:-/tmp}/emulator-$AVD_NAME.log" &
