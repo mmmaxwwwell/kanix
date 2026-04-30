@@ -19,6 +19,7 @@
     "db:migrate": "liquibase update",
     "db:rollback": "liquibase rollback-count 1",
     "db:seed": "tsx src/db/scripts/seed.ts",
+    "db:seed-e2e-refundable": "tsx src/db/scripts/seed-e2e-refundable-order.ts",
     "db:reset": "tsx src/db/scripts/reset.ts",
     "stripe:webhook-secret": "bash ../scripts/stripe-webhook-secret.sh",
     "stripe:listen:start": "bash ../scripts/stripe-listen-start.sh",

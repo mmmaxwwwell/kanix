@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -146,10 +147,16 @@ class _OrderHeader extends ConsumerWidget {
         const SizedBox(width: 16),
         Text(order.formattedTotal,
             style: Theme.of(context).textTheme.titleLarge),
-        const Spacer(),
-        _RefundButton(order: order),
-        const SizedBox(width: 8),
-        _CancelButton(order: order),
+        Expanded(
+          child: OverflowBar(
+            alignment: MainAxisAlignment.end,
+            spacing: 8,
+            children: [
+              _RefundButton(order: order),
+              _CancelButton(order: order),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -259,8 +266,19 @@ class _RefundButton extends ConsumerWidget {
         }
       } catch (e) {
         if (context.mounted) {
+          String errorMessage;
+          if (e is DioException) {
+            final data = e.response?.data;
+            if (data is Map && data['message'] != null) {
+              errorMessage = 'Refund failed: ${data['message']}';
+            } else {
+              errorMessage = 'Refund failed: payment provider error';
+            }
+          } else {
+            errorMessage = 'Refund failed: $e';
+          }
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Refund failed: $e')),
+            SnackBar(content: Text(errorMessage)),
           );
         }
       }

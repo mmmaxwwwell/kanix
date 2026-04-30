@@ -416,6 +416,30 @@ else
   log "  WARNING: seed-admin-user failed — see $STATE_DIR/seed-admin.json"
 fi
 
+# Seed a refundable order for E2E refund tests (T104c).
+# Only runs when a real Stripe test key is configured — skipped in stub mode.
+# The script is idempotent: skips if the seed order already exists in the DB.
+_stripe_key="${STRIPE_SECRET_KEY:-}"
+if [ -n "$_stripe_key" ] \
+   && [[ ! "$_stripe_key" =~ placeholder ]] \
+   && [[ ! "$_stripe_key" =~ REPLACE_ME ]] \
+   && [ "$_stripe_key" != "sk_test_e2e_placeholder_key" ]; then
+  log "Seeding E2E refundable order (Stripe test mode)..."
+  (cd "$PROJECT_ROOT/api" && \
+    DATABASE_URL="postgresql://kanix:kanix@127.0.0.1:${PORT_POSTGRES}/kanix" \
+    STRIPE_SECRET_KEY="$_stripe_key" \
+    pnpm db:seed-e2e-refundable) \
+    > "$STATE_DIR/seed-refundable.log" 2>&1 && {
+    _seed_order_id=$(grep 'ORDER_ID=' "$STATE_DIR/seed-refundable.log" | tail -1 | cut -d= -f2)
+    if [ -n "$_seed_order_id" ]; then
+      echo "E2E_REFUNDABLE_ORDER_ID=$_seed_order_id" >> "$STATE_DIR/env"
+      log "  Refundable order seeded: id=$_seed_order_id"
+    fi
+  } || log "  WARNING: seed-e2e-refundable failed — see $STATE_DIR/seed-refundable.log"
+else
+  log "STRIPE_SECRET_KEY is a placeholder — skipping refundable order seed."
+fi
+
 # -------------------------------------------------------------------
 # Step 5: Astro site (dev server)
 # -------------------------------------------------------------------
