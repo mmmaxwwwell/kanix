@@ -354,6 +354,11 @@ Countermeasures shipped — cross-cutting changes live in these places, keep the
 
 Full rationale and contract details: `.claude/skills/spec-kit/reference/cost-guardrails.md`.
 
+## T102 — Concurrent inventory E2E test
+
+- Checkout requires 4 policy snapshots (`terms_of_service`, `refund_policy`, `shipping_policy`, `privacy_policy`) — without them, all checkout attempts return `ERR_MISSING_POLICY` instead of `ERR_INVENTORY_INSUFFICIENT`. Seed them with `.onConflictDoNothing()` to be idempotent.
+- The `reserveInventory` function uses `SELECT ... FOR UPDATE` which serializes concurrent requests at the DB row level — with 1 unit available, exactly 1 of N concurrent checkouts succeeds deterministically.
+
 ## INFRA-mcp-android-not-connected (2026-04-26)
 
 - `ANDROID_BUILD_ROOT` in `.mcp.json` was set to `customer` — change to `admin` for admin E2E tests. This only affects APK/build-path resolution, not MCP connectivity.

@@ -1,13 +1,10 @@
 /**
- * Flow test: concurrent inventory [mirrors T102, SC-003]
+ * T102 E2E: concurrent inventory [SC-003]
  *
- * N concurrent checkouts against a variant with stock M < N.
- * At most M succeed, the rest fail (400 inventory insufficient or 500 from
- * order-number collision under concurrency). The core invariants:
- *   - No over-sell: successCount <= STOCK_M
- *   - Final balance: available = 0, no negative values
- *   - Exactly STOCK_M reservations created (all active)
- *   - All reservations accounted for
+ * Scripted API-level concurrency test (no MCP needed):
+ *   1 unit available → 10 concurrent checkout POSTs →
+ *   exactly 1 succeeds → 9 fail with ERR_INVENTORY_INSUFFICIENT →
+ *   available = 0
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createTestServer, stopTestServer, type TestServer } from "../test-server.js";
@@ -21,6 +18,7 @@ import {
   inventoryLocation,
   inventoryReservation,
 } from "../db/schema/inventory.js";
+import { policySnapshot } from "../db/schema/evidence.js";
 import type { TaxAdapter } from "../services/tax-adapter.js";
 import { createStubShippingAdapter } from "../services/shipping-adapter.js";
 import type { PaymentAdapter } from "../services/payment-adapter.js";
@@ -31,10 +29,10 @@ import type { PaymentAdapter } from "../services/payment-adapter.js";
 
 const WEBHOOK_SECRET = "whsec_concurrent_inventory_flow_test";
 
-/** Total stock for the variant under test */
-const STOCK_M = 3;
+/** Total stock for the variant under test — exactly 1 unit */
+const STOCK_M = 1;
 
-/** Number of concurrent checkout attempts (must be > STOCK_M) */
+/** Number of concurrent checkout attempts */
 const CONCURRENCY_N = 10;
 
 const VALID_ADDRESS = {
@@ -81,7 +79,7 @@ function createStubPaymentAdapter(): PaymentAdapter {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("concurrent inventory flow (T266, mirrors T102/SC-003)", () => {
+describe("concurrent inventory (T102, SC-003)", () => {
   let ts_: TestServer;
   let app: FastifyInstance;
   let dbConn: DatabaseConnection;
@@ -140,7 +138,7 @@ describe("concurrent inventory flow (T266, mirrors T102/SC-003)", () => {
       productClassId: cls.id,
     });
 
-    // 3. Inventory location + balance with exactly STOCK_M available
+    // 3. Inventory location + balance with exactly 1 unit available
     const existingBalances = await db.select().from(inventoryBalance).limit(1);
     if (existingBalances.length > 0) {
       locationId = existingBalances[0].locationId;
@@ -168,6 +166,21 @@ describe("concurrent inventory flow (T266, mirrors T102/SC-003)", () => {
       reserved: 0,
       available: STOCK_M,
     });
+
+    // 4. Seed required policy snapshots for checkout
+    const policyTypes = ["terms_of_service", "refund_policy", "shipping_policy", "privacy_policy"];
+    for (const pType of policyTypes) {
+      await db
+        .insert(policySnapshot)
+        .values({
+          policyType: pType,
+          version: 1,
+          contentHtml: `<p>${pType} v1</p>`,
+          contentText: `${pType} v1`,
+          effectiveAt: new Date(Date.now() - 86400000),
+        })
+        .onConflictDoNothing();
+    }
   }, 30_000);
 
   afterAll(async () => {
@@ -207,7 +220,7 @@ describe("concurrent inventory flow (T266, mirrors T102/SC-003)", () => {
 
   let cartTokens: string[] = [];
 
-  it("step 1: pre-create N carts each with 1 unit of the variant", async () => {
+  it("step 1: pre-create 10 carts each with 1 unit of the variant", async () => {
     const tokens: string[] = [];
     for (let i = 0; i < CONCURRENCY_N; i++) {
       tokens.push(await createCartWithOneUnit());
@@ -217,16 +230,12 @@ describe("concurrent inventory flow (T266, mirrors T102/SC-003)", () => {
   }, 60_000);
 
   // -------------------------------------------------------------------------
-  // Step 2: Fire N concurrent checkouts — at most M succeed, rest fail
+  // Step 2: Fire 10 concurrent checkouts — exactly 1 succeeds, 9 fail
   // -------------------------------------------------------------------------
 
-  let successCount = 0;
-  let failCount400 = 0;
-  let failCount500 = 0;
   let successOrderIds: string[] = [];
 
-  it(`step 2: ${CONCURRENCY_N} concurrent checkouts with stock=${STOCK_M} → no over-sell`, async () => {
-    // Fire all checkouts concurrently
+  it("step 2: 10 concurrent checkouts with 1 unit → exactly 1 succeeds, 9 fail ERR_INVENTORY_INSUFFICIENT", async () => {
     const results = await Promise.allSettled(
       cartTokens.map((token, i) =>
         app.inject({
@@ -244,7 +253,6 @@ describe("concurrent inventory flow (T266, mirrors T102/SC-003)", () => {
 
     const successes: string[] = [];
     let inv400 = 0;
-    let other500 = 0;
 
     for (const result of results) {
       expect(result.status).toBe("fulfilled");
@@ -261,35 +269,28 @@ describe("concurrent inventory flow (T266, mirrors T102/SC-003)", () => {
         expect(body.error).toBe("ERR_INVENTORY_INSUFFICIENT");
         inv400++;
       } else {
-        // 500 from order-number collision under concurrency — reservations
-        // were already claimed from the inventory balance, so the stock
-        // protection still holds even if the order creation step raced.
-        expect(res.statusCode).toBe(500);
-        other500++;
+        // Unexpected status — fail with details
+        throw new Error(
+          `Unexpected status ${res.statusCode}: ${res.body}`,
+        );
       }
     }
 
-    successCount = successes.length;
-    failCount400 = inv400;
-    failCount500 = other500;
     successOrderIds = successes;
 
-    // Core invariant: NO over-sell — at most M checkouts succeed
-    expect(successCount).toBeLessThanOrEqual(STOCK_M);
-    // At least 1 must succeed (the FOR UPDATE lock serializes, so the first
-    // through always gets stock)
-    expect(successCount).toBeGreaterThanOrEqual(1);
-    // All N attempts accounted for
-    expect(successCount + inv400 + other500).toBe(CONCURRENCY_N);
-    // At least N-M failed due to inventory exhaustion
-    expect(inv400).toBeGreaterThanOrEqual(CONCURRENCY_N - STOCK_M);
+    // Exactly 1 succeeds (1 unit available)
+    expect(successes.length).toBe(1);
+    // Exactly 9 fail with ERR_INVENTORY_INSUFFICIENT
+    expect(inv400).toBe(CONCURRENCY_N - STOCK_M);
+    // All 10 accounted for
+    expect(successes.length + inv400).toBe(CONCURRENCY_N);
   }, 60_000);
 
   // -------------------------------------------------------------------------
-  // Step 3: Verify final inventory balance — available=0, no over-sell
+  // Step 3: Verify final inventory balance — available=0
   // -------------------------------------------------------------------------
 
-  it("step 3: final inventory balance has available=0, no negative values", async () => {
+  it("step 3: final inventory balance has available=0", async () => {
     const db = dbConn.db;
 
     const [balance] = await db
@@ -300,23 +301,19 @@ describe("concurrent inventory flow (T266, mirrors T102/SC-003)", () => {
       );
 
     expect(balance).toBeDefined();
-    // available must be exactly 0 — all stock was claimed by reservations
     expect(balance.available).toBe(0);
-    // reserved equals STOCK_M (every unit that was available got reserved)
     expect(balance.reserved).toBe(STOCK_M);
-    // onHand unchanged (stock still physically present, just reserved)
     expect(balance.onHand).toBe(STOCK_M);
-    // No negative values anywhere
     expect(balance.available).toBeGreaterThanOrEqual(0);
     expect(balance.reserved).toBeGreaterThanOrEqual(0);
     expect(balance.onHand).toBeGreaterThanOrEqual(0);
   });
 
   // -------------------------------------------------------------------------
-  // Step 4: All reservations accounted for — exactly STOCK_M active
+  // Step 4: Exactly 1 active reservation exists
   // -------------------------------------------------------------------------
 
-  it("step 4: exactly STOCK_M active reservations exist for this variant", async () => {
+  it("step 4: exactly 1 active reservation exists for this variant", async () => {
     const db = dbConn.db;
 
     const reservations = await db
@@ -329,23 +326,12 @@ describe("concurrent inventory flow (T266, mirrors T102/SC-003)", () => {
         ),
       );
 
-    // Exactly M active reservations (one per unit of stock)
     expect(reservations.length).toBe(STOCK_M);
+    expect(reservations[0].quantity).toBe(1);
 
-    // Each reservation is for quantity=1
-    for (const res of reservations) {
-      expect(res.quantity).toBe(1);
-    }
-
-    // Successful orders should have their reservations linked
-    for (const orderId of successOrderIds) {
-      const linked = reservations.find((r) => r.orderId === orderId);
-      expect(linked).toBeDefined();
-    }
-
-    // Total reserved quantity across active reservations = STOCK_M
-    const totalReservedQty = reservations.reduce((sum, r) => sum + r.quantity, 0);
-    expect(totalReservedQty).toBe(STOCK_M);
+    // The successful order should have its reservation linked
+    const linked = reservations.find((r) => r.orderId === successOrderIds[0]);
+    expect(linked).toBeDefined();
   });
 
   // -------------------------------------------------------------------------
@@ -360,21 +346,11 @@ describe("concurrent inventory flow (T266, mirrors T102/SC-003)", () => {
       .from(inventoryReservation)
       .where(eq(inventoryReservation.variantId, variantId));
 
-    // Every reservation for this variant should be "active"
-    // (failed checkouts that got past inventory reservation may have orphan
-    // reservations if order creation failed, but they're still "active")
     for (const res of allReservations) {
       expect(["active", "released"]).toContain(res.status);
     }
 
-    // Active reservation count must equal STOCK_M
     const activeCount = allReservations.filter((r) => r.status === "active").length;
     expect(activeCount).toBe(STOCK_M);
-
-    // Total reserved quantity across active reservations = STOCK_M
-    const totalReservedQty = allReservations
-      .filter((r) => r.status === "active")
-      .reduce((sum, r) => sum + r.quantity, 0);
-    expect(totalReservedQty).toBe(STOCK_M);
   });
 });

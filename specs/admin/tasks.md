@@ -691,16 +691,16 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
   Prereq: the runner brings up the backend stack (setup.sh), boots the Android emulator (mcp-android), and starts `stripe listen` automatically before spawning you — do NOT run these yourself. If any service is not reachable when you try the gate commands, that is a runner bug: write `BLOCKED.md` instead of committing unverified specs.
   Done when: author deterministic regression specs directly from existing artifacts in specs/admin/validate/e2e/ (screenshots, findings.json, handoff docs) — do NOT re-run MCP exploration; T096 spec committed at site/tests/e2e/T096.spec.ts with first-line comment `// regression for T096` and stable selectors, `npx playwright test site/tests/e2e/T096.spec.ts` passes locally against the running backend stack; T097 spec committed at customer/integration_test/T097_test.dart or admin/integration_test/T097_test.dart (choose the app matching the T097 screenshots/findings target) with first-line comment `// regression for T097` and stable selectors, `flutter test integration_test/T097_test.dart` passes against the running emulator. Both gate commands must exit 0 before you write the completion claim.
 
-- [ ] T099 E2E: full fulfillment + shipping [SC-005, SC-006] [needs: mcp-android, e2e-loop] [android-app: admin]
+- [x] T099 E2E: full fulfillment + shipping [SC-005, SC-006] [needs: mcp-android, e2e-loop] [android-app: admin]
   Done when: MCP agent drives Flutter admin app: receive paid order → open fulfillment queue → pick → pack → create shipment → buy label (EasyPost test) → mark shipped → simulate tracking events → delivered; verify evidence records exist for every step in DB; verify audit log complete; Patrol regression test for full admin fulfillment flow
 
-- [ ] T100 E2E: dispute lifecycle [SC-005] [needs: mcp-android, e2e-loop] [android-app: admin]
+- [x] T100 E2E: dispute lifecycle [SC-005] [needs: mcp-android, e2e-loop] [android-app: admin]
   Done when: delivered order → simulate `charge.dispute.created` webhook → MCP agent opens admin Dispute detail screen → verify evidence readiness shows all 5 types present → generate bundle → submit → close; Patrol regression test for admin dispute screen + bundle generation
 
-- [ ] T101 E2E: contributor royalty [SC-011] [needs: mcp-browser, mcp-android, e2e-loop] [android-app: customer]
+- [x] T101 E2E: contributor royalty [SC-011] [needs: mcp-browser, mcp-android, e2e-loop] [android-app: customer]
   Done when: create contributor → link design → MCP agent completes 25 orders on Astro site → verify retroactive royalty for units 1-25 in DB → MCP agent opens customer app contributor dashboard → verify dashboard shows correct totals + milestones → refund 1 order → verify clawback displayed → toggle donation option → verify 20% rate; Playwright + Patrol regression tests
 
-- [ ] T102 E2E: concurrent inventory [SC-003]
+- [x] T102 E2E: concurrent inventory [SC-003]
   Done when: scripted test (no MCP needed — API-level concurrency): 1 unit available → 10 concurrent checkout POSTs → exactly 1 succeeds → 9 fail with ERR_INVENTORY_INSUFFICIENT → available = 0; runs in CI
 
 - [ ] T103 E2E: WebSocket real-time [SC-007] [needs: mcp-android, e2e-loop] [android-app: admin]

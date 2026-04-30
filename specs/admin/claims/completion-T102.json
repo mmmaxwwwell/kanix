@@ -1,0 +1,17 @@
+{
+  "task_id": "T102",
+  "status": "complete",
+  "summary": "Fixed concurrent inventory integration test: STOCK_M=1, seeded policy snapshots, exact assertions (1 success, 9 ERR_INVENTORY_INSUFFICIENT), all 5 steps pass",
+  "commands_run": [
+    {"command": "cd api && npx tsc --noEmit --pretty", "exit_code": 0},
+    {"command": "DATABASE_URL=... SUPERTOKENS_CONNECTION_URI=... npx vitest run --config vitest.integration.config.ts 'concurrent-inventory' --reporter=verbose", "exit_code": 0}
+  ],
+  "files_created": ["specs/admin/claims/completion-T102.json"],
+  "files_modified": [
+    "api/src/flows/concurrent-inventory.integration.test.ts",
+    "specs/admin/tasks.md",
+    "specs/admin/learnings.md"
+  ],
+  "screenshots": [],
+  "mcp_interactions": 0
+}
