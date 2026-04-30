@@ -74,10 +74,7 @@ export async function listAllOrders(
   const offset = options.offset ?? 0;
 
   const searchCondition = options.search
-    ? or(
-        ilike(order.orderNumber, `%${options.search}%`),
-        ilike(order.email, `%${options.search}%`),
-      )
+    ? or(ilike(order.orderNumber, `%${options.search}%`), ilike(order.email, `%${options.search}%`))
     : undefined;
 
   const [rows, [{ total }]] = await Promise.all([
