@@ -35,9 +35,7 @@ function isPlaceholderKey(key: string): boolean {
 
 async function run() {
   if (isPlaceholderKey(STRIPE_SECRET_KEY)) {
-    console.log(
-      "[seed-e2e-refundable] STRIPE_SECRET_KEY is a placeholder — skipping (stub mode).",
-    );
+    console.log("[seed-e2e-refundable] STRIPE_SECRET_KEY is a placeholder — skipping (stub mode).");
     process.exit(0);
   }
 
@@ -50,7 +48,7 @@ async function run() {
     .from(order)
     .where(eq(order.orderNumber, ORDER_NUMBER));
   if (existing.length > 0) {
-    const existingOrderId = existing[0]!.id;
+    const existingOrderId = existing[0].id;
     const existingPayment = await db
       .select({ id: payment.id })
       .from(payment)
@@ -76,9 +74,7 @@ async function run() {
       metadata: { order_number: ORDER_NUMBER, source: "e2e-seed-recovery" },
     });
     if (recoveryIntent.status !== "succeeded") {
-      console.error(
-        `[seed-e2e-refundable] Recovery PI status=${recoveryIntent.status}. Aborting.`,
-      );
+      console.error(`[seed-e2e-refundable] Recovery PI status=${recoveryIntent.status}. Aborting.`);
       await sql.end();
       process.exit(1);
     }
