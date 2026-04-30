@@ -195,7 +195,7 @@ export async function updateContributorProfileVisibility(
 export async function linkContributorDesign(
   db: PostgresJsDatabase,
   input: LinkDesignInput,
-): Promise<{ id: string; contributorId: string; productId: string; createdAt: Date }> {
+): Promise<{ id: string; contributorId: string; productId: string; salesCount: number; createdAt: Date }> {
   const [row] = await db
     .insert(contributorDesign)
     .values({
@@ -206,6 +206,7 @@ export async function linkContributorDesign(
       id: contributorDesign.id,
       contributorId: contributorDesign.contributorId,
       productId: contributorDesign.productId,
+      salesCount: contributorDesign.salesCount,
       createdAt: contributorDesign.createdAt,
     });
   return row;
@@ -345,7 +346,13 @@ export async function processOrderCompletionSales(
 
   if (designs.length === 0) return { sales: results, newMilestones: allNewMilestones };
 
-  const productToDesign = new Map(designs.map((d) => [d.productId, d]));
+  // Group designs by productId so all contributors for a shared product are updated
+  const productToDesigns = new Map<string, (typeof designs)[number][]>();
+  for (const d of designs) {
+    const arr = productToDesigns.get(d.productId) ?? [];
+    arr.push(d);
+    productToDesigns.set(d.productId, arr);
+  }
 
   // Pre-fetch contributor donation settings for all relevant contributors
   const contributorIds = [...new Set(designs.map((d) => d.contributorId))];
@@ -364,76 +371,78 @@ export async function processOrderCompletionSales(
     const productId = variantToProduct.get(line.variantId);
     if (!productId) continue;
 
-    const design = productToDesign.get(productId);
-    if (!design) continue;
+    const designsForProduct = productToDesigns.get(productId);
+    if (!designsForProduct) continue;
 
-    const previousSalesCount = design.salesCount;
-    const newSalesCount = previousSalesCount + line.quantity;
+    for (const design of designsForProduct) {
+      const previousSalesCount = design.salesCount;
+      const newSalesCount = previousSalesCount + line.quantity;
 
-    // Increment sales_count
-    await db
-      .update(contributorDesign)
-      .set({ salesCount: newSalesCount })
-      .where(eq(contributorDesign.id, design.id));
+      // Increment sales_count
+      await db
+        .update(contributorDesign)
+        .set({ salesCount: newSalesCount })
+        .where(eq(contributorDesign.id, design.id));
 
-    // Update in-memory for subsequent lines referencing the same design
-    design.salesCount = newSalesCount;
+      // Update in-memory for subsequent lines referencing the same design
+      design.salesCount = newSalesCount;
 
-    const contrib = contributorMap.get(design.contributorId);
-    const rate = contrib ? getRoyaltyRate(contrib, newSalesCount) : ROYALTY_RATE;
+      const contrib = contributorMap.get(design.contributorId);
+      const rate = contrib ? getRoyaltyRate(contrib, newSalesCount) : ROYALTY_RATE;
 
-    let royaltyCreated = false;
+      let royaltyCreated = false;
 
-    // Check if we just crossed the threshold (retroactive royalties needed)
-    if (
-      previousSalesCount < ROYALTY_ACTIVATION_THRESHOLD &&
-      newSalesCount >= ROYALTY_ACTIVATION_THRESHOLD
-    ) {
-      // Create retroactive royalty entries for ALL order lines (including the
-      // current one, since the order is already "completed") that contributed
-      // to this design's sales.
-      const created = await createRetroactiveRoyalties(
-        db,
-        design.productId,
-        design.contributorId,
-        rate,
-      );
-      royaltyCreated = created > 0;
-
-      // Create donation entry if contributor has 501(c)(3) configured
-      if (contrib?.charityName && contrib?.charityEin) {
-        await createDonationFromRoyalties(
+      // Check if we just crossed the threshold (retroactive royalties needed)
+      if (
+        previousSalesCount < ROYALTY_ACTIVATION_THRESHOLD &&
+        newSalesCount >= ROYALTY_ACTIVATION_THRESHOLD
+      ) {
+        // Create retroactive royalty entries for ALL order lines (including the
+        // current one, since the order is already "completed") that contributed
+        // to this design's sales.
+        const created = await createRetroactiveRoyalties(
           db,
+          design.productId,
           design.contributorId,
-          contrib.charityName,
-          contrib.charityEin,
+          rate,
         );
-      }
-    } else if (newSalesCount >= ROYALTY_ACTIVATION_THRESHOLD) {
-      // Already above threshold — create royalty for current line only
-      const royaltyAmount = Math.floor(line.unitPriceMinor * rate) * line.quantity;
-      try {
-        await db.insert(contributorRoyalty).values({
-          contributorId: design.contributorId,
-          orderLineId: line.id,
-          amountMinor: royaltyAmount,
-          status: "accrued",
-        });
-        royaltyCreated = true;
-      } catch (err: unknown) {
-        const error = err as { code?: string };
-        if (error.code !== "23505") throw err;
-      }
-    }
+        royaltyCreated = created > 0;
 
-    results.push({
-      designId: design.id,
-      contributorId: design.contributorId,
-      productId,
-      previousSalesCount,
-      newSalesCount,
-      royaltyCreated,
-    });
+        // Create donation entry if contributor has 501(c)(3) configured
+        if (contrib?.charityName && contrib?.charityEin) {
+          await createDonationFromRoyalties(
+            db,
+            design.contributorId,
+            contrib.charityName,
+            contrib.charityEin,
+          );
+        }
+      } else if (newSalesCount >= ROYALTY_ACTIVATION_THRESHOLD) {
+        // Already above threshold — create royalty for current line only
+        const royaltyAmount = Math.floor(line.unitPriceMinor * rate) * line.quantity;
+        try {
+          await db.insert(contributorRoyalty).values({
+            contributorId: design.contributorId,
+            orderLineId: line.id,
+            amountMinor: royaltyAmount,
+            status: "accrued",
+          });
+          royaltyCreated = true;
+        } catch (err: unknown) {
+          const error = err as { code?: string };
+          if (error.code !== "23505") throw err;
+        }
+      }
+
+      results.push({
+        designId: design.id,
+        contributorId: design.contributorId,
+        productId,
+        previousSalesCount,
+        newSalesCount,
+        royaltyCreated,
+      });
+    }
   }
 
   // Auto-detect milestones for all contributors involved in this order
@@ -616,6 +625,42 @@ export async function clawbackRoyaltiesByOrderId(
   }
 
   return { clawedBack };
+}
+
+// ---------------------------------------------------------------------------
+// List royalties by contributor
+// ---------------------------------------------------------------------------
+
+export interface ContributorRoyaltyRow {
+  id: string;
+  contributorId: string;
+  orderLineId: string;
+  amountMinor: number;
+  currency: string;
+  status: string;
+  createdAt: Date;
+}
+
+/**
+ * List all royalty entries for a contributor, newest first.
+ */
+export async function listRoyaltiesByContributor(
+  db: PostgresJsDatabase,
+  contributorId: string,
+): Promise<ContributorRoyaltyRow[]> {
+  return db
+    .select({
+      id: contributorRoyalty.id,
+      contributorId: contributorRoyalty.contributorId,
+      orderLineId: contributorRoyalty.orderLineId,
+      amountMinor: contributorRoyalty.amountMinor,
+      currency: contributorRoyalty.currency,
+      status: contributorRoyalty.status,
+      createdAt: contributorRoyalty.createdAt,
+    })
+    .from(contributorRoyalty)
+    .where(eq(contributorRoyalty.contributorId, contributorId))
+    .orderBy(contributorRoyalty.createdAt);
 }
 
 // ---------------------------------------------------------------------------

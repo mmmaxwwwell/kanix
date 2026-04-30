@@ -217,6 +217,7 @@ import {
   processOrderCompletionSales,
   clawbackRoyaltyByOrderLine,
   clawbackRoyaltiesByOrderId,
+  listRoyaltiesByContributor,
   setContributorDonation,
   recordMilestone,
   listMilestonesByContributor,
@@ -7418,6 +7419,27 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         }
         const milestones = await listMilestonesByContributor(db, id);
         return { milestones };
+      },
+    );
+
+    // GET /api/admin/contributors/:id/royalties — list royalty entries for contributor [BUG-T101-003]
+    app.get(
+      "/api/admin/contributors/:id/royalties",
+      {
+        preHandler: [
+          verifySession,
+          requireAdmin,
+          requireCapability(CAPABILITIES.CONTRIBUTORS_READ),
+        ],
+      },
+      async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const contrib = await findContributorById(db, id);
+        if (!contrib) {
+          return reply.status(404).send({ error: "Contributor not found" });
+        }
+        const royalties = await listRoyaltiesByContributor(db, id);
+        return { royalties };
       },
     );
 
