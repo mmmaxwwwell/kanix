@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../config/api_client.dart';
 import '../models/order.dart';
@@ -284,10 +285,14 @@ class _FileClaimFormState extends State<_FileClaimForm> {
     }
   }
 
-  void _addPhoto() {
-    setState(() {
-      _photoNames.add('photo_${_photoNames.length + 1}.jpg');
-    });
+  Future<void> _addPhoto() async {
+    final image =
+        await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (image != null && mounted) {
+      setState(() {
+        _photoNames.add(image.name);
+      });
+    }
   }
 
   @override

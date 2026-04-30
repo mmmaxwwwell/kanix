@@ -27,6 +27,11 @@ class AppShell extends ConsumerWidget {
             label: 'Cart',
           ),
           NavigationDestination(
+            icon: Icon(Icons.support_agent_outlined),
+            selectedIcon: Icon(Icons.support_agent),
+            label: 'Support',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),
             selectedIcon: Icon(Icons.receipt_long),
             label: 'Orders',
@@ -44,6 +49,7 @@ class AppShell extends ConsumerWidget {
   static const _routes = [
     '/catalog',
     '/cart',
+    '/support',
     '/orders',
     '/account',
   ];
@@ -62,7 +68,7 @@ class AppShell extends ConsumerWidget {
     if (location.startsWith('/support') || location.startsWith('/warranty')) {
       return 2;
     }
-    if (location.startsWith('/contributor')) return 3;
+    if (location.startsWith('/contributor')) return 4;
     return 0;
   }
 
