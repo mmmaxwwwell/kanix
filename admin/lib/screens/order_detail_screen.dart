@@ -136,9 +136,12 @@ class _OrderHeader extends ConsumerWidget {
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         const SizedBox(width: 8),
-        Text(
-          'Order ${order.orderNumber}',
-          style: Theme.of(context).textTheme.headlineMedium,
+        Flexible(
+          child: Text(
+            'Order ${order.orderNumber}',
+            style: Theme.of(context).textTheme.headlineMedium,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
         const SizedBox(width: 16),
         Text(order.formattedTotal,

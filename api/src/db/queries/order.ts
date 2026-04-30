@@ -55,7 +55,7 @@ export async function findOrdersByCustomerId(
  */
 export async function listAllOrders(
   db: PostgresJsDatabase,
-  options: { limit?: number; offset?: number; search?: string } = {},
+  options: { limit?: number; offset?: number; search?: string; paymentStatus?: string } = {},
 ): Promise<{
   orders: {
     id: string;
@@ -77,6 +77,12 @@ export async function listAllOrders(
     ? or(ilike(order.orderNumber, `%${options.search}%`), ilike(order.email, `%${options.search}%`))
     : undefined;
 
+  const paymentStatusCondition = options.paymentStatus
+    ? eq(order.paymentStatus, options.paymentStatus)
+    : undefined;
+
+  const whereCondition = and(searchCondition, paymentStatusCondition);
+
   const [rows, [{ total }]] = await Promise.all([
     db
       .select({
@@ -91,11 +97,11 @@ export async function listAllOrders(
         createdAt: order.createdAt,
       })
       .from(order)
-      .where(searchCondition)
+      .where(whereCondition)
       .orderBy(desc(order.createdAt))
       .limit(limit)
       .offset(offset),
-    db.select({ total: count() }).from(order).where(searchCondition),
+    db.select({ total: count() }).from(order).where(whereCondition),
   ]);
 
   return { orders: rows, total };
