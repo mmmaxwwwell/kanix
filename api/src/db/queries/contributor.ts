@@ -195,7 +195,13 @@ export async function updateContributorProfileVisibility(
 export async function linkContributorDesign(
   db: PostgresJsDatabase,
   input: LinkDesignInput,
-): Promise<{ id: string; contributorId: string; productId: string; salesCount: number; createdAt: Date }> {
+): Promise<{
+  id: string;
+  contributorId: string;
+  productId: string;
+  salesCount: number;
+  createdAt: Date;
+}> {
   const [row] = await db
     .insert(contributorDesign)
     .values({
