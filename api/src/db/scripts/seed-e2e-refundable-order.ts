@@ -44,15 +44,56 @@ async function run() {
   const sql = postgres(DATABASE_URL);
   const db = drizzle(sql);
 
-  // Idempotency: skip if order already exists
+  // Idempotency: skip if order AND payment both exist
   const existing = await db
     .select({ id: order.id })
     .from(order)
     .where(eq(order.orderNumber, ORDER_NUMBER));
   if (existing.length > 0) {
+    const existingOrderId = existing[0]!.id;
+    const existingPayment = await db
+      .select({ id: payment.id })
+      .from(payment)
+      .where(eq(payment.orderId, existingOrderId));
+    if (existingPayment.length > 0) {
+      console.log(
+        `[seed-e2e-refundable] Order ${ORDER_NUMBER} already exists with payment (id=${existingOrderId}), skipping.`,
+      );
+      await sql.end();
+      process.exit(0);
+    }
+    // Order exists but payment row is missing (orphaned) — create a new PI and insert payment.
     console.log(
-      `[seed-e2e-refundable] Order ${ORDER_NUMBER} already exists (id=${existing[0]!.id}), skipping.`,
+      `[seed-e2e-refundable] Order ${ORDER_NUMBER} exists (id=${existingOrderId}) but payment row is missing — recovering.`,
     );
+    const stripe = new Stripe(STRIPE_SECRET_KEY);
+    const recoveryIntent = await stripe.paymentIntents.create({
+      amount: AMOUNT_MINOR,
+      currency: "usd",
+      payment_method: "pm_card_visa",
+      confirm: true,
+      return_url: "http://localhost:3000",
+      metadata: { order_number: ORDER_NUMBER, source: "e2e-seed-recovery" },
+    });
+    if (recoveryIntent.status !== "succeeded") {
+      console.error(
+        `[seed-e2e-refundable] Recovery PI status=${recoveryIntent.status}. Aborting.`,
+      );
+      await sql.end();
+      process.exit(1);
+    }
+    await db.insert(payment).values({
+      orderId: existingOrderId,
+      provider: "stripe",
+      providerPaymentIntentId: recoveryIntent.id,
+      status: "succeeded",
+      amountMinor: AMOUNT_MINOR,
+      currency: "USD",
+    });
+    console.log(
+      `[seed-e2e-refundable] Recovered: inserted payment for order ${ORDER_NUMBER} (id=${existingOrderId}) with PI ${recoveryIntent.id}`,
+    );
+    console.log(`[seed-e2e-refundable] ORDER_ID=${existingOrderId}`);
     await sql.end();
     process.exit(0);
   }
@@ -109,7 +150,7 @@ async function run() {
     orderId: newOrder.id,
     provider: "stripe",
     providerPaymentIntentId: intent.id,
-    status: "paid",
+    status: "succeeded",
     amountMinor: AMOUNT_MINOR,
     currency: "USD",
   });
