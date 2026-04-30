@@ -53,9 +53,8 @@ async function signUpUser(
 
 async function verifyEmail(userId: string): Promise<void> {
   const { default: supertokens } = await import("supertokens-node");
-  const { default: EmailVerification } = await import(
-    "supertokens-node/recipe/emailverification/index.js"
-  );
+  const { default: EmailVerification } =
+    await import("supertokens-node/recipe/emailverification/index.js");
   const tokenRes = await EmailVerification.createEmailVerificationToken(
     "public",
     supertokens.convertToRecipeUserId(userId),
@@ -154,10 +153,7 @@ describe("T104 security boundary tests [SC-008, SC-015]", () => {
     const login = await signIn(address, CUSTOMER_EMAIL, PASSWORD);
     customerHeaders = login.headers;
 
-    const [cust] = await dbConn.db
-      .select()
-      .from(customer)
-      .where(eq(customer.authSubject, userId));
+    const [cust] = await dbConn.db.select().from(customer).where(eq(customer.authSubject, userId));
     customerId = cust.id;
   }, 60_000);
 
@@ -234,10 +230,9 @@ describe("T104 security boundary tests [SC-008, SC-015]", () => {
 
     it("SQL injection in product search does not cause errors", async () => {
       for (const payload of sqliPayloads) {
-        const res = await fetch(
-          `${address}/api/products?search=${encodeURIComponent(payload)}`,
-          { headers: { origin: "http://localhost:3000" } },
-        );
+        const res = await fetch(`${address}/api/products?search=${encodeURIComponent(payload)}`, {
+          headers: { origin: "http://localhost:3000" },
+        });
         // Should return 200 with empty results, not 500
         expect(res.status).toBeLessThan(500);
       }
@@ -305,7 +300,7 @@ describe("T104 security boundary tests [SC-008, SC-015]", () => {
 
     it("XSS payload in address line does not cause HTML response", async () => {
       const xssPayloads = [
-        '<img src=x onerror=alert(1)>',
+        "<img src=x onerror=alert(1)>",
         '"><svg onload=alert(1)>',
         "javascript:alert(document.cookie)",
       ];
@@ -336,10 +331,9 @@ describe("T104 security boundary tests [SC-008, SC-015]", () => {
 
     it("product search with XSS payload returns JSON, not HTML", async () => {
       const xss = '<script>alert("xss")</script>';
-      const res = await fetch(
-        `${address}/api/products?search=${encodeURIComponent(xss)}`,
-        { headers: { origin: "http://localhost:3000" } },
-      );
+      const res = await fetch(`${address}/api/products?search=${encodeURIComponent(xss)}`, {
+        headers: { origin: "http://localhost:3000" },
+      });
       expect(res.status).toBeLessThan(500);
       const contentType = res.headers.get("content-type");
       expect(contentType).toMatch(/application\/json/);
