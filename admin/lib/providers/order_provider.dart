@@ -68,9 +68,14 @@ final orderListProvider =
     FutureProvider.autoDispose<List<Order>>((ref) async {
   final dio = ref.watch(dioProvider);
   final filters = ref.watch(orderFiltersProvider);
+  final params = {
+    ...filters.toQueryParameters(),
+    'limit': '100',
+    'offset': '0',
+  };
   final response = await dio.get(
     '/api/admin/orders',
-    queryParameters: filters.toQueryParameters(),
+    queryParameters: params,
   );
   final data = response.data as Map<String, dynamic>;
   final ordersJson = data['orders'] as List<dynamic>;

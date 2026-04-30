@@ -1,4 +1,4 @@
-import { eq, and, isNull, desc } from "drizzle-orm";
+import { eq, and, isNull, desc, count } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { order } from "../schema/order.js";
 
@@ -50,10 +50,14 @@ export async function findOrdersByCustomerId(
 }
 
 /**
- * Lists all orders in the system for admin use.
+ * Lists orders in the system for admin use, with pagination.
+ * Defaults to the first 100 orders sorted by most-recent first.
  */
-export async function listAllOrders(db: PostgresJsDatabase): Promise<
-  {
+export async function listAllOrders(
+  db: PostgresJsDatabase,
+  options: { limit?: number; offset?: number } = {},
+): Promise<{
+  orders: {
     id: string;
     orderNumber: string;
     email: string;
@@ -63,20 +67,31 @@ export async function listAllOrders(db: PostgresJsDatabase): Promise<
     totalMinor: number;
     placedAt: Date | null;
     createdAt: Date;
-  }[]
-> {
-  return db
-    .select({
-      id: order.id,
-      orderNumber: order.orderNumber,
-      email: order.email,
-      status: order.status,
-      paymentStatus: order.paymentStatus,
-      fulfillmentStatus: order.fulfillmentStatus,
-      totalMinor: order.totalMinor,
-      placedAt: order.placedAt,
-      createdAt: order.createdAt,
-    })
-    .from(order)
-    .orderBy(desc(order.createdAt));
+  }[];
+  total: number;
+}> {
+  const limit = options.limit ?? 100;
+  const offset = options.offset ?? 0;
+
+  const [rows, [{ total }]] = await Promise.all([
+    db
+      .select({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        email: order.email,
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        fulfillmentStatus: order.fulfillmentStatus,
+        totalMinor: order.totalMinor,
+        placedAt: order.placedAt,
+        createdAt: order.createdAt,
+      })
+      .from(order)
+      .orderBy(desc(order.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db.select({ total: count() }).from(order),
+  ]);
+
+  return { orders: rows, total };
 }
