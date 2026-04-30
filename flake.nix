@@ -206,10 +206,24 @@
             rm -f "$AVD_DIR/$AVD_NAME.avd/multiinstance.lock" 2>/dev/null || true
             rm -rf "$AVD_DIR/running" 2>/dev/null || true
             echo "Cleaned stale AVD lock files (if any)."
+            # Ensure existing AVD has the correct RAM size (3072 MB).
+            # INFRA-emulator-offline-after-login-tap: 2048 MB was insufficient;
+            # OOM killed the qemu process mid-session when the Flutter app + Android
+            # OS together exceeded available RAM. Patch config.ini in-place so the
+            # emulator uses the updated setting without requiring an AVD recreation.
+            _cfg="$AVD_DIR/$AVD_NAME.avd/config.ini"
+            if [ -f "$_cfg" ] && grep -q 'hw.ramSize *= *2048' "$_cfg" 2>/dev/null; then
+              sed -i 's/hw\.ramSize *= *2048/hw.ramSize=3072/' "$_cfg"
+              echo "Patched AVD hw.ramSize from 2048 to 3072 MB."
+            fi
+            if [ -f "$_cfg" ] && grep -q 'vm.heapSize *= *576' "$_cfg" 2>/dev/null; then
+              sed -i 's/vm\.heapSize *= *576/vm.heapSize=768/' "$_cfg"
+              echo "Patched AVD vm.heapSize from 576 to 768 MB."
+            fi
           fi
 
           if [ ! -d "$AVD_DIR/$AVD_NAME.avd" ]; then
-            echo "Creating AVD: $AVD_NAME (API 34, x86_64, 2GB RAM)"
+            echo "Creating AVD: $AVD_NAME (API 34, x86_64, 3GB RAM)"
             SYS_IMG="$ANDROID_HOME/system-images/android-34/google_apis/x86_64"
             if [ ! -d "$SYS_IMG" ]; then
               echo "ERROR: System image not found at $SYS_IMG" >&2
@@ -246,14 +260,14 @@
           hw.lcd.density=420
           hw.lcd.height=2400
           hw.lcd.width=1080
-          hw.ramSize=2048
+          hw.ramSize=3072
           hw.sdCard.status=absent
           image.sysdir.1=$SYS_IMG/
           showDeviceFrame=no
           skin.dynamic=yes
           tag.display=Google APIs
           tag.id=google_apis
-          vm.heapSize=576
+          vm.heapSize=768
           CFGINI
               }
             echo "AVD created: $AVD_NAME"
@@ -279,7 +293,7 @@
           emulator @"$AVD_NAME" \
             -no-window -no-audio -no-boot-anim \
             -gpu swiftshader_indirect \
-            $KVM_FLAG -memory 2048 -no-snapshot \
+            $KVM_FLAG -memory 3072 -no-snapshot \
             $WIPE_FLAG -verbose \
             &>"''${TMPDIR:-/tmp}/emulator-$AVD_NAME.log" &
           EMU_PID=$!
