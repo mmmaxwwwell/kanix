@@ -359,6 +359,12 @@ Full rationale and contract details: `.claude/skills/spec-kit/reference/cost-gua
 - Checkout requires 4 policy snapshots (`terms_of_service`, `refund_policy`, `shipping_policy`, `privacy_policy`) — without them, all checkout attempts return `ERR_MISSING_POLICY` instead of `ERR_INVENTORY_INSUFFICIENT`. Seed them with `.onConflictDoNothing()` to be idempotent.
 - The `reserveInventory` function uses `SELECT ... FOR UPDATE` which serializes concurrent requests at the DB row level — with 1 unit available, exactly 1 of N concurrent checkouts succeeds deterministically.
 
+## T104 — Security boundary tests
+
+- `/api/admin/dashboard` does not exist as a route — returns 404, not 401/403. Don't include it in auth boundary tests.
+- Drizzle's `ilike()` uses parameterized queries so SQL injection payloads are treated as literal strings — no server errors, just empty results.
+- Fastify returns `application/json` content-type by default, so XSS payloads in JSON fields have no execution context — the key assertion is that the response is JSON, not HTML.
+
 ## INFRA-mcp-android-not-connected (2026-04-26)
 
 - `ANDROID_BUILD_ROOT` in `.mcp.json` was set to `customer` — change to `admin` for admin E2E tests. This only affects APK/build-path resolution, not MCP connectivity.

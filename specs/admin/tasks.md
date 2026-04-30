@@ -703,10 +703,10 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T102 E2E: concurrent inventory [SC-003]
   Done when: scripted test (no MCP needed — API-level concurrency): 1 unit available → 10 concurrent checkout POSTs → exactly 1 succeeds → 9 fail with ERR_INVENTORY_INSUFFICIENT → available = 0; runs in CI
 
-- [ ] T103 E2E: WebSocket real-time [SC-007] [needs: mcp-android, e2e-loop] [android-app: admin]
+- [x] T103 E2E: WebSocket real-time [SC-007] [needs: mcp-android, e2e-loop] [android-app: admin]
   Done when: MCP agent opens admin app (observes order list) and customer app (observes order detail) simultaneously; scripted actor creates order via API → admin app shows order.placed within 2 seconds (MCP verifies UI update); shipment status change → customer app shows update within 2 seconds; Patrol regression test asserts UI reacts to WebSocket events
 
-- [ ] T104 Security boundary tests [SC-008, SC-015]
+- [x] T104 Security boundary tests [SC-008, SC-015]
   Done when: scripted API-level test: unauthenticated → 401 on all protected endpoints; wrong permission → 403; SQL injection attempts → rejected; XSS in input → sanitized in response; invalid webhook signature → rejected; runs in CI
 
 - [ ] T104a E2E: guest-order → account linking [FR-066] [needs: mcp-browser, e2e-loop]
