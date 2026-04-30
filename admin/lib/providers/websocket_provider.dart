@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../config/api_client.dart';
 
@@ -20,9 +21,9 @@ class WsMessage {
 
   factory WsMessage.fromJson(Map<String, dynamic> json) {
     return WsMessage(
-      subject: json['subject'] as String? ?? '',
-      event: json['event'] as String? ?? '',
-      payload: json['payload'] as Map<String, dynamic>? ?? {},
+      subject: json['entity'] as String? ?? '',
+      event: json['type'] as String? ?? '',
+      payload: json['data'] as Map<String, dynamic>? ?? {},
       sequenceId: json['sequenceId'] as int? ?? 0,
     );
   }
@@ -30,8 +31,14 @@ class WsMessage {
 
 class WebSocketNotifier extends StateNotifier<AsyncValue<void>> {
   final _controller = StreamController<WsMessage>.broadcast();
+  WebSocketChannel? _channel;
+  final Ref _ref;
 
-  WebSocketNotifier(Ref ref) : super(const AsyncValue.data(null));
+  WebSocketNotifier(Ref ref)
+      : _ref = ref,
+        super(const AsyncValue.loading()) {
+    _connect();
+  }
 
   Stream<WsMessage> get messages => _controller.stream;
 
@@ -39,11 +46,43 @@ class WebSocketNotifier extends StateNotifier<AsyncValue<void>> {
     return _controller.stream.where((m) => m.subject == subject);
   }
 
-  void handleMessage(String raw) {
+  void _connect() {
+    final token = _ref.read(accessTokenProvider);
+    if (token == null) {
+      state = const AsyncValue.data(null);
+      return;
+    }
+
+    final baseUrl = const String.fromEnvironment('API_BASE_URL',
+        defaultValue: 'http://localhost:3000');
+    final wsUrl = baseUrl.replaceFirst(RegExp(r'^http'), 'ws');
+    final uri = Uri.parse('$wsUrl/ws?token=$token');
+
+    try {
+      _channel = WebSocketChannel.connect(uri);
+      _channel!.stream.listen(
+        (raw) => _handleMessage(raw as String),
+        onError: (_) => _reconnect(),
+        onDone: () => _reconnect(),
+      );
+      state = const AsyncValue.data(null);
+    } catch (e) {
+      state = AsyncValue.error(e, StackTrace.current);
+    }
+  }
+
+  void _reconnect() {
+    _channel = null;
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) _connect();
+    });
+  }
+
+  void _handleMessage(String raw) {
     try {
       final json = jsonDecode(raw) as Map<String, dynamic>;
       final type = json['type'] as String?;
-      if (type == 'message') {
+      if (type != null && type != 'connected') {
         _controller.add(WsMessage.fromJson(json));
       }
     } catch (_) {
@@ -53,6 +92,7 @@ class WebSocketNotifier extends StateNotifier<AsyncValue<void>> {
 
   @override
   void dispose() {
+    _channel?.sink.close();
     _controller.close();
     super.dispose();
   }

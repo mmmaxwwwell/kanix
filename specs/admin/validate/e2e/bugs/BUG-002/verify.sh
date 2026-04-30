@@ -1,24 +1,35 @@
 #!/usr/bin/env bash
-# Verifies BUG-002 — shipments_screen.dart uses /buy-label not /purchase-label
+# Verifies BUG-002 — WebSocketNotifier now establishes a real WS connection
 set -eu
 
-SCREEN="admin/lib/screens/shipments_screen.dart"
+PROVIDER="admin/lib/providers/websocket_provider.dart"
+PUBSPEC="admin/pubspec.yaml"
 
-if grep -q "purchase-label" "$SCREEN" 2>/dev/null; then
+# Check web_socket_channel dependency is added
+if ! grep -q "web_socket_channel" "$PUBSPEC" 2>/dev/null; then
   echo "STATUS: STILL_BROKEN"
-  echo "EVIDENCE: $SCREEN still contains /purchase-label (should be /buy-label)"
-  echo "COMMAND: grep purchase-label $SCREEN"
+  echo "EVIDENCE: web_socket_channel not found in $PUBSPEC"
+  echo "COMMAND: grep web_socket_channel $PUBSPEC"
   exit 1
 fi
 
-if grep -q "buy-label" "$SCREEN" 2>/dev/null; then
-  echo "STATUS: FIXED"
-  echo "EVIDENCE: $SCREEN contains /buy-label (correct API endpoint)"
-  echo "COMMAND: grep buy-label $SCREEN"
-  exit 0
+# Check WebSocketChannel.connect() is called (real connection logic present)
+if ! grep -q "WebSocketChannel.connect" "$PROVIDER" 2>/dev/null; then
+  echo "STATUS: STILL_BROKEN"
+  echo "EVIDENCE: $PROVIDER does not call WebSocketChannel.connect — no real WS connection"
+  echo "COMMAND: grep WebSocketChannel.connect $PROVIDER"
+  exit 1
 fi
 
-echo "STATUS: STILL_BROKEN"
-echo "EVIDENCE: $SCREEN does not contain /buy-label"
-echo "COMMAND: grep -n label $SCREEN"
-exit 1
+# Check WsMessage.fromJson reads from correct server key 'entity' (not 'subject')
+if ! grep -q "json\['entity'\]" "$PROVIDER" 2>/dev/null; then
+  echo "STATUS: STILL_BROKEN"
+  echo "EVIDENCE: $PROVIDER WsMessage.fromJson still reads wrong JSON key (missing entity mapping)"
+  echo "COMMAND: grep entity $PROVIDER"
+  exit 1
+fi
+
+echo "STATUS: FIXED"
+echo "EVIDENCE: pubspec has web_socket_channel; provider calls WebSocketChannel.connect and reads correct server JSON keys (entity/type/data)"
+echo "COMMAND: grep -n 'WebSocketChannel.connect' $PROVIDER; grep web_socket_channel $PUBSPEC"
+exit 0

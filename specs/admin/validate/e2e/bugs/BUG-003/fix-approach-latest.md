@@ -1,7 +1,1 @@
-Fixed the `_markShipped` method in `admin/lib/screens/shipments_screen.dart` to send
-`{'new_status': 'shipped'}` instead of `{'status': 'shipped'}`. The API's shipment
-transition schema (server.ts lines 2133–2135) requires the field name `new_status`;
-the Flutter screen was sending `status` which the API silently ignores, causing the
-transition to fail or return a 400 validation error. Previous fix attempts added
-an unrelated `/api/test/seed-paid-order` endpoint; this iteration fixes the actual
-field name mismatch in the Flutter screen.
+The `findOrderStatusHistory` query in `api/src/db/queries/order-state-machine.ts` omitted `orderId` from its `.select()` projection, so the field was absent from the returned JSON. The Flutter model `OrderStatusHistoryEntry.fromJson` (admin/lib/models/order.dart:154) cast `json['orderId'] as String`, which throws `type 'Null' is not a subtype of type 'String' in type cast` when the key is missing. Fixed by adding `orderId: orderStatusHistory.orderId` to both the Drizzle `.select()` call and the TypeScript return-type annotation — a one-line mechanical addition that adds the already-present `NOT NULL` DB column to the JSON response without touching any other code.

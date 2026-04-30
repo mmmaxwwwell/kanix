@@ -1,5 +1,1 @@
-Fixed the `_purchaseLabel` method in `admin/lib/screens/shipments_screen.dart` to call
-`/api/admin/shipments/${shipment.id}/buy-label` instead of the wrong
-`/api/admin/shipments/${shipment.id}/purchase-label`. The API route is defined as
-`/api/admin/shipments/:id/buy-label` (server.ts line 1995); the Flutter screen had
-`purchase-label` which caused a 404 on every label purchase attempt.
+The `WebSocketNotifier` in `admin/lib/providers/websocket_provider.dart` was a non-functional stub: the constructor did nothing (no WebSocket connection was ever opened), `WsMessage.fromJson` read from wrong JSON keys (`subject`/`event`/`payload`) instead of the server's actual keys (`entity`/`type`/`data`), and `handleMessage` filtered on `type == 'message'` which is never sent by the server. All three defects were fixed together: (1) added `web_socket_channel: ^3.0.1` to `admin/pubspec.yaml`; (2) rewrote `WebSocketNotifier` to call `_connect()` from the constructor, which reads `accessTokenProvider`, builds the WebSocket URI as `ws[s]://host/ws?token=<token>`, and starts listening via `WebSocketChannel.connect()`; (3) fixed `WsMessage.fromJson` to map `entity→subject`, `type→event`, `data→payload`; (4) changed `_handleMessage` to accept all messages except the `"connected"` welcome frame (dropping the broken `type == 'message'` guard).

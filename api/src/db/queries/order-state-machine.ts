@@ -298,6 +298,7 @@ export async function findOrderStatusHistory(
 ): Promise<
   {
     id: string;
+    orderId: string;
     statusType: string;
     oldValue: string;
     newValue: string;
@@ -309,6 +310,7 @@ export async function findOrderStatusHistory(
   return db
     .select({
       id: orderStatusHistory.id,
+      orderId: orderStatusHistory.orderId,
       statusType: orderStatusHistory.statusType,
       oldValue: orderStatusHistory.oldValue,
       newValue: orderStatusHistory.newValue,
