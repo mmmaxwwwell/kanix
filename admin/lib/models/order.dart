@@ -17,7 +17,7 @@ class Order {
   final Map<String, dynamic>? shippingAddressSnapshot;
   final DateTime? placedAt;
   final DateTime createdAt;
-  final DateTime updatedAt;
+  final DateTime? updatedAt;
   final List<OrderLine>? lines;
 
   const Order({
@@ -39,7 +39,7 @@ class Order {
     this.shippingAddressSnapshot,
     this.placedAt,
     required this.createdAt,
-    required this.updatedAt,
+    this.updatedAt,
     this.lines,
   });
 
@@ -52,7 +52,7 @@ class Order {
       status: json['status'] as String,
       paymentStatus: json['paymentStatus'] as String,
       fulfillmentStatus: json['fulfillmentStatus'] as String,
-      shippingStatus: json['shippingStatus'] as String,
+      shippingStatus: json['shippingStatus'] as String? ?? 'not_shipped',
       currency: json['currency'] as String? ?? 'USD',
       subtotalMinor: json['subtotalMinor'] as int? ?? 0,
       taxMinor: json['taxMinor'] as int? ?? 0,
@@ -67,7 +67,9 @@ class Order {
           ? DateTime.parse(json['placedAt'] as String)
           : null,
       createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : null,
       lines: json['lines'] != null
           ? (json['lines'] as List<dynamic>)
               .map((e) => OrderLine.fromJson(e as Map<String, dynamic>))
