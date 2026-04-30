@@ -1127,10 +1127,11 @@ export async function createServer(options: CreateServerOptions): Promise<Server
         preHandler: [verifySession, requireAdmin, requireCapability(CAPABILITIES.ORDERS_READ)],
       },
       async (request) => {
-        const query = request.query as { limit?: string; offset?: string };
+        const query = request.query as { limit?: string; offset?: string; search?: string };
         const limit = query.limit ? Math.min(Math.max(parseInt(query.limit, 10), 1), 500) : 100;
         const offset = query.offset ? Math.max(parseInt(query.offset, 10), 0) : 0;
-        const result = await listAllOrders(database.db, { limit, offset });
+        const search = query.search?.trim() || undefined;
+        const result = await listAllOrders(database.db, { limit, offset, search });
         return { orders: result.orders, total: result.total, limit, offset };
       },
     );

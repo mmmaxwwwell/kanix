@@ -257,7 +257,7 @@ export async function transitionOrderStatus(
 // ---------------------------------------------------------------------------
 
 /**
- * Find an order by ID with all four status fields.
+ * Find an order by ID with all fields needed for the admin detail view.
  */
 export async function findOrderById(
   db: PostgresJsDatabase,
@@ -265,23 +265,45 @@ export async function findOrderById(
 ): Promise<{
   id: string;
   orderNumber: string;
+  customerId: string | null;
   email: string;
   status: string;
   paymentStatus: string;
   fulfillmentStatus: string;
   shippingStatus: string;
+  currency: string;
+  subtotalMinor: number;
+  taxMinor: number;
+  shippingMinor: number;
+  discountMinor: number;
   totalMinor: number;
+  billingAddressSnapshotJson: unknown;
+  shippingAddressSnapshotJson: unknown;
+  placedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 } | null> {
   const [row] = await db
     .select({
       id: order.id,
       orderNumber: order.orderNumber,
+      customerId: order.customerId,
       email: order.email,
       status: order.status,
       paymentStatus: order.paymentStatus,
       fulfillmentStatus: order.fulfillmentStatus,
       shippingStatus: order.shippingStatus,
+      currency: order.currency,
+      subtotalMinor: order.subtotalMinor,
+      taxMinor: order.taxMinor,
+      shippingMinor: order.shippingMinor,
+      discountMinor: order.discountMinor,
       totalMinor: order.totalMinor,
+      billingAddressSnapshotJson: order.billingAddressSnapshotJson,
+      shippingAddressSnapshotJson: order.shippingAddressSnapshotJson,
+      placedAt: order.placedAt,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
     })
     .from(order)
     .where(eq(order.id, orderId));

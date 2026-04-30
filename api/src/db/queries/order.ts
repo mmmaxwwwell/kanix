@@ -1,4 +1,4 @@
-import { eq, and, isNull, desc, count } from "drizzle-orm";
+import { eq, and, isNull, desc, count, or, ilike } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { order } from "../schema/order.js";
 
@@ -55,7 +55,7 @@ export async function findOrdersByCustomerId(
  */
 export async function listAllOrders(
   db: PostgresJsDatabase,
-  options: { limit?: number; offset?: number } = {},
+  options: { limit?: number; offset?: number; search?: string } = {},
 ): Promise<{
   orders: {
     id: string;
@@ -73,6 +73,13 @@ export async function listAllOrders(
   const limit = options.limit ?? 100;
   const offset = options.offset ?? 0;
 
+  const searchCondition = options.search
+    ? or(
+        ilike(order.orderNumber, `%${options.search}%`),
+        ilike(order.email, `%${options.search}%`),
+      )
+    : undefined;
+
   const [rows, [{ total }]] = await Promise.all([
     db
       .select({
@@ -87,10 +94,11 @@ export async function listAllOrders(
         createdAt: order.createdAt,
       })
       .from(order)
+      .where(searchCondition)
       .orderBy(desc(order.createdAt))
       .limit(limit)
       .offset(offset),
-    db.select({ total: count() }).from(order),
+    db.select({ total: count() }).from(order).where(searchCondition),
   ]);
 
   return { orders: rows, total };
