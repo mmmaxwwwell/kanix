@@ -53,10 +53,9 @@ Available belts:
 
 | Belt                  | Belt H | Belt thickness | Plate t | Use with        |
 |-----------------------|--------|----------------|---------|-----------------|
-| `kanix_belt_38x4`     | 38     | 4              | 4       | 2-row grids     |
-| `kanix_belt_38x5_3`   | 38     | 5.3            | 4       | 2-row grids     |
-| `kanix_belt_52x6_5`   | 52     | 6.5            | 5.5     | 3-row grids     |
-| `kanix_belt_52x12`    | 52     | 12             | 5.5     | 3-row grids     |
+| `kanix_belt_38x5_3`   | 38     | 5.3            | 5       | 2-row grids     |
+| `kanix_belt_52x6_5`   | 52     | 6.5            | 5       | 3-row grids     |
+| `kanix_belt_52x12`    | 52     | 12             | 5       | 3-row grids     |
 
 ### Plate matrix — which combinations exist
 
@@ -65,25 +64,20 @@ A plate fixture exists at `scad/plates/` for every valid grid × belt pair.
 
 **38mm belt (1.5" duty) — 2-row grids:**
 
-| Grid \ Belt | `38x4` (4mm) | `38x5.3` (5.3mm) |
-|-------------|--------------|------------------|
-| `2x2`       | `kanix_plate_2x2_38x4.scad` ✓ | `kanix_plate_2x2_38x5.3.scad` ✓ |
-| `3x2`       | `kanix_plate_3x2_38x4.scad` ⚠ | `kanix_plate_3x2_38x5.3.scad` ⚠ |
-| `4x2`       | `kanix_plate_4x2_38x4.scad` ⚠ | `kanix_plate_4x2_38x5.3.scad` ⚠ |
+| Grid \ Belt | `38x5.3` (5.3mm) |
+|-------------|------------------|
+| `2x2`       | `kanix_plate_2x2_38x5.3.scad` |
+| `3x2`       | `kanix_plate_3x2_38x5.3.scad` |
+| `4x2`       | `kanix_plate_4x2_38x5.3.scad` |
 
 **52mm belt (2" duty) — 3-row grids:**
 
 | Grid \ Belt | `52x6.5` (6.5mm) | `52x12` (12mm) |
 |-------------|------------------|----------------|
-| `3x3`       | `kanix_plate_3x3_52x6.5.scad` ✓ | `kanix_plate_3x3_52x12.scad` ✓ |
-| `4x3`       | `kanix_plate_4x3_52x6.5.scad` ⚠ | `kanix_plate_4x3_52x12.scad` ⚠ |
+| `3x3`       | `kanix_plate_3x3_52x6.5.scad` | `kanix_plate_3x3_52x12.scad` |
+| `4x3`       | `kanix_plate_4x3_52x6.5.scad` | `kanix_plate_4x3_52x12.scad` |
 
-Legend: ✓ = renders the full clip today. ⚠ = renders a placeholder back plate
-only; needs the rectangular-`kanix_plate` rewrite (see "Clip plates" below).
-
-Total: **10 plate fixtures** (4 working + 6 stubbed). 3-wide and 4-wide
-non-square plates are blocked on rectangular-plate support in
-[lib/kanix-plate.scad](lib/kanix-plate.scad).
+Total: **7 plate fixtures**, all rendering full clips.
 
 ### How to read a preset
 

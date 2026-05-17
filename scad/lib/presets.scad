@@ -105,23 +105,16 @@ kanix_grid_4x3 = [
 //   belt_height      mm; informational — matches the grid's plate_h
 //   belt_thickness   mm; gap the clip wraps around the belt
 //   plate_thickness  mm; thickness of the back plate (where bolts go)
-//   screw_length     mm; max bite depth into plate (plate_thickness - 1mm)
+//   screw_length     mm; bite depth into the accessory module (10mm screw -
+//                    3mm head rest - 2mm plate passthrough = 8mm into module).
 
 // ----- 38mm / 1.5" duty belts -----
-kanix_belt_38x4 = [
-    ["name",            "38x4"],
-    ["belt_height",     38],
-    ["belt_thickness",  4],
-    ["plate_thickness", 4],
-    ["screw_length",    3]
-];
-
 kanix_belt_38x5_3 = [
     ["name",            "38x5.3"],
     ["belt_height",     38],
     ["belt_thickness",  5.3],
-    ["plate_thickness", 4],
-    ["screw_length",    3]
+    ["plate_thickness", 5],
+    ["screw_length",    8]
 ];
 
 // ----- 52mm / 2" duty belts -----
@@ -129,16 +122,16 @@ kanix_belt_52x6_5 = [
     ["name",            "52x6.5"],
     ["belt_height",     52],
     ["belt_thickness",  6.5],
-    ["plate_thickness", 5.5],
-    ["screw_length",    5]
+    ["plate_thickness", 5],
+    ["screw_length",    8]
 ];
 
 kanix_belt_52x12 = [
     ["name",            "52x12"],
     ["belt_height",     52],
     ["belt_thickness",  12],
-    ["plate_thickness", 5.5],
-    ["screw_length",    5]
+    ["plate_thickness", 5],
+    ["screw_length",    8]
 ];
 
 // ============================================================================
