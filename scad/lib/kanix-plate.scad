@@ -351,8 +351,8 @@ module kanix_plate(
 
     module middle_clip_bottom_block_protrustion_cutout()
     {
-        translate([0,plate_h/2 + bottom_block_length/2 + plate_thickness/2 - middle_clip_interface_depth/2,plate_thickness/2])
-        cube([plate_w/2,plate_thickness + middle_clip_interface_depth,plate_thickness],center=true);
+        translate([0,plate_h/2 + bottom_block_length/2,plate_thickness/2])
+        cube([plate_w - side_locking_tab_depth*4,bottom_block_length + middle_clip_interface_depth*2,plate_thickness],center=true);
     }
 
     module middle_clip_bottom_block_hinge_cutout(){
