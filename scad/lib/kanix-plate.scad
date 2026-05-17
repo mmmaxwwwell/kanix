@@ -5,6 +5,28 @@
 use <hinge.scad>
 use <hinge2.scad>
 include <common.scad>
+include <presets.scad>
+
+// Preset-driven entry point. Plates in scad/plates/ call this.
+// Only handles square grids today (2x2, 3x3); rectangular grids (3x2, 4x2,
+// 4x3) will fail the assert below until kanix_plate is reworked to support
+// non-square plates.
+module kanix_plate_from_presets(grid, belt, view = "open") {
+    plate_w = preset_get(grid, "plate_w");
+    plate_h = preset_get(grid, "plate_h");
+    assert(plate_w == plate_h,
+        "kanix_plate currently only supports square plates (plate_w == plate_h). Rectangular grid support is TODO.");
+
+    kanix_plate(
+        belt_height     = preset_get(belt, "belt_height"),
+        belt_thickness  = preset_get(belt, "belt_thickness"),
+        plate_size      = plate_w,
+        plate_thickness = preset_get(belt, "plate_thickness"),
+        hole_cols       = preset_get(grid, "hole_cols"),
+        hole_rows       = preset_get(grid, "hole_rows"),
+        view            = view
+    );
+}
 
 module kanix_plate(
     belt_height = 51,        // mm (2" duty belt)
