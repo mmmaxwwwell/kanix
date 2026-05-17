@@ -3,12 +3,8 @@
 // Free for personal use. Commercial use requires a separate license.
 //
 // Render fixture: Kanix clip — 4x3 grid, 52mm belt height, 12mm belt thickness.
-//
-// TODO: kanix-plate.scad currently only supports square plates. Placeholder
-// renders the back plate only. Switch to kanix_plate_from_presets after the
-// rectangular-plate rewrite.
 
 include <../lib/presets.scad>
-use <../lib/mounting-plate.scad>
+use <../lib/kanix-plate.scad>
 
-mounting_plate(kanix_grid_4x3, thickness = 5.5);
+kanix_plate_from_presets(kanix_grid_4x3, kanix_belt_52x12);

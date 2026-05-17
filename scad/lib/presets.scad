@@ -39,9 +39,10 @@ include <common.scad>
 //   plate_h       plate height in mm (up the belt)   — matches belt height
 //   pilot_hole_d  M5 self-tap pilot
 //
-// Plate footprint rule of thumb: plate_h matches the belt height (38 or 52).
-// plate_w = hole_spacing*(cols-1) + 2*margin, where margin is chosen per grid
-// to give a clean edge-to-hole distance.
+// Plate footprint:
+//   plate_h = belt height (38mm for 2-row, 52mm for 3-row).
+//   plate_w = kanix_grid_plate_w(cols) = hole_spacing*(cols-1) + 2*plate_margin
+//             (plate_margin = 7 from common.scad — same margin accessories use).
 
 // ----- 38mm belt (1.5" duty), 2 rows -----
 kanix_grid_2x2 = [
@@ -49,7 +50,7 @@ kanix_grid_2x2 = [
     ["hole_cols",      2],
     ["hole_rows",      2],
     ["hole_spacing",   kanix_hole_spacing],
-    ["plate_w",        38],
+    ["plate_w",        kanix_grid_plate_w(2)],   // 33.05
     ["plate_h",        38],
     ["pilot_hole_d",   kanix_screw_d]
 ];
@@ -59,7 +60,7 @@ kanix_grid_3x2 = [
     ["hole_cols",      3],
     ["hole_rows",      2],
     ["hole_spacing",   kanix_hole_spacing],
-    ["plate_w",        kanix_hole_spacing * 2 + 14],   // 57.1
+    ["plate_w",        kanix_grid_plate_w(3)],   // 52.1
     ["plate_h",        38],
     ["pilot_hole_d",   kanix_screw_d]
 ];
@@ -69,7 +70,7 @@ kanix_grid_4x2 = [
     ["hole_cols",      4],
     ["hole_rows",      2],
     ["hole_spacing",   kanix_hole_spacing],
-    ["plate_w",        kanix_hole_spacing * 3 + 14],   // 76.15
+    ["plate_w",        kanix_grid_plate_w(4)],   // 71.15
     ["plate_h",        38],
     ["pilot_hole_d",   kanix_screw_d]
 ];
@@ -80,7 +81,7 @@ kanix_grid_3x3 = [
     ["hole_cols",      3],
     ["hole_rows",      3],
     ["hole_spacing",   kanix_hole_spacing],
-    ["plate_w",        52],
+    ["plate_w",        kanix_grid_plate_w(3)],   // 52.1
     ["plate_h",        52],
     ["pilot_hole_d",   kanix_screw_d]
 ];
@@ -90,7 +91,7 @@ kanix_grid_4x3 = [
     ["hole_cols",      4],
     ["hole_rows",      3],
     ["hole_spacing",   kanix_hole_spacing],
-    ["plate_w",        kanix_hole_spacing * 3 + 14],   // 76.15
+    ["plate_w",        kanix_grid_plate_w(4)],   // 71.15
     ["plate_h",        52],
     ["pilot_hole_d",   kanix_screw_d]
 ];

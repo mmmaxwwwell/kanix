@@ -23,6 +23,12 @@ plate_edge_r   = 2;   // mm top edge rounding radius
 function kanix_plate_dim(grid_size, margin = plate_margin) =
     kanix_hole_spacing * (grid_size - 1) + margin * 2;
 
+// Plate width derived from the bolt grid: spans the outermost holes plus
+// `margin` on each side. Used by grid presets so width tracks `hole_cols`
+// automatically. plate_h is set separately (matches belt height).
+function kanix_grid_plate_w(cols, margin = plate_margin) =
+    kanix_hole_spacing * (cols - 1) + margin * 2;
+
 // Grid offset: centers a grid_size x grid_size pattern around the origin.
 function kanix_grid_offset(grid_size) =
     (grid_size - 1) / 2;

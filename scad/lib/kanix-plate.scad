@@ -12,15 +12,14 @@ include <presets.scad>
 // 4x3) will fail the assert below until kanix_plate is reworked to support
 // non-square plates.
 module kanix_plate_from_presets(grid, belt, view = "open") {
-    plate_w = preset_get(grid, "plate_w");
-    plate_h = preset_get(grid, "plate_h");
-    assert(plate_w == plate_h,
-        "kanix_plate currently only supports square plates (plate_w == plate_h). Rectangular grid support is TODO.");
-
+    // plate_w is derived from the bolt grid (kanix_grid_plate_w in common.scad).
+    // plate_h is the belt height. Both are owned by the plate module here, not
+    // duplicated on the grid preset side, so changes only happen in one place.
     kanix_plate(
         belt_height     = preset_get(belt, "belt_height"),
         belt_thickness  = preset_get(belt, "belt_thickness"),
-        plate_size      = plate_w,
+        plate_w         = kanix_grid_plate_w(preset_get(grid, "hole_cols")),
+        plate_h         = preset_get(belt, "belt_height"),
         plate_thickness = preset_get(belt, "plate_thickness"),
         hole_cols       = preset_get(grid, "hole_cols"),
         hole_rows       = preset_get(grid, "hole_rows"),
@@ -31,7 +30,8 @@ module kanix_plate_from_presets(grid, belt, view = "open") {
 module kanix_plate(
     belt_height = 51,        // mm (2" duty belt)
     belt_thickness = 6.5,    // mm
-    plate_size = 52,         // mm, square mounting_plate
+    plate_w = 52,            // mm, X dimension (across the belt)
+    plate_h = 52,            // mm, Y dimension (along the belt)
     plate_thickness = 5,     // mm
     bolt_hole_d = 5.5,       // M5 clearance hole
     counterbore_d = 11.5,    // Counterbore for M5 bolt heads
@@ -49,17 +49,17 @@ module kanix_plate(
 
     top_block_length = hinge_od/2 - hinge_gap/2;
     top_block_height = plate_thickness + belt_thickness / 2;
-    top_block_offset = plate_size / 2 + top_block_length / 2;
+    top_block_offset = plate_h / 2 + top_block_length / 2;
 
     bottom_block_length = 10;
-    bottom_block_offset = plate_size / 2 + bottom_block_length / 2;
+    bottom_block_offset = plate_h / 2 + bottom_block_length / 2;
 
-    module_offset = plate_size/2 + top_block_length + hinge_gap/2;
+    module_offset = plate_h/2 + top_block_length + hinge_gap/2;
 
     side_locking_tab_depth = 5;
     rx_wall_width = 2;
     tx_tip_cutoff = 1.5;
-    locking_tab_width = plate_size - side_locking_tab_depth*4 - hinge_gap * 2;
+    locking_tab_width = plate_w - side_locking_tab_depth*4 - hinge_gap * 2;
 
     middle_clip_interface_depth = 4;
     middle_clip_interface_diameter = plate_thickness * 0.75;
@@ -69,7 +69,7 @@ module kanix_plate(
 
     module plate_body() {
         translate([0, 0, plate_thickness/2])
-        cube([plate_size, plate_size + 1, plate_thickness], center = true);
+        cube([plate_w, plate_h + 1, plate_thickness], center = true);
     }
 
     module bolt_hole() {
@@ -94,12 +94,12 @@ module kanix_plate(
     }
 
     module latch_hinge_base_void(){
-        translate([0,plate_size/2 + bottom_block_length - plate_thickness/2,plate_thickness/2])
+        translate([0,plate_h/2 + bottom_block_length - plate_thickness/2,plate_thickness/2])
         cube([locking_tab_width,plate_thickness,plate_thickness], center = true);
     }
 
     module latch_hinge_base(inner, angle = 0,cutout=false){
-        translate([0,plate_size/2 + bottom_block_length - plate_thickness/2,plate_thickness/2])
+        translate([0,plate_h/2 + bottom_block_length - plate_thickness/2,plate_thickness/2])
         rotate([0,90,0])
         rotate([0,0,angle])
         hinge(
@@ -122,7 +122,7 @@ module kanix_plate(
         main_hinge_transform()
         hinge(
             gap = hinge_gap,
-            length = plate_size,
+            length = plate_w,
             outer_diam = hinge_od,
             segments = main_hinge_segments,
             inner = inner
@@ -133,7 +133,7 @@ module kanix_plate(
         main_hinge_transform()
         hinge(
             gap = hinge_gap,
-            length = plate_size,
+            length = plate_w,
             outer_diam = hinge_od,
             segments = main_hinge_segments,
             inner = inner,
@@ -144,7 +144,7 @@ module kanix_plate(
     module mounting_block(){
         rotate([0, -90, 0])
         translate([0, top_block_length/2, -top_block_height/2])
-        cube([plate_size, top_block_length, top_block_height], center = true);
+        cube([plate_w, top_block_length, top_block_height], center = true);
     }
 
     module right_angle_fillet(diameter, length){
@@ -168,7 +168,7 @@ module kanix_plate(
             difference() {
                 union() {
                     translate([0, top_block_length/2, plate_thickness - top_block_height/2])
-                    right_angle_fillet(diameter = fillet_d, length = plate_size);
+                    right_angle_fillet(diameter = fillet_d, length = plate_w);
                     difference() {
                         main_hinge_transform()
                         mounting_block();
@@ -203,31 +203,31 @@ module kanix_plate(
 
     module bottom_block(){
         translate([0, bottom_block_offset, plate_thickness/2 ]){
-            cube([plate_size, bottom_block_length, plate_thickness ], center = true);
+            cube([plate_w, bottom_block_length, plate_thickness ], center = true);
         }
 
     }
 
     module front_cutout_feature(){
         offset = 2;
-        translate([plate_size/2 - side_locking_tab_depth*0.75 -side_locking_tab_depth * 2,0,plate_thickness/2]){
+        translate([plate_w/2 - side_locking_tab_depth*0.75 -side_locking_tab_depth * 2,0,plate_thickness/2]){
             translate([offset/2,0,0])
             hull(){
                 cylinder(d = side_locking_tab_depth * 1.5 - 2, h=plate_thickness + 1, center=true, $fn=32);
-                translate([0,plate_size,0])
+                translate([0,plate_h,0])
                 cylinder(d = side_locking_tab_depth * 1.5 - 2, h=plate_thickness + 1, center=true, $fn=32);
 
             }
             hull(){
                 translate([side_locking_tab_depth * 2.5/3,0,0]){
                     cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
-                    translate([0,plate_size/2 - side_locking_tab_depth * 0.75,0])
+                    translate([0,plate_h/2 - side_locking_tab_depth * 0.75,0])
                     cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
                 }
 
                 translate([offset,0,0]){
                     cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
-                        translate([0,plate_size/2 - side_locking_tab_depth * 0.75,0])
+                        translate([0,plate_h/2 - side_locking_tab_depth * 0.75,0])
                     cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
                 }
             }
@@ -244,26 +244,26 @@ module kanix_plate(
         channel_width = side_locking_tab_depth * 1.5 - 2;
         offset = 2;
         translate([
-            plate_size/2 - side_locking_tab_depth*0.75 -side_locking_tab_depth * 2,
-            -plate_size/2 - bottom_block_length + 2.5 ,
+            plate_w/2 - side_locking_tab_depth*0.75 -side_locking_tab_depth * 2,
+            -plate_h/2 - bottom_block_length + 2.5 ,
             plate_thickness/2]
         ){
             translate([offset/2,0,0]){
-                translate([0,plate_size/2 - plate_thickness/2,0])
+                translate([0,plate_h/2 - plate_thickness/2,0])
                 cube([channel_width - hinge_gap * 2,bottom_block_length,plate_thickness], center = true);
             }
             hull(){
                 translate([side_locking_tab_depth * 2.5/3 - hinge_gap, - hinge_gap,0]){
-                    translate([0,plate_size/2 - side_locking_tab_depth * 0.75 - 5,0])
+                    translate([0,plate_h/2 - side_locking_tab_depth * 0.75 - 5,0])
                     cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness, center=true, $fn=32);
-                    translate([0,plate_size/2 - side_locking_tab_depth * 0.75 ,0])
+                    translate([0,plate_h/2 - side_locking_tab_depth * 0.75 ,0])
                     cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness, center=true, $fn=32);
                 }
 
                 translate([offset + hinge_gap,-hinge_gap,0]){
-                    translate([0,plate_size/2 - side_locking_tab_depth * 0.75 - 5,0])
+                    translate([0,plate_h/2 - side_locking_tab_depth * 0.75 - 5,0])
                     cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness, center=true, $fn=32);
-                    translate([0,plate_size/2 - side_locking_tab_depth * 0.75,0])
+                    translate([0,plate_h/2 - side_locking_tab_depth * 0.75,0])
                     cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness, center=true, $fn=32);
                 }
             }
@@ -278,7 +278,7 @@ module kanix_plate(
 
 
     module latch_block_rx(){
-        translate([plate_size/2 - side_locking_tab_depth/2,plate_size/2 + bottom_block_length/2,plate_thickness+belt_thickness/2]){
+        translate([plate_w/2 - side_locking_tab_depth/2,plate_h/2 + bottom_block_length/2,plate_thickness+belt_thickness/2]){
             difference(){
                 //outer block
                 cube([
@@ -302,7 +302,7 @@ module kanix_plate(
     }
 
     module latch_block_tx(){
-        translate([plate_size/2 - side_locking_tab_depth*1.5,plate_size/2 + bottom_block_length/2,plate_thickness+belt_thickness/2]){
+        translate([plate_w/2 - side_locking_tab_depth*1.5,plate_h/2 + bottom_block_length/2,plate_thickness+belt_thickness/2]){
             cube([side_locking_tab_depth,bottom_block_length,belt_thickness],center = true);
             difference(){
                 translate([side_locking_tab_depth/2,bottom_block_length/2 - rx_wall_width,0]){
@@ -321,17 +321,20 @@ module kanix_plate(
     }
 
     module front_edge_fillet_feature(){
+        // Length spans the longer plate edge so the rotated feature covers both
+        // axes when reused on top/bottom and sides — overshoot is trimmed by
+        // the surrounding plate body.
         rotate([0, 0, 90])
-        right_angle_fillet(diameter = plate_thickness/2, length = plate_size*2);
+        right_angle_fillet(diameter = plate_thickness/2, length = max(plate_w, plate_h)*2);
     }
 
     module front_edge_fillet(){
-        translate([plate_size/2,0,0])
+        translate([plate_w/2,0,0])
         front_edge_fillet_feature();
         mirror([1,0,0])
-        translate([plate_size/2,0,0])
+        translate([plate_w/2,0,0])
         front_edge_fillet_feature();
-        translate([0,plate_size/2 + bottom_block_length,0])
+        translate([0,plate_h/2 + bottom_block_length,0])
         rotate([0,0,90])
         front_edge_fillet_feature();
     }
@@ -348,18 +351,18 @@ module kanix_plate(
 
     module middle_clip_bottom_block_protrustion_cutout()
     {
-        translate([0,plate_size/2 + bottom_block_length/2 + plate_thickness/2 - middle_clip_interface_depth/2,plate_thickness/2])
-        cube([plate_size/2,plate_thickness + middle_clip_interface_depth,plate_thickness],center=true);
+        translate([0,plate_h/2 + bottom_block_length/2 + plate_thickness/2 - middle_clip_interface_depth/2,plate_thickness/2])
+        cube([plate_w/2,plate_thickness + middle_clip_interface_depth,plate_thickness],center=true);
     }
 
     module middle_clip_bottom_block_hinge_cutout(){
-        translate([0,plate_size/2 + bottom_block_length/2 + plate_thickness/2,plate_thickness/2]){
-            cube([plate_size - side_locking_tab_depth * 4, plate_thickness + hinge_gap * 2, plate_thickness],center=true);
+        translate([0,plate_h/2 + bottom_block_length/2 + plate_thickness/2,plate_thickness/2]){
+            cube([plate_w - side_locking_tab_depth * 4, plate_thickness + hinge_gap * 2, plate_thickness],center=true);
         }
     }
 
     module middle_clip_front_hinge_front_translate(){
-        translate([0,plate_size/2 + bottom_block_length - plate_thickness/2,plate_thickness/2])
+        translate([0,plate_h/2 + bottom_block_length - plate_thickness/2,plate_thickness/2])
         rotate([0,90,0])
         children();
     }
@@ -431,10 +434,10 @@ module kanix_plate(
     }
 
     module front(){
-        translate([0,plate_size/2 + middle_clip_interface_depth/4,plate_thickness + belt_thickness/2 ])
+        translate([0,plate_h/2 + middle_clip_interface_depth/4,plate_thickness + belt_thickness/2 ])
         rotate([0,90,0])
         middle_clip_protrustion();
-        translate([0,plate_size/2 ,plate_thickness]){
+        translate([0,plate_h/2 ,plate_thickness]){
             rotate([0,0,180])
             translate([0, middle_clip_interface_depth/4 ,0])
             right_angle_fillet(diameter = belt_thickness, length = locking_tab_width - side_locking_tab_depth * 2 - hinge_gap * 3);
@@ -486,10 +489,10 @@ module kanix_plate(
         translate([0, module_offset ,0])
         back();
 
-        translate([0,-module_offset - plate_size/2 - bottom_block_length,0])
+        translate([0,-module_offset - plate_h/2 - bottom_block_length,0])
         middle_clip_middle_section();
 
-        translate([0,-module_offset - plate_size/2 - bottom_block_length - middle_clip_length - plate_thickness/2,0])
+        translate([0,-module_offset - plate_h/2 - bottom_block_length - middle_clip_length - plate_thickness/2,0])
         middle_clip_end_section();
     }
 
@@ -504,7 +507,7 @@ module kanix_plate(
         rotate([90,180,0])
         middle_clip_middle_section();
 
-        translate([0, plate_size/2 + bottom_block_length - plate_thickness/2 ,plate_thickness + belt_thickness])
+        translate([0, plate_h/2 + bottom_block_length - plate_thickness/2 ,plate_thickness + belt_thickness])
         middle_clip_end_section();
     }
 }
