@@ -56,7 +56,13 @@ module hinge(
 
     module cone_pin(h) {
         sh = h * cone_scale;
-        cylinder(h = sh, r1 = sh, r2 = tip_r, $fn = 32);
+        // Radial size must fit inside the barrel; height is independent of radius.
+        // Original code used r1 = sh, which only happened to fit for the 52x6.5
+        // preset (r=3.25, sh~2.38). For thinner barrels (e.g. r=2 with sh~2.43),
+        // the cone protrudes radially past the barrel wall.
+        max_r = max(tip_r, r - gap);
+        base_r = min(sh, max_r);
+        cylinder(h = sh, r1 = base_r, r2 = tip_r, $fn = 32);
     }
 
     module barrel_segment(seg_len) {

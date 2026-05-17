@@ -36,6 +36,10 @@ thread_crest_d = thread_d - thread_pitch * 1.08;       // ~34.84mm (protects bor
 // Container height: roll + bottom + margin + threads above roll
 container_h    = roll_height + bottom + 3 + thread_height; // 77mm
 
+// Base chamfer: 30 degrees from vertical (printable overhang), breaks sharp bottom edge
+base_chamfer_w = 1;                              // mm horizontal run of chamfer
+base_chamfer_h = base_chamfer_w / tan(30);       // mm vertical rise (~1.73mm)
+
 // ===== Cap (flush plug with bowl grip) =====
 cap_h          = thread_height - 0.5; // 7.5mm total plug height
 cap_thread_l   = cap_h - thread_pitch; // effective thread length after bevel
@@ -124,12 +128,26 @@ module v_slit() {
     }
 }
 
+// Cylinder with a 30-deg-from-vertical chamfer at its base. Used inside the
+// body hull so the plate bridge inherits the chamfered profile.
+module chamfered_cylinder(d, h, chamfer_w, chamfer_h) {
+    union() {
+        // Chamfer frustum: small at bottom, full diameter at chamfer_h.
+        cylinder(d1 = d - 2 * chamfer_w, d2 = d, h = chamfer_h);
+        // Main shaft above the chamfer.
+        translate([0, 0, chamfer_h])
+            cylinder(d = d, h = h - chamfer_h);
+    }
+}
+
 module body() {
     difference() {
         // Step 1: body solid with thread grooves cut ONLY into the wall
         difference() {
             hull() {
-                cylinder(d = thread_section_od, h = container_h);
+                chamfered_cylinder(d = thread_section_od, h = container_h,
+                                   chamfer_w = base_chamfer_w,
+                                   chamfer_h = base_chamfer_h);
                 translate([0, plate_y, container_h - plate_height / 2])
                     rotate([90, 0, 0])
                     plate_shape();

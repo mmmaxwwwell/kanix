@@ -14,14 +14,14 @@ holes_per_side       = 3;
 // ===== Plate Parameters =====
 plate_length    = 110;  // mm (long axis)
 plate_width     = 30;   // mm (hinge axis)
-plate_thickness = 3.65; // mm
+plate_thickness = 5; // mm
 
 // ===== Hinge Parameters =====
 knuckle_diam     = plate_thickness * 2;
 end_knuckle_diam = plate_thickness * 2;
 center_hinge_segs = 5;
 end_hinge_segs    = 5;
-hinge_gap        = 0.2;
+hinge_gap        = 0.3;
 
 block_length     = knuckle_diam/2 + hinge_gap/4;
 block_height     = plate_thickness;
@@ -163,17 +163,32 @@ module end_block(inner = false){
 }
 
 module half(inner = false){
+    if(inner)
+    translate([0,plate_length/2 - 6])
+    difference(){
+        cylinder(d = 8,h = plate_thickness * 1.5);
+        cylinder(d = 4,h = plate_thickness* 4);
+    }
     translate([0, 0, plate_thickness/2])
-    intersection() {
-        union() {
-            leaf(holes = !inner);
-            center_block(inner);
-            end_block(inner);
+    difference(){
+        intersection() {
+            union() {
+                    leaf(holes = !inner);
+                    
+                center_block(inner);
+                end_block(inner);
+            }
+            // Clip everything to the rounded profile
+            rotate([90, 0, 0])
+                linear_extrude(height = plate_length * 2, center = true)
+                leaf_profile();
         }
-        // Clip everything to the rounded profile
-        rotate([90, 0, 0])
-            linear_extrude(height = plate_length * 2, center = true)
-            leaf_profile();
+        translate([0,plate_length/2 - 6,-plate_thickness]){
+        cylinder(d = 4,h = plate_thickness * 4);
+        if(!inner) 
+            translate([0,0,plate_thickness])
+            cylinder(d = 8.2,h = plate_thickness * 1.5);
+        }
     }
 }
 
@@ -192,6 +207,7 @@ front();
 rotate([0, 0, 180])
 translate([0, module_offset, 0])
 back();
+
 
 if ($preview) {
     //split

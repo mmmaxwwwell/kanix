@@ -25,22 +25,30 @@ use <mounting-plate.scad>
 // wall_back    — wall thickness behind the cavity (against the plate)
 // wall_bottom  — wall thickness below the cavity (closed bottom)
 // plate_t      — override plate thickness; defaults to preset's plate_thickness
+// hole_depth   — override counterbore-pilot depth; defaults to plate_t - 1
+// arc_y_offset — shift arc/slot/bumps up (+) or down (-) from default
 module clicker_holder(
     preset,
-    clicker_h   = 52.2,
-    clicker_w   = 33,
-    clicker_d   = 18,
-    wall_side   = 3,
-    wall_front  = 1.5,
-    wall_back   = 1.5,
-    wall_bottom = 3,
-    plate_t     = undef
+    clicker_h    = 52.2,
+    clicker_w    = 33,
+    clicker_d    = 18,
+    wall_side    = 3,
+    wall_front   = 1.5,
+    wall_back    = 1.5,
+    wall_bottom  = 3,
+    plate_t      = undef,
+    hole_depth   = undef,
+    arc_y_offset = 0
 ) {
     plate_size = preset_get(preset, "plate_size");
     cols       = preset_get(preset, "hole_cols");
     rows       = preset_get(preset, "hole_rows");
     spacing    = preset_get(preset, "hole_spacing");
-    pt         = plate_t == undef ? preset_get(preset, "plate_thickness") : plate_t;
+    pt_base    = plate_t == undef ? preset_get(preset, "plate_thickness") : plate_t;
+    // If the screw holes are deeper than the plate would normally be, grow
+    // the plate so the holes stay blind (≥1mm cap of material above them).
+    hd_req     = hole_depth == undef ? pt_base - 1 : hole_depth;
+    pt         = max(pt_base, hd_req + 1);
 
     // Plate footprint (matches mounting_plate's grow-with-grid logic).
     grid_w   = (cols - 1) * spacing + plate_margin * 2;
@@ -67,14 +75,15 @@ module clicker_holder(
     cavity_back_z = pocket_back_z + wall_back;
 
     // Default cap thickness used by mounting_plate (t - 1mm). We re-derive
-    // it here so the hole-drill subtraction matches.
-    hole_dep = pt - 1;
+    // it here so the hole-drill subtraction matches. When hole_depth was
+    // explicitly requested, pt was already grown above to keep ≥1mm of cap.
+    hole_dep = hd_req;
 
     // U-arc cutout geometry (shared with bumps so they stay co-centered).
     arc_or       = 23 / 2;
     arc_kerf     = 0.2;
     arc_ir       = arc_or - arc_kerf;
-    arc_bottom_y = pocket_bottom + wall_bottom + 3.5;
+    arc_bottom_y = pocket_bottom + wall_bottom + 3.5 + arc_y_offset;
     arc_center_y = arc_bottom_y + arc_or;
     arc_slot_len = 15;
 
@@ -82,7 +91,7 @@ module clicker_holder(
     bump_d = 20;
     bump_h = 6;
     bump_R = (pow(bump_d / 2, 2) + pow(bump_h, 2)) / (2 * bump_h);
-    bump_y = arc_center_y;
+    bump_y = arc_center_y - 1;
 
     rotate([90, 0, 0]) {
         union() {
@@ -106,7 +115,7 @@ module clicker_holder(
 
             // Bolt grid (drilled into the fused body, since we suppressed it
             // inside mounting_plate above).
-            plate_holes(preset, hole_dep);
+            plate_holes(preset, hole_dep, cols, rows);
 
             // U-shaped slot through the front face: 180° arc + two upward
             // 0.2mm kerf slots, bottom 1.5mm above the cavity floor.
@@ -178,6 +187,25 @@ module clicker_holder(
             translate([-bump_d, bump_y - bump_d, bump_z0_in - bump_h])
                 cube([bump_d * 2, bump_d * 2, bump_h]);
         }
+
+        // Sacrificial 0.2mm radial rods spanning the arc cutout, sitting
+        // flush against the front wall's front and back faces. The user
+        // clips them out after printing — they hold the bridge while FDM
+        // lays the layers above the arc cutout. Rods extend slightly past
+        // the outer edge of the cut so each end lands in solid material.
+        rod_d        = 0.2;
+        rod_overhang = 0.5;
+        rod_len      = arc_or + rod_overhang;
+        // Rod sits flush against the wall face, extending into the wall.
+        front_face_z = pocket_back_z + pocket_t - rod_d;  // top of rod = front face
+        back_face_z  = pocket_back_z + pocket_t - wall_front;  // bottom of rod = back face
+        rod_angles   = [0, 15, -15, 30, -30, 45, -45];
+        for (face_z = [front_face_z, back_face_z])
+            for (a = rod_angles)
+                translate([0, arc_center_y, face_z])
+                    rotate([0, 0, a])
+                        translate([-rod_d/2, -rod_len, 0])
+                            cube([rod_d, rod_len, rod_d]);
         }
     }
 }

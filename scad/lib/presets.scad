@@ -13,10 +13,10 @@
 
 include <common.scad>
 
-// ----- 37mm plate, 4mm belt (2x2 hole grid) -----
-kanix_preset_37x4 = [
-    ["name",          "37x4"],
-    ["plate_size",    37],     // mm, square plate edge length
+// ----- 38mm plate, 4mm belt (2x2 hole grid) -----
+kanix_preset_38x4 = [
+    ["name",          "38x4"],
+    ["plate_size",    38],     // mm, square plate edge length
     ["plate_thickness", 4],    // mm
     ["belt_thickness", 4],     // mm (clip-only; accessories ignore)
     ["belt_height",   51],     // mm (2" duty belt; clip-only)

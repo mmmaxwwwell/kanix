@@ -1,0 +1,27 @@
+// Copyright (c) 2026 mmmaxwwwell
+// Licensed under CC BY-NC-ND 4.0, https://creativecommons.org/licenses/by-nc-nd/4.0/
+// Free for personal use. Commercial use requires a separate license.
+//
+// Render fixture: 1x3 carabiner clip on the 52x6.5 preset.
+
+include <lib/presets.scad>
+use <lib/carabiner-clip.scad>
+
+$fn = 64;
+
+ring_size = 30;
+
+rotate([90,0,0])
+carabiner_clip(kanix_preset_52x65,
+    hole_rows           = 1,    // 1 = single-row clip, 2 = double-row clip
+    hole_cols           = 3,    // columns along the plate's long edge
+    outer_disc_diameter = ring_size,   // outside diameter of the carabiner disc
+    outer_disc_height   = 8,   // disc thickness (axis = Y, away from plate)
+    inner_disc_diameter = ring_size-12,   // through-hole the carabiner clips into
+    disc_taper          = 1,    // 45° taper depth on each face of the disc
+    bore_chamfer        = 1.5,    // 45° chamfer radial depth on each lip of the bore
+    bore_chamfer_recess = 0,    // shift chamfer narrow end inward along bore axis (recess below disc face)
+    bore_round          = 1,    // round-over on every edge of the bore cut
+    screw_length        = 8,    // override preset's screw_length (5mm) for this fixture
+    disc_z_override     = ring_size/2 + 5, // disc bottom flush with plate bottom (Z=0)
+);

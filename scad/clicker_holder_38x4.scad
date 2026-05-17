@@ -2,11 +2,11 @@
 // Licensed under CC BY-NC-ND 4.0, https://creativecommons.org/licenses/by-nc-nd/4.0/
 // Free for personal use. Commercial use requires a separate license.
 //
-// Render fixture: clicker holder for the 52x6.5 (3x3) Kanix preset.
+// Render fixture: clicker holder for the 38x4 (2x2) Kanix preset.
 
 include <lib/presets.scad>
 use <lib/clicker-holder.scad>
 
 $fn = 64;
 
-clicker_holder(kanix_preset_52x65, hole_depth = 9, arc_y_offset = 4);
+clicker_holder(kanix_preset_38x4);

@@ -16,9 +16,9 @@ scad/
 │   ├── kanix-plate.scad    the full hinged belt clip (separate concern)
 │   ├── hinge.scad
 │   └── hinge2.scad
-├── kanix_plate_37x4mm.scad     render fixture for the 37x4 clip
+├── kanix_plate_38x4mm.scad     render fixture for the 38x4 clip
 ├── kanix_plate_52x6.5mm.scad   render fixture for the 52x6.5 clip
-├── mounting_plate_37x4.scad    render fixture for the 2x2 back plate
+├── mounting_plate_38x4.scad    render fixture for the 2x2 back plate
 ├── mounting_plate_52x65.scad   render fixture for the 3x3 back plate
 └── <accessory>.scad            top-level accessory (e.g. wuben-g5-holster)
 ```
@@ -51,7 +51,7 @@ intentional, do not paper over it with default fallbacks.
 
 | Preset                | Plate    | Belt    | Hole grid |
 |-----------------------|----------|---------|-----------|
-| `kanix_preset_37x4`   | 37 × 4   | 4 mm    | 2 × 2     |
+| `kanix_preset_38x4`   | 38 × 4   | 4 mm    | 2 × 2     |
 | `kanix_preset_52x65`  | 52 × 5   | 6.5 mm  | 3 × 3     |
 
 ## Module conventions
@@ -68,7 +68,7 @@ Every accessory module that mounts to a Kanix clip:
    preset.
 3. **Ships with one render fixture per preset.** A render fixture is a
    thin top-level `.scad` that does nothing but `include` the preset and
-   call the module. Naming: `<accessory>_37x4.scad`, `<accessory>_52x65.scad`.
+   call the module. Naming: `<accessory>_38x4.scad`, `<accessory>_52x65.scad`.
    This keeps `scripts/test-scad.sh` honest — every accessory is verified
    against every preset on every test run.
 
@@ -92,11 +92,11 @@ module my_accessory(preset) {
 ```
 
 ```openscad
-// my_accessory_37x4.scad   (render fixture)
+// my_accessory_38x4.scad   (render fixture)
 include <lib/presets.scad>
 use <lib/my-accessory.scad>
 $fn = 64;
-my_accessory(kanix_preset_37x4);
+my_accessory(kanix_preset_38x4);
 ```
 
 ```openscad
