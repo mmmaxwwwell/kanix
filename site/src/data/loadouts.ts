@@ -80,7 +80,7 @@ export const loadouts: Loadout[] = [
         groupLabel: "E-Collar Holster",
         groupDescription:
           "Pick the holster that matches the e-collar receiver you already own. All e-collar holsters use the same 3×3 / 52mm / 6.5mm plate, so the mount is identical no matter which one you print.",
-        choices: ["mini-educator-holder", "dogtra-200c-202c-arc-holder", "dogtra-280x-arcx-holder"],
+        choices: ["mini-educator-holder", "dogtra-200ncpt-202c-arc-holder", "dogtra-280x-arcx-holder"],
         plate: "plates/kanix_plate_3x3_52x6.5.stl",
         note: "Click any of the candidates to see which e-collars it supports.",
       },

@@ -21,5 +21,5 @@ carabiner_clip(kanix_preset_52x65,
     bore_chamfer_recess = 0,    // shift chamfer narrow end inward along bore axis (recess below disc face)
     bore_round          = 1,    // round-over on every edge of the bore cut
     screw_length        = 8,    // override preset's screw_length (5mm) for this fixture
-    disc_z_override     = 30, // disc bottom flush with plate bottom (Z=0)
+    disc_z_override     = 30 // disc bottom flush with plate bottom (Z=0)
 );

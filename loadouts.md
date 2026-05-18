@@ -59,7 +59,7 @@ When the user asks to "regenerate the loadouts" (or similar), do this:
      ```
      - group "E-Collar Holster" [plates/kanix_plate_3x3_52x6.5.stl] — note
          description: One-paragraph description shown on the group card.
-         choices: mini-educator-holder, dogtra-200c-202c-arc-holder, dogtra-280x-arcx-holder
+         choices: mini-educator-holder, dogtra-200ncpt-202c-arc-holder, dogtra-280x-arcx-holder
      ```
      The first line has a leading `group "<label>"` (in quotes) instead
      of a slug. The two indented sub-lines are required: `description:`

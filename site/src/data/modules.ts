@@ -543,15 +543,15 @@ export const modules: Module[] = [
 
 export const comingSoonModules: ComingSoonModule[] = [
   {
-    slug: "dogtra-200c-202c-arc-holder",
-    name: "E-Collar Holder (Dogtra 200C/202C/ARC)",
+    slug: "dogtra-200ncpt-202c-arc-holder",
+    name: "E-Collar Holder (Dogtra 200NCPT/202C/ARC)",
     description:
-      "Compact holder for Dogtra 200C/202C series e-collar receivers. Keep your remote trainer secured on your belt for instant access during training sessions. Also fits the Dogtra 280C, Tom Davis 280C 2.0, and Dogtra ARC receivers.",
+      "Compact holder for Dogtra 200NCPT/202C series e-collar receivers. Keep your remote trainer secured on your belt for instant access during training sessions. Also fits the Dogtra 280C, Tom Davis 280C 2.0, and Dogtra ARC receivers.",
     screwCount: 6,
     products: [
       {
-        name: "Dogtra 200C",
-        url: "https://www.amazon.com/Dogtra-200C-Remote-Training-Collar/dp/B07FSG5V8C",
+        name: "Dogtra 200NCPT",
+        url: "https://www.amazon.com/dp/B08KJQTKQL",
       },
       {
         name: "Dogtra 202C (2-Dog)",
@@ -559,7 +559,7 @@ export const comingSoonModules: ComingSoonModule[] = [
       },
       {
         name: "Dogtra 280C",
-        url: "https://www.amazon.com/Dogtra-280C-Remote-Training-Collar/dp/B07FSLZCS8",
+        url: "https://www.amazon.com/dp/B0DSPF748B",
       },
       {
         name: "Dogtra ARC",
@@ -593,11 +593,11 @@ export const comingSoonModules: ComingSoonModule[] = [
     products: [
       {
         name: "Mini Educator ET-300",
-        url: "https://www.amazon.com/Mini-Educator-Dog-Training-Collar/dp/B0190P0NG6",
+        url: "https://www.amazon.com/dp/B01CRLQBXO",
       },
       {
         name: "Educator ET-400 (3/4 Mile)",
-        url: "https://www.amazon.com/Educator-Collar-Training-Collar-System/dp/B07WXSMKGQ",
+        url: "https://www.amazon.com/dp/B01M6CV2EI",
       },
       {
         name: "Micro Educator ME-300",
