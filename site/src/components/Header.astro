@@ -8,10 +8,13 @@ interface Props {
 const { variant = "marketing", showModulesAnchor = false, activePath } = Astro.props;
 const base = import.meta.env.BASE_URL;
 
+// Marketing nav uses page-anchor links for Loadouts and Modules (the
+// landing page sections), then Contributing as a top-level route. Shop /
+// Warranty / Returns / Kits are hidden from the marketing variant for
+// now — the storefront isn't surfaced from the landing page.
 const baseLinks = [
-  { href: `${base}products/`, label: "Shop", path: "products" },
-  { href: `${base}warranty/`, label: "Warranty", path: "warranty" },
-  { href: `${base}returns/`, label: "Returns", path: "returns" },
+  { href: `${base}#loadouts`, label: "Loadouts", path: "loadouts" },
+  { href: `${base}#modules`, label: "Modules", path: "modules" },
   { href: `${base}contributions/`, label: "Contributing", path: "contributions" },
 ];
 
@@ -19,8 +22,6 @@ const links = variant === "shop"
   ? [
       { href: `${base}products/`, label: "Shop", path: "products" },
       { href: `${base}kits/`, label: "Kits", path: "kits" },
-      { href: `${base}warranty/`, label: "Warranty", path: "warranty" },
-      { href: `${base}returns/`, label: "Returns", path: "returns" },
       { href: `${base}contributions/`, label: "Contributing", path: "contributions" },
     ]
   : baseLinks;
@@ -35,9 +36,6 @@ const showCart = variant === "shop";
       <span><span class="text-amber-500">K</span>ANIX<sup class="text-[0.5em] align-super">™</sup></span>
     </a>
     <div class="hidden sm:flex items-center gap-6">
-      {showModulesAnchor && (
-        <a href="#modules" class="text-sm text-neutral-400 hover:text-white transition-colors">Modules</a>
-      )}
       {links.map(({ href, label, path }) => (
         <a
           href={href}
@@ -69,9 +67,6 @@ const showCart = variant === "shop";
     </button>
   </div>
   <div id="mobile-nav" class="hidden sm:hidden border-t border-neutral-800 px-6 py-4 flex-col gap-4">
-    {showModulesAnchor && (
-      <a href="#modules" class="text-sm text-neutral-400 hover:text-white transition-colors">Modules</a>
-    )}
     {links.map(({ href, label }) => (
       <a href={href} class="text-sm text-neutral-400 hover:text-white transition-colors">{label}</a>
     ))}

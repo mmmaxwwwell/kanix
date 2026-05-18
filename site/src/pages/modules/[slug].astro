@@ -12,56 +12,357 @@ export function getStaticPaths() {
   }));
 }
 
-const { name, description, scadFile, stlFile, products } = Astro.props;
+const { name, description, scadFile, stlFile, noModel, details, products, variants, genericVariants } = Astro.props;
 const repoUrl = "https://github.com/mmmaxwwwell/kanix";
-const stlPath = `${import.meta.env.BASE_URL}models/${stlFile}`;
+const stlPath = stlFile ? `${import.meta.env.BASE_URL}models/${stlFile}` : "";
+const baseUrl = import.meta.env.BASE_URL;
 ---
 
 <Base title={`${name} - Kanix™`} description={description}>
   <Header />
 
   <main id="main" class="pt-20 pb-16 px-4 sm:px-6">
-    <div class="max-w-4xl mx-auto">
-      <a href={import.meta.env.BASE_URL} class="text-sm text-neutral-500 hover:text-white transition-colors mb-4 inline-block">
+    <div class:list={[
+      "mx-auto",
+      variants || genericVariants ? "max-w-4xl lg:max-w-6xl" : "max-w-4xl",
+    ]}>
+      <a href={baseUrl} class="text-sm text-neutral-500 hover:text-white transition-colors mb-4 inline-block">
         &larr; Back to all modules
       </a>
 
       <h1 class="text-2xl sm:text-4xl font-bold tracking-tight mb-2">{name}</h1>
       <p class="text-neutral-400 text-base sm:text-lg leading-relaxed mb-6">{description}</p>
 
-      <div class="flex flex-col sm:flex-row sm:justify-between items-center gap-3 mb-6">
-        <a
-          href={stlPath}
-          download
-          class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white text-neutral-950 font-semibold rounded-lg hover:bg-neutral-200 transition-colors text-sm"
+      {variants ? (
+        <>
+        <div
+          id="plate-configurator"
+          data-base-url={baseUrl}
+          data-variants={JSON.stringify(variants.variants)}
+          data-belts={JSON.stringify(variants.belts)}
+          data-default-belt={variants.defaultBelt}
+          data-default-grid={variants.defaultGrid}
+          data-default-thickness={variants.defaultThickness}
+          data-repo-url={repoUrl}
         >
-          Download STL
-        </a>
-        <a
-          href={`${repoUrl}/blob/main/${scadFile}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-neutral-700 text-neutral-300 font-semibold rounded-lg hover:border-neutral-500 hover:text-white transition-colors text-sm"
-        >
-          View OpenSCAD Source
-        </a>
-        {products && products.length > 0 && (
-          products.map(({ name: productName, url }) => (
+          <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-10">
+          <div class="lg:order-1">
+          {/* ── Step 1: Belt picker ────────────────────────────────── */}
+          <section class="mb-6" aria-labelledby="belt-heading">
+            <h2 id="belt-heading" class="text-xs font-semibold tracking-widest uppercase text-amber-500 mb-3">
+              1. Belt
+            </h2>
+            <p class="text-neutral-300 text-sm mb-4">Which duty belt are you using?</p>
+            <div class="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Belt size">
+              {variants.belts.map((belt) => (
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={belt.height === variants.defaultBelt}
+                  data-belt-option={belt.height}
+                  class:list={[
+                    "belt-option text-left px-3 py-2.5 rounded-lg border transition-colors",
+                    belt.height === variants.defaultBelt
+                      ? "border-amber-500 bg-amber-500/5"
+                      : "border-neutral-800 hover:border-neutral-600",
+                  ]}
+                >
+                  <div class="font-semibold text-base">{belt.label}</div>
+                </button>
+              ))}
+            </div>
+
+            {/* Per-belt context (just the description; Amazon links live
+                in the "Compatible belts" section below the configurator). */}
+            {variants.belts.map((belt) => (
+              <p
+                data-belt-detail={belt.height}
+                class:list={[
+                  "mt-3 text-neutral-400 text-sm leading-relaxed",
+                  belt.height === variants.defaultBelt ? "" : "hidden",
+                ]}
+              >
+                {belt.description}
+              </p>
+            ))}
+          </section>
+
+          {/* ── Step 2: Grid width ─────────────────────────────────── */}
+          <section class="mb-6" aria-labelledby="grid-heading">
+            <h2 id="grid-heading" class="text-xs font-semibold tracking-widest uppercase text-amber-500 mb-3">
+              2. Width
+            </h2>
+            <p class="text-neutral-300 text-sm mb-4">How wide a footprint on your belt?</p>
+            <div class="grid grid-cols-3 gap-3" role="radiogroup" aria-label="Grid width" id="grid-options">
+              {/* Grid options are rendered/labeled by JS so they can show
+                  belt-aware mm widths and disabled state for invalid combos. */}
+            </div>
+          </section>
+
+          {/* ── Step 3: Thickness (only for 52mm) ──────────────────── */}
+          <section class="mb-6 hidden" aria-labelledby="thickness-heading" data-thickness-section>
+            <h2 id="thickness-heading" class="text-xs font-semibold tracking-widest uppercase text-amber-500 mb-3">
+              3. Plate thickness
+            </h2>
+            <p class="text-neutral-300 text-sm mb-1"><strong>6.5mm is the standard.</strong> Most plates on your belt use this thickness.</p>
+            <p class="text-neutral-500 text-xs mb-4">
+              The 12mm version is only needed where the belt doubles over itself — typically the section behind the buckle.
+              If you're not sure, stick with 6.5mm.
+            </p>
+            <div class="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Plate thickness" id="thickness-options">
+              {/* Rendered by JS. */}
+            </div>
+          </section>
+
+          </div>{/* /lg:order-1 left column */}
+
+          <div class="lg:order-2 lg:sticky lg:top-24 lg:self-start">
+          {/* ── Viewer + downloads ─────────────────────────────────── */}
+          <div
+            id="plate-viewer-container"
+            class="w-full aspect-square bg-neutral-900 rounded-xl border border-neutral-800 overflow-hidden relative cursor-grab active:cursor-grabbing"
+            role="img"
+            aria-label="Interactive 3D model. Drag to rotate, scroll to zoom."
+          >
+            <div class="absolute inset-0 flex items-center justify-center text-neutral-500 text-sm" id="plate-viewer-loading">
+              Loading model...
+            </div>
+          </div>
+          <p class="text-neutral-600 text-xs sm:text-sm mt-2 text-center mb-4">
+            Drag to rotate. Scroll to zoom. Pinch on mobile.
+          </p>
+
+          <div class="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-8">
             <a
-              href={url}
+              id="download-stl-link"
+              href={stlPath}
+              download
+              class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white text-neutral-950 font-semibold rounded-lg hover:bg-neutral-200 transition-colors text-sm"
+            >
+              <span id="download-stl-label">Download STL</span>
+            </a>
+            <a
+              id="view-scad-link"
+              href={`${repoUrl}/blob/main/${scadFile}`}
               target="_blank"
               rel="noopener noreferrer"
-              class="inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-amber-500/30 text-amber-500 font-semibold rounded-lg hover:border-amber-500 hover:text-amber-400 transition-colors text-sm"
+              class="inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-neutral-700 text-neutral-300 font-semibold rounded-lg hover:border-neutral-500 hover:text-white transition-colors text-sm"
             >
-              {productName} on Amazon &rarr;
+              View OpenSCAD Source
             </a>
-          ))
-        )}
-      </div>
+          </div>
+          </div>{/* /lg:order-2 right column */}
+          </div>{/* /lg:grid */}
+        </div>
 
-      <STLViewer stlPath={stlPath} name={name} />
+        {/* ── Compatible belts (outside the configurator, so it doesn't
+              compete with the selector for attention). ───────────── */}
+        <section class="mb-8 mt-4" aria-labelledby="compatible-belts-heading">
+          <h2 id="compatible-belts-heading" class="text-base font-semibold text-white mb-1">Compatible belts</h2>
+          <p class="text-neutral-500 text-sm mb-4">
+            Any rigid duty belt in the matching size will work — here are the ones we've tested.
+          </p>
+          <div class="grid sm:grid-cols-2 gap-3">
+            {variants.belts.map((belt) => (
+              <div class="p-4 rounded-lg bg-neutral-900/50 border border-neutral-800/60">
+                <p class="text-xs font-semibold tracking-widest uppercase text-amber-500/80 mb-2">{belt.label}</p>
+                <ul class="space-y-2">
+                  {belt.products.map((p) => (
+                    <li>
+                      <a
+                        href={p.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class:list={[
+                          "inline-flex items-baseline gap-2 text-sm transition-colors",
+                          p.recommended
+                            ? "text-amber-400 hover:text-amber-300"
+                            : "text-neutral-300 hover:text-white",
+                        ]}
+                      >
+                        <span>{p.name}</span>
+                        {p.recommended && <span class="text-xs text-amber-500/80">✓ recommended</span>}
+                        <span aria-hidden="true">&rarr;</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+        </>
+      ) : genericVariants ? (
+        <div
+          id="generic-configurator"
+          data-base-url={baseUrl}
+          data-repo-url={repoUrl}
+          data-groups={JSON.stringify(genericVariants.groups)}
+          data-default-id={genericVariants.defaultId}
+        >
+          <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-10">
+          <div class="lg:order-1">
+          {genericVariants.groups.map((group, groupIdx) => (
+            <section class="mb-6" aria-labelledby={`group-heading-${groupIdx}`}>
+              <h2 id={`group-heading-${groupIdx}`} class="text-xs font-semibold tracking-widest uppercase text-amber-500 mb-2">
+                {group.label}
+              </h2>
+              {group.description && (
+                <p class="text-neutral-400 text-sm mb-3">{group.description}</p>
+              )}
+              <div class="flex flex-wrap gap-2" role="radiogroup" aria-label={group.label}>
+                {group.options.map((opt) => {
+                  const selected = opt.id === genericVariants.defaultId;
+                  return (
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      data-variant-option={opt.id}
+                      data-stl-file={opt.stlFile}
+                      data-scad-file={opt.scadFile}
+                      class:list={[
+                        "variant-option text-left px-4 py-2.5 rounded-lg border transition-colors",
+                        selected
+                          ? "border-amber-500 bg-amber-500/5"
+                          : "border-neutral-800 hover:border-neutral-600",
+                      ]}
+                    >
+                      <div class="font-semibold text-sm">{opt.label}</div>
+                      {opt.sublabel && (
+                        <div class="text-xs text-neutral-400 mt-0.5">{opt.sublabel}</div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+          </div>{/* /lg:order-1 left column */}
 
-      <p class="text-neutral-600 text-xs sm:text-sm mt-2 text-center mb-8">Drag to rotate. Scroll to zoom. Pinch on mobile.</p>
+          <div class="lg:order-2 lg:sticky lg:top-24 lg:self-start">
+          <div
+            id="generic-viewer-container"
+            class="w-full aspect-square bg-neutral-900 rounded-xl border border-neutral-800 overflow-hidden relative cursor-grab active:cursor-grabbing"
+            role="img"
+            aria-label="Interactive 3D model. Drag to rotate, scroll to zoom."
+          >
+            <div class="absolute inset-0 flex items-center justify-center text-neutral-500 text-sm" id="generic-viewer-loading">
+              Loading model...
+            </div>
+          </div>
+          <p class="text-neutral-600 text-xs sm:text-sm mt-2 text-center mb-4">
+            Drag to rotate. Scroll to zoom. Pinch on mobile.
+          </p>
+
+          <div class="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-8">
+            <a
+              id="generic-download-link"
+              href={stlPath}
+              download
+              class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white text-neutral-950 font-semibold rounded-lg hover:bg-neutral-200 transition-colors text-sm"
+            >
+              <span id="generic-download-label">Download STL</span>
+            </a>
+            <a
+              id="generic-scad-link"
+              href={`${repoUrl}/blob/main/${scadFile}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-neutral-700 text-neutral-300 font-semibold rounded-lg hover:border-neutral-500 hover:text-white transition-colors text-sm"
+            >
+              View OpenSCAD Source
+            </a>
+            {products && products.length > 0 && (
+              products.map(({ name: productName, url }) => (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-amber-500/30 text-amber-500 font-semibold rounded-lg hover:border-amber-500 hover:text-amber-400 transition-colors text-sm"
+                >
+                  {productName} on Amazon &rarr;
+                </a>
+              ))
+            )}
+          </div>
+          </div>{/* /lg:order-2 right column */}
+          </div>{/* /lg:grid */}
+        </div>
+      ) : noModel ? (
+        <>
+          {details && details.length > 0 && (
+            <section class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 sm:p-8 mb-8" aria-labelledby="spec-heading">
+              <h2 id="spec-heading" class="text-xs font-semibold tracking-widest uppercase text-amber-500 mb-4">
+                Spec & features
+              </h2>
+              <ul class="space-y-3">
+                {details.map((line) => (
+                  <li class="flex gap-3 text-neutral-300 leading-relaxed">
+                    <span class="text-amber-500 mt-1.5 flex-shrink-0" aria-hidden="true">
+                      <svg class="w-1.5 h-1.5" viewBox="0 0 8 8" fill="currentColor">
+                        <circle cx="4" cy="4" r="4" />
+                      </svg>
+                    </span>
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {products && products.length > 0 && (
+            <div class="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-8">
+              {products.map(({ name: productName, url }) => (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-amber-500/30 text-amber-500 font-semibold rounded-lg hover:border-amber-500 hover:text-amber-400 transition-colors text-sm"
+                >
+                  {productName} &rarr;
+                </a>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div class="flex flex-col sm:flex-row sm:justify-between items-center gap-3 mb-6">
+            <a
+              href={stlPath}
+              download
+              class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white text-neutral-950 font-semibold rounded-lg hover:bg-neutral-200 transition-colors text-sm"
+            >
+              Download STL
+            </a>
+            <a
+              href={`${repoUrl}/blob/main/${scadFile}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-neutral-700 text-neutral-300 font-semibold rounded-lg hover:border-neutral-500 hover:text-white transition-colors text-sm"
+            >
+              View OpenSCAD Source
+            </a>
+            {products && products.length > 0 && (
+              products.map(({ name: productName, url }) => (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-amber-500/30 text-amber-500 font-semibold rounded-lg hover:border-amber-500 hover:text-amber-400 transition-colors text-sm"
+                >
+                  {productName} on Amazon &rarr;
+                </a>
+              ))
+            )}
+          </div>
+
+          <STLViewer stlPath={stlPath} name={name} />
+
+          <p class="text-neutral-600 text-xs sm:text-sm mt-2 text-center mb-8">Drag to rotate. Scroll to zoom. Pinch on mobile.</p>
+        </>
+      )}
 
       <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
         <h3 class="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-3">Disclaimer</h3>
@@ -74,3 +375,428 @@ const stlPath = `${import.meta.env.BASE_URL}models/${stlFile}`;
 
   <Footer />
 </Base>
+
+<script>
+  import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { STLLoader } from "three/addons/loaders/STLLoader.js";
+
+    type Variant = {
+      grid: string;
+      thickness: number;
+      scadFile: string;
+      stlFile: string;
+    };
+    type Belt = {
+      height: number;
+      label: string;
+      description: string;
+      products: Array<{ name: string; url: string; recommended?: boolean }>;
+    };
+
+    const root = document.getElementById("plate-configurator");
+    if (root) {
+      const baseUrl = root.dataset.baseUrl ?? "/";
+      const repoUrl = root.dataset.repoUrl ?? "";
+      const variants: Variant[] = JSON.parse(root.dataset.variants ?? "[]");
+      const belts: Belt[] = JSON.parse(root.dataset.belts ?? "[]");
+
+      // Grid widths: cols × belt_h. The belt height drives the row count
+      // (38mm → 2 rows, 52mm → 3 rows), so we display footprint per belt.
+      const COL_WIDTHS: Record<string, number> = {
+        2: 33.05,
+        3: 52.10,
+        4: 71.15,
+      };
+      const GRID_LABELS: Record<string, { cols: number; rows: number }> = {
+        "2x2": { cols: 2, rows: 2 },
+        "3x2": { cols: 3, rows: 2 },
+        "4x2": { cols: 4, rows: 2 },
+        "2x3": { cols: 2, rows: 3 },
+        "3x3": { cols: 3, rows: 3 },
+        "4x3": { cols: 4, rows: 3 },
+      };
+
+      const state = {
+        belt: Number(root.dataset.defaultBelt),
+        grid: root.dataset.defaultGrid ?? "3x3",
+        thickness: Number(root.dataset.defaultThickness),
+      };
+
+      // ─── Grid + thickness option rendering ────────────────────────
+      const gridContainer = document.getElementById("grid-options")!;
+      const thicknessSection = root.querySelector<HTMLElement>("[data-thickness-section]")!;
+      const thicknessContainer = document.getElementById("thickness-options")!;
+
+      function gridsForBelt(belt: number): string[] {
+        const rows = belt === 38 ? 2 : 3;
+        return Object.keys(GRID_LABELS).filter((g) => GRID_LABELS[g].rows === rows);
+      }
+      function thicknessesForBelt(belt: number): number[] {
+        const set = new Set<number>();
+        variants
+          .filter((v) => (belt === 38 ? GRID_LABELS[v.grid].rows === 2 : GRID_LABELS[v.grid].rows === 3))
+          .forEach((v) => set.add(v.thickness));
+        return [...set].sort((a, b) => b - a); // 12 before 6.5 — most common first
+      }
+      function variantFor(grid: string, thickness: number): Variant | undefined {
+        return variants.find((v) => v.grid === grid && v.thickness === thickness);
+      }
+
+      function renderGridOptions() {
+        const grids = gridsForBelt(state.belt);
+        gridContainer.innerHTML = grids
+          .map((g) => {
+            const { cols, rows } = GRID_LABELS[g];
+            const widthMm = COL_WIDTHS[String(cols)].toFixed(1);
+            const selected = g === state.grid;
+            return `
+              <button
+                type="button"
+                role="radio"
+                aria-checked="${selected}"
+                data-grid-option="${g}"
+                class="grid-option text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                  selected ? "border-amber-500 bg-amber-500/5" : "border-neutral-800 hover:border-neutral-600"
+                }"
+              >
+                <div class="font-semibold text-base">${cols} × ${rows}</div>
+                <div class="text-xs text-neutral-400 mt-0.5">${widthMm} mm wide</div>
+              </button>`;
+          })
+          .join("");
+
+        gridContainer.querySelectorAll<HTMLButtonElement>("[data-grid-option]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.grid = btn.dataset.gridOption!;
+            // Snap to a valid thickness for the new grid if needed.
+            if (!variantFor(state.grid, state.thickness)) {
+              const fallback = thicknessesForBelt(state.belt).find((t) => variantFor(state.grid, t));
+              if (fallback) state.thickness = fallback;
+            }
+            update();
+          });
+        });
+      }
+
+      function renderThicknessOptions() {
+        const ts = thicknessesForBelt(state.belt);
+        if (ts.length <= 1) {
+          thicknessSection.classList.add("hidden");
+          return;
+        }
+        thicknessSection.classList.remove("hidden");
+        thicknessContainer.innerHTML = ts
+          .map((t) => {
+            const selected = t === state.thickness;
+            const caption = t === 12 ? "only for buckle area (belt doubles over)" : "standard — fits the whole belt";
+            return `
+              <button
+                type="button"
+                role="radio"
+                aria-checked="${selected}"
+                data-thickness-option="${t}"
+                class="thickness-option text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                  selected ? "border-amber-500 bg-amber-500/5" : "border-neutral-800 hover:border-neutral-600"
+                }"
+              >
+                <div class="font-semibold text-base">${t} mm</div>
+                <div class="text-xs text-neutral-400 mt-0.5">${caption}</div>
+              </button>`;
+          })
+          .join("");
+
+        thicknessContainer.querySelectorAll<HTMLButtonElement>("[data-thickness-option]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.thickness = Number(btn.dataset.thicknessOption!);
+            update();
+          });
+        });
+      }
+
+      // ─── Belt option wiring ───────────────────────────────────────
+      root.querySelectorAll<HTMLButtonElement>("[data-belt-option]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.belt = Number(btn.dataset.beltOption!);
+          // Reset to the first valid grid/thickness for the new belt.
+          state.grid = gridsForBelt(state.belt)[Math.floor(gridsForBelt(state.belt).length / 2)] ?? gridsForBelt(state.belt)[0];
+          state.thickness = thicknessesForBelt(state.belt)[0];
+
+          root.querySelectorAll<HTMLButtonElement>("[data-belt-option]").forEach((b) => {
+            const on = Number(b.dataset.beltOption) === state.belt;
+            b.setAttribute("aria-checked", String(on));
+            b.classList.toggle("border-amber-500", on);
+            b.classList.toggle("bg-amber-500/5", on);
+            b.classList.toggle("border-neutral-800", !on);
+          });
+          root.querySelectorAll<HTMLElement>("[data-belt-detail]").forEach((el) => {
+            el.classList.toggle("hidden", Number(el.dataset.beltDetail) !== state.belt);
+          });
+          update();
+        });
+      });
+
+      // ─── Viewer ───────────────────────────────────────────────────
+      const container = document.getElementById("plate-viewer-container")!;
+      const loadingEl = document.getElementById("plate-viewer-loading")!;
+      const downloadLink = document.getElementById("download-stl-link") as HTMLAnchorElement;
+      const downloadLabel = document.getElementById("download-stl-label")!;
+      const scadLink = document.getElementById("view-scad-link") as HTMLAnchorElement;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0a0a0a);
+      const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 2000);
+      camera.up.set(0, 0, 1);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      container.appendChild(renderer.domElement);
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.1;
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+      const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.0);
+      dirLight1.position.set(1, 1, 1);
+      scene.add(dirLight1);
+      const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+      dirLight2.position.set(-1, -0.5, -1);
+      scene.add(dirLight2);
+
+      const loader = new STLLoader();
+      let currentMesh: THREE.Mesh | null = null;
+      let loadToken = 0;
+
+      function loadVariantSTL(stlPath: string) {
+        const myToken = ++loadToken;
+        loadingEl.textContent = "Loading model...";
+        loadingEl.classList.remove("hidden");
+        loader.load(
+          stlPath,
+          (geometry) => {
+            if (myToken !== loadToken) return; // stale load — user moved on
+            geometry.computeVertexNormals();
+            if (currentMesh) {
+              scene.remove(currentMesh);
+              currentMesh.geometry.dispose();
+              (currentMesh.material as THREE.Material).dispose();
+            }
+            const mesh = new THREE.Mesh(
+              geometry,
+              new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.1, roughness: 0.6 }),
+            );
+            geometry.computeBoundingBox();
+            const box = geometry.boundingBox!;
+            const center = new THREE.Vector3();
+            box.getCenter(center);
+            mesh.position.sub(center);
+            scene.add(mesh);
+            currentMesh = mesh;
+
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            const dist = (maxDim / (2 * Math.tan(fov / 2))) * 1.5;
+            camera.position.set(dist * 0.7, -dist * 0.7, dist * 0.5);
+            camera.lookAt(0, 0, 0);
+            controls.target.set(0, 0, 0);
+            controls.update();
+
+            loadingEl.classList.add("hidden");
+          },
+          undefined,
+          (err) => {
+            if (myToken !== loadToken) return;
+            loadingEl.textContent = "Failed to load model";
+            console.error("STL load error", err);
+          },
+        );
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      const resizeObs = new ResizeObserver(() => {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      });
+      resizeObs.observe(container);
+
+      // ─── State sync ───────────────────────────────────────────────
+      function update() {
+        renderGridOptions();
+        renderThicknessOptions();
+
+        const v = variantFor(state.grid, state.thickness);
+        if (!v) return;
+
+        const stlPath = `${baseUrl}models/${v.stlFile}`;
+        downloadLink.href = stlPath;
+        downloadLink.download = v.stlFile.split("/").pop() ?? "kanix-plate.stl";
+        downloadLabel.textContent = `Download STL — ${v.grid} / ${v.thickness}mm`;
+        scadLink.href = `${repoUrl}/blob/main/${v.scadFile}`;
+
+        loadVariantSTL(stlPath);
+      }
+
+    update();
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // Generic variant configurator (clicker, carabiner, belt clip, C3 holster)
+  // Reused viewer machinery scoped to its own root.
+  // ─────────────────────────────────────────────────────────────────
+  const genericRoot = document.getElementById("generic-configurator");
+  if (genericRoot) {
+    type GenericOption = {
+      id: string;
+      label: string;
+      sublabel?: string;
+      scadFile: string;
+      stlFile: string;
+    };
+    type GenericGroup = {
+      label: string;
+      description?: string;
+      options: GenericOption[];
+    };
+
+    const gBaseUrl = genericRoot.dataset.baseUrl ?? "/";
+    const gRepoUrl = genericRoot.dataset.repoUrl ?? "";
+    const groups: GenericGroup[] = JSON.parse(genericRoot.dataset.groups ?? "[]");
+
+    let selectedId = genericRoot.dataset.defaultId ?? "";
+    const flatOptions: GenericOption[] = groups.flatMap((g) => g.options);
+
+    const container = document.getElementById("generic-viewer-container")!;
+    const loadingEl = document.getElementById("generic-viewer-loading")!;
+    const downloadLink = document.getElementById("generic-download-link") as HTMLAnchorElement;
+    const downloadLabel = document.getElementById("generic-download-label")!;
+    const scadLink = document.getElementById("generic-scad-link") as HTMLAnchorElement;
+
+    const gScene = new THREE.Scene();
+    gScene.background = new THREE.Color(0x0a0a0a);
+    const gCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 2000);
+    gCamera.up.set(0, 0, 1);
+    const gRenderer = new THREE.WebGLRenderer({ antialias: true });
+    gRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    gRenderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(gRenderer.domElement);
+    const gControls = new OrbitControls(gCamera, gRenderer.domElement);
+    gControls.enableDamping = true;
+    gControls.dampingFactor = 0.1;
+
+    gScene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const gLight1 = new THREE.DirectionalLight(0xffffff, 1.0);
+    gLight1.position.set(1, 1, 1);
+    gScene.add(gLight1);
+    const gLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+    gLight2.position.set(-1, -0.5, -1);
+    gScene.add(gLight2);
+
+    const gLoader = new STLLoader();
+    let gCurrentMesh: THREE.Mesh | null = null;
+    let gToken = 0;
+
+    function gLoadSTL(stlPath: string) {
+      const myToken = ++gToken;
+      loadingEl.textContent = "Loading model...";
+      loadingEl.classList.remove("hidden");
+      gLoader.load(
+        stlPath,
+        (geometry) => {
+          if (myToken !== gToken) return;
+          geometry.computeVertexNormals();
+          if (gCurrentMesh) {
+            gScene.remove(gCurrentMesh);
+            gCurrentMesh.geometry.dispose();
+            (gCurrentMesh.material as THREE.Material).dispose();
+          }
+          const mesh = new THREE.Mesh(
+            geometry,
+            new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.1, roughness: 0.6 }),
+          );
+          geometry.computeBoundingBox();
+          const box = geometry.boundingBox!;
+          const center = new THREE.Vector3();
+          box.getCenter(center);
+          mesh.position.sub(center);
+          gScene.add(mesh);
+          gCurrentMesh = mesh;
+
+          const size = new THREE.Vector3();
+          box.getSize(size);
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const fov = gCamera.fov * (Math.PI / 180);
+          const dist = (maxDim / (2 * Math.tan(fov / 2))) * 1.5;
+          gCamera.position.set(dist * 0.7, -dist * 0.7, dist * 0.5);
+          gCamera.lookAt(0, 0, 0);
+          gControls.target.set(0, 0, 0);
+          gControls.update();
+
+          loadingEl.classList.add("hidden");
+        },
+        undefined,
+        (err) => {
+          if (myToken !== gToken) return;
+          loadingEl.textContent = "Failed to load model";
+          console.error("STL load error", err);
+        },
+      );
+    }
+
+    function gAnimate() {
+      requestAnimationFrame(gAnimate);
+      gControls.update();
+      gRenderer.render(gScene, gCamera);
+    }
+    gAnimate();
+
+    const gResize = new ResizeObserver(() => {
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      gCamera.aspect = w / h;
+      gCamera.updateProjectionMatrix();
+      gRenderer.setSize(w, h);
+    });
+    gResize.observe(container);
+
+    function gUpdate() {
+      const opt = flatOptions.find((o) => o.id === selectedId);
+      if (!opt) return;
+
+      genericRoot!.querySelectorAll<HTMLButtonElement>("[data-variant-option]").forEach((btn) => {
+        const on = btn.dataset.variantOption === selectedId;
+        btn.setAttribute("aria-checked", String(on));
+        btn.classList.toggle("border-amber-500", on);
+        btn.classList.toggle("bg-amber-500/5", on);
+        btn.classList.toggle("border-neutral-800", !on);
+      });
+
+      const stlPath = `${gBaseUrl}models/${opt.stlFile}`;
+      downloadLink.href = stlPath;
+      downloadLink.download = opt.stlFile.split("/").pop() ?? "model.stl";
+      downloadLabel.textContent = `Download STL — ${opt.label}`;
+      scadLink.href = `${gRepoUrl}/blob/main/${opt.scadFile}`;
+
+      gLoadSTL(stlPath);
+    }
+
+    genericRoot.querySelectorAll<HTMLButtonElement>("[data-variant-option]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        selectedId = btn.dataset.variantOption!;
+        gUpdate();
+      });
+    });
+
+    gUpdate();
+  }
+</script>

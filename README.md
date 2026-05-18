@@ -6,7 +6,7 @@ A free, open-source modular belt system for dog handlers.
 
 ## What is Kanix™?
 
-Kanix™ is a modular mounting system that turns any 2" duty belt into a fully customized dog handling rig. Each module bolts onto a standard Kanix™ belt clip using a universal 3x3 bolt pattern (M5 hardware, 3/4" spacing), so you can rearrange your gear in seconds.
+Kanix™ is a modular mounting system that turns any 1.5" or 2" duty belt into a fully customized dog handling rig. Each module bolts onto a standard Kanix™ belt clip using a universal Kanix™ grid (M5 hardware, 3/4" spacing). The clip comes in two belt heights — **38mm (1.5")** and **52mm (2")** — and three footprints (2/3/4 columns wide) for each, so you can pick exactly how much belt real estate each clip takes up.
 
 Whether you're a professional trainer, a dog walker, or an everyday owner, Kanix™ gives you a system that adapts to your workflow.
 
@@ -14,15 +14,20 @@ Whether you're a professional trainer, a dog walker, or an everyday owner, Kanix
 
 | Module | Description | Compatible Product |
 |--------|-------------|-------------------|
-| **Kanix™ Plate** | Universal mounting plate with 3x3 bolt pattern and integrated hinge | |
+| **Kanix™ Plate** | The hinged belt clip every module bolts to. Nine variants: 38mm or 52mm belt height × 2/3/4-column footprint, with 6.5mm or 12mm plate thickness on 52mm (12mm fits the buckle-area where the belt doubles over) | [IDOGEAR SPORTS Tactical Ratchet Belt (1.5")](https://www.amazon.com/dp/B0FJDMN78R), [IDOGEAR SPORTS Tactical 2" Heavy-Duty MOLLE Belt](https://www.amazon.com/dp/B0G2PTBGF2) (recommended) |
+| **Belt Clip (no duty belt required)** | Alternate mounting system — clips onto a regular pants belt and exposes a standard Kanix™ bolt grid. Three sizes for a 1.5" belt (2×2, 3×2, 3×3). | |
 | **Waste Bag Dispenser** | Holds a standard roll of waste bags with a screw-in cap and front dispensing slit | [Earth Rated Dog Waste Bags](https://www.amazon.com/Earth-Rated-Leak-Proof-Extra-Thick-Unscented/dp/B0CS8GCYS1) |
 | **First Aid Kit Mount** | Mounting plate with center cutout for strap pass-through | [Individual First Aid Kit](https://www.amazon.com/dp/B0F311WTPC) |
 | **MK3 Canister Holder** | Holder for an MK-3 pepper spray canister | [Sabre Protector Dog Spray](https://www.amazon.com/dp/B00AU6J68Q) |
 | **Slip Lead Wrap Post** | Post for securely wrapping a 5/8" x 5' slip lead | [Mendota Products Slip Lead](https://www.amazon.com/dp/B086WMV7G7) |
+| **Quick-Detach BioThane Heel Lead** | Hands-free belt-mounted heel lead. BioThane, Cobra buckle quick-release, dual-action carabiner, 500 lb working load. No 3D-printed part — spec only | |
 | **Treat Bag Mount** | Folding hinge mount for a treat pouch carabiner loop | [Wilderdog Treat Bag](https://www.amazon.com/Wilderdog-Training-Magnetic-Carabiner-Adjustable/dp/B0FCVFF9J9) |
-| **Flashlight Holster (Wuben C3)** | Holster for the Wuben C3 flashlight | [Wuben C3](https://www.amazon.com/dp/B086WJBB7K) |
+| **Flashlight Holster (Wuben C3)** | Holster for the Wuben C3 flashlight. Two variants for 38mm and 52mm belts | [Wuben C3](https://www.amazon.com/dp/B086WJBB7K) |
 | **Flashlight Holster (Wuben G5)** | Holster for the Wuben G5 EDC flashlight | [Wuben G5](https://www.amazon.com/dp/B0DT6SS412) |
 | **Pepper Spray Holster (Dual)** | Side-by-side holster for two compact pepper spray canisters | [Guard Dog Security Pepper Spray](https://www.amazon.com/Guard-Dog-Security-Pepper-Spray/dp/B0CCZ1D6YQ) |
+| **Clicker Holder** | Always-ready slot for a training clicker. Two variants for 38mm and 52mm belts | [Training Clicker](https://www.amazon.com/dp/B0GRWPSYSD) |
+| **Carabiner Clip** | Bolt-on carabiner loop for clipping leashes, keys, or gear. Five sizes across 1×2 (tiny, small) and 1×3 (medium, large, strong) grids | |
+| **Dump Bag Mount** | Mount for a tactical dump pouch — stash a backup leash, slip lead, wipes, or whatever extras you pick up on the go | [LIVANS Tactical Molle Dump Pouch](https://www.amazon.com/dp/B07Y7CCJDK) |
 | **E-Collar Holder (Dogtra 200C/202C/ARC)** *(coming soon)* | Holder for Dogtra 200C/202C/ARC series e-collar receivers | [Dogtra 200C](https://www.amazon.com/Dogtra-200C-Remote-Training-Collar/dp/B07FSG5V8C), [Dogtra 202C](https://www.amazon.com/Dogtra-202C-Remote-Training-Collar/dp/B07FSKBQ1L), [Dogtra ARC](https://www.amazon.com/Dogtra-ARC-Remote-Training-Collar/dp/B00NXYXVU6) |
 | **E-Collar Holder (Dogtra 280X/ARC-X)** *(coming soon)* | Holder for Dogtra 280X and ARC-X e-collar receivers | [Dogtra 280X](https://www.amazon.com/Dogtra-280X-Stubborn-Waterproof-Vibration/dp/B0DBMW4YN9), [Dogtra ARC-X](https://www.amazon.com/Dogtra-ARC-X-Collar-Dog-Training/dp/B0FC1LN2VW) |
 | **E-Collar Holder (Mini Educator)** *(coming soon)* | Holder for Mini Educator ET-300 e-collar receiver | [Mini Educator ET-300](https://www.amazon.com/Mini-Educator-Dog-Training-Collar/dp/B0190P0NG6), [Educator ET-400](https://www.amazon.com/Educator-Collar-Training-Collar-System/dp/B07WXSMKGQ) |
@@ -30,7 +35,9 @@ Whether you're a professional trainer, a dog walker, or an everyday owner, Kanix
 
 ## What You Need
 
-- A **2" duty belt** - any rigid 2" (51mm) belt will work. We prototype with [this one](https://www.amazon.com/dp/B0FXRGCY7C).
+- A duty belt:
+  - **2" (52mm)** — recommended: [IDOGEAR SPORTS Tactical 2" Heavy-Duty MOLLE Belt](https://www.amazon.com/dp/B0G2PTBGF2). Plain alternative: [Heavy Duty 2 inch duty belt](https://www.amazon.com/dp/B0FXRGCY7C).
+  - **1.5" (38mm)** — recommended: [IDOGEAR SPORTS Tactical Ratchet Belt](https://www.amazon.com/dp/B0FJDMN78R).
 - **[M5x10 button head cap screws](https://www.amazon.com/dp/B08DS7XJN8)** - used to mount most modules to belt clips
 - **A 3D printer**
 

@@ -11,6 +11,24 @@ If a gotcha or convention seems worth remembering, put it in a `CLAUDE.md`:
 
 Do not read from auto-memory either — treat the kanix memory directory as empty.
 
+## Loadouts: edit the markdown, not the TypeScript
+
+The site's "Suggested Loadouts" cards and detail pages are rendered from
+[site/src/data/loadouts.ts](site/src/data/loadouts.ts), but **the authoring
+source is [loadouts.md](loadouts.md) at the repo root.** When the user asks
+to add, edit, or reorder a loadout:
+
+1. Edit `loadouts.md` (the human-readable source).
+2. Regenerate `site/src/data/loadouts.ts` by translating the markdown
+   sections into `Loadout` objects per the protocol in `loadouts.md`'s
+   "Instructions for Claude" section.
+3. Validate every module slug exists in
+   [site/src/data/modules.ts](site/src/data/modules.ts) before writing.
+4. Run `cd site && npm run build` (inside `nix develop`) to confirm.
+
+Do not edit `loadouts.ts` directly without also updating `loadouts.md` —
+the next regeneration will silently undo the change.
+
 ## Quick Start
 
 ```bash

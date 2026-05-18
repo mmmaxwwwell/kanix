@@ -3,8 +3,15 @@ import Base from "../layouts/Base.astro";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
 import { modules, comingSoonModules } from "../data/modules";
+import { loadouts } from "../data/loadouts";
 
 const repoUrl = "https://github.com/mmmaxwwwell/kanix";
+
+// Mounting systems (the things you pick first, before any accessory). Anything
+// not in this set is a regular accessory module.
+const MOUNTING_SLUGS = new Set(["kanix-plate", "belt-clip"]);
+const mountingSystems = modules.filter((m) => MOUNTING_SLUGS.has(m.slug));
+const accessoryModules = modules.filter((m) => !MOUNTING_SLUGS.has(m.slug));
 ---
 
 <Base
@@ -33,10 +40,10 @@ const repoUrl = "https://github.com/mmmaxwwwell/kanix";
         the perfect setup for training, walking, or working with dogs.
       </p>
       <a
-        href="#modules"
+        href="#loadouts"
         class="inline-flex items-center gap-2 px-8 py-3 bg-white text-neutral-950 font-semibold rounded-lg hover:bg-neutral-200 transition-colors"
       >
-        Explore Modules
+        View Loadouts
       </a>
     </div>
   </section>
@@ -98,10 +105,25 @@ const repoUrl = "https://github.com/mmmaxwwwell/kanix";
       </h2>
       <div class="text-neutral-400 leading-relaxed max-w-3xl mx-auto">
         <p class="mb-4">
-          Kanix™ is a modular mounting system that turns any duty belt into a fully customized dog
-          handling rig. Each module snaps onto a standard Kanix™ belt clip using a
-          universal bolt pattern, so you can rearrange your gear in seconds.
+          Kanix™ is a modular mounting system that turns any belt into a fully customized dog
+          handling rig. Each module snaps onto a standard Kanix™ belt clip using a universal
+          bolt pattern, so you can rearrange your gear in seconds.
         </p>
+        <p class="mb-4">
+          You can wear it two ways:
+        </p>
+        <ul class="mb-4 space-y-2 list-disc pl-6">
+          <li>
+            <strong class="text-white">Mount to a duty belt.</strong> Bolt your modules onto a
+            full-width Kanix™ plate that slides directly onto a 1.5" or 2" duty belt — the
+            stiffest, most secure option, and what we recommend if you're carrying multiple modules.
+          </li>
+          <li>
+            <strong class="text-white">Clip to a regular belt.</strong> Don't want a separate duty
+            belt? Use the Kanix™ belt-clip adapter — it clamps onto any standard pants belt and
+            exposes the same bolt grid, so every Kanix™ module still works.
+          </li>
+        </ul>
         <p class="mb-4">
           Whether you're a professional trainer managing reactive dogs, a dog walker juggling
           multiple leashes, or an owner who just wants hands-free access to bags and treats,
@@ -136,8 +158,10 @@ const repoUrl = "https://github.com/mmmaxwwwell/kanix";
           in a fixed position, right where your hand expects it, every single time.
         </p>
         <p>
-          That's why Kanix™ exists, a sturdy duty belt that doesn't sag or shift, with purpose-built
-          mounts that keep every piece of gear locked in place and instantly accessible. No more
+          That's why Kanix™ exists — purpose-built mounts that keep every piece of gear locked in
+          place and instantly accessible. Bolt them onto a duty belt for the most secure setup, or
+          clip them onto a regular pants belt with the Kanix™ belt-clip adapter — either way,
+          everything sits in a fixed position, right where your hand expects it. No more
           juggling. No more hoping you can find what you need in time.
         </p>
       </div>
@@ -154,27 +178,64 @@ const repoUrl = "https://github.com/mmmaxwwwell/kanix";
         {[
           {
             step: "1",
+            title: "Choose Your Belt",
+            text: "Pick a 1.5\" or 2\" duty belt, or use the Kanix™ belt-clip adapter to mount onto any regular pants belt.",
+          },
+          {
+            step: "2",
             title: "Choose Your Modules",
             text: "Browse the available modules and pick the ones that match your gear and workflow.",
           },
           {
-            step: "2",
-            title: "Print",
-            text: "Download the OpenSCAD files and 3D print them yourself. Modify the parametric designs to fit your exact gear.",
-          },
-          {
             step: "3",
             title: "Mount & Go",
-            text: "Bolt your modules onto Kanix™ belt clips, slide them onto your duty belt, and rearrange anytime.",
+            text: "Bolt your modules onto Kanix™ belt clips, slide them onto your belt, and rearrange anytime.",
           },
         ].map(({ step, title, text }) => (
-          <div class="text-left">
+          <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col items-center text-center">
             <div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 font-bold text-lg mb-4">
               {step}
             </div>
             <h3 class="text-lg font-semibold mb-2 text-white">{title}</h3>
             <p class="text-neutral-400 leading-relaxed">{text}</p>
           </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Suggested Loadouts -->
+  <section id="loadouts" class="py-24 px-6">
+    <div class="max-w-5xl mx-auto">
+      <h2 class="text-3xl sm:text-4xl font-bold tracking-tight mb-4 text-center">
+        Suggested Loadouts
+      </h2>
+      <p class="text-neutral-400 text-center mb-4 max-w-2xl mx-auto">
+        Not sure where to start? Pick a loadout built for how you actually work with dogs. Each one is a starting point — swap modules in or out to match your setup.
+      </p>
+      <p class="text-neutral-500 text-center mb-12 max-w-2xl mx-auto text-sm">
+        Or skip the suggestions and <a href="#modules" class="text-amber-500 hover:text-amber-400 transition-colors">build your own from scratch</a> — every module is browsable below.
+      </p>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-2 gap-6">
+        {loadouts.map(({ slug, name, tagline, belt, modules: mods }) => (
+          <a
+            href={`${import.meta.env.BASE_URL}loadouts/${slug}/`}
+            class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col hover:border-neutral-600 transition-colors group"
+          >
+            <div class="flex items-start justify-between gap-3 mb-2">
+              <h3 class="text-xl font-bold text-white group-hover:text-amber-500 transition-colors">{name}</h3>
+              <span class="px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-500 rounded-full border border-amber-500/20 whitespace-nowrap">
+                {slug === "freeform" ? "No belt — clips" : `${belt} belt`}
+              </span>
+            </div>
+            <p class="text-neutral-400 leading-relaxed mb-4 flex-1">{tagline}</p>
+            <p class="text-xs text-neutral-500 mb-4">
+              {mods.length} modules
+            </p>
+            <span class="text-sm text-amber-500 group-hover:text-amber-400 transition-colors font-medium">
+              View loadout &rarr;
+            </span>
+          </a>
         ))}
       </div>
     </div>
@@ -193,42 +254,90 @@ const repoUrl = "https://github.com/mmmaxwwwell/kanix";
           the load of holsters, pouches, and tools evenly around your waist.
         </p>
         <p class="mb-4">
-          Kanix™ is designed around a standard 2" (51mm) duty belt. The wide, stiff construction
-          gives you a stable platform to mount modules that won't shift or bounce while you're
-          handling dogs.
+          Kanix™ supports both <strong class="text-white">1.5"</strong> and <strong class="text-white">2"</strong> duty belts.
+          We recommend the <a href="https://www.amazon.com/dp/B0G2PTBGF2" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:text-amber-400 transition-colors">2" with MOLLE webbing</a> — it's the stiffest option and gives you an extra row of
+          webbing for any non-Kanix gear you already own. All three belts below use the same Kanix™ bolt pattern;
+          pick the size you want to wear and print the matching plate or belt-clip variant. Every module attaches with
+          <a href="https://www.amazon.com/dp/B08DS7XJN8" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:text-amber-400 transition-colors">M5×10 button-head cap screws</a>.
         </p>
         <p class="mb-8">
-          Any 2" duty belt will work. We're currently prototyping with the belt linked below,
-          but the system is designed to be belt-agnostic. If it's 2" wide and rigid, it's compatible.
+          Wearing a belt size that's not 1.5" or 2"?
+          <a href={`${import.meta.env.BASE_URL}#custom-requests`} class="text-amber-500 hover:text-amber-400 transition-colors">Open an issue</a>
+          with the belt width and a link to the product — we'll add it.
         </p>
       </div>
-      <div class="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
-        <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
-          <p class="text-sm text-neutral-500 uppercase tracking-wider font-semibold mb-3">Recommended Belt</p>
-          <p class="text-white font-medium mb-1">2" Tactical Duty Belt</p>
-          <p class="text-neutral-500 text-sm mb-4">Rigid, double-layered nylon. The belt we use for prototyping all Kanix™ modules.</p>
-          <a
-            href="https://www.amazon.com/dp/B0FXRGCY7C"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="inline-flex items-center gap-2 text-amber-500 hover:text-amber-400 transition-colors text-sm font-medium"
-          >
+      <div class="grid sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
+        <a
+          href="https://www.amazon.com/dp/B0G2PTBGF2"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col hover:border-neutral-600 transition-colors group"
+        >
+          <p class="text-sm text-amber-500 uppercase tracking-wider font-semibold mb-3">Recommended — 2" with MOLLE</p>
+          <p class="text-white font-medium mb-1 group-hover:text-amber-500 transition-colors">IDOGEAR SPORTS Tactical 2" Heavy-Duty MOLLE Belt</p>
+          <p class="text-neutral-500 text-sm mb-4 flex-1">
+            A 2" duty belt with full MOLLE/PALS webbing. Kanix™ bolt grid plus extra rows of webbing for any non-Kanix gear.
+          </p>
+          <span class="inline-flex items-center gap-2 text-amber-500 group-hover:text-amber-400 transition-colors text-sm font-medium">
             View on Amazon &rarr;
-          </a>
-        </div>
-        <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
-          <p class="text-sm text-neutral-500 uppercase tracking-wider font-semibold mb-3">Mounting Hardware</p>
-          <p class="text-white font-medium mb-1">M5x10 Button Head Cap Screws</p>
-          <p class="text-neutral-500 text-sm mb-4">Used to mount most modules to belt clips. Stainless steel, fits the standard Kanix™ bolt pattern.</p>
-          <a
-            href="https://www.amazon.com/dp/B08DS7XJN8"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="inline-flex items-center gap-2 text-amber-500 hover:text-amber-400 transition-colors text-sm font-medium"
-          >
+          </span>
+        </a>
+        <a
+          href="https://www.amazon.com/dp/B0FXRGCY7C"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col hover:border-neutral-600 transition-colors group"
+        >
+          <p class="text-sm text-neutral-500 uppercase tracking-wider font-semibold mb-3">2" duty belt</p>
+          <p class="text-white font-medium mb-1 group-hover:text-amber-500 transition-colors">Heavy Duty 2 inch duty belt</p>
+          <p class="text-neutral-500 text-sm mb-4 flex-1">
+            A plain 2" duty belt — no MOLLE webbing, a bit cheaper. Works with every 52mm Kanix™ plate or belt-clip variant.
+          </p>
+          <span class="inline-flex items-center gap-2 text-amber-500 group-hover:text-amber-400 transition-colors text-sm font-medium">
             View on Amazon &rarr;
+          </span>
+        </a>
+        <a
+          href="https://www.amazon.com/dp/B0FJDMN78R"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col hover:border-neutral-600 transition-colors group"
+        >
+          <p class="text-sm text-neutral-500 uppercase tracking-wider font-semibold mb-3">1.5" duty belt</p>
+          <p class="text-white font-medium mb-1 group-hover:text-amber-500 transition-colors">IDOGEAR SPORTS Tactical Ratchet Belt</p>
+          <p class="text-neutral-500 text-sm mb-4 flex-1">
+            A 1.5" tactical ratchet belt — smaller footprint, same Kanix™ bolt pattern. Use with any 38mm Kanix™ plate or belt-clip variant.
+          </p>
+          <span class="inline-flex items-center gap-2 text-amber-500 group-hover:text-amber-400 transition-colors text-sm font-medium">
+            View on Amazon &rarr;
+          </span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mounting Systems -->
+  <section id="mounting-systems" class="py-24 px-6">
+    <div class="max-w-3xl mx-auto">
+      <h2 class="text-3xl sm:text-4xl font-bold tracking-tight mb-4 text-center">
+        Mounting Systems
+      </h2>
+      <p class="text-neutral-400 text-center mb-12 max-w-xl mx-auto">
+        Pick one of these first — every module below bolts onto it.
+      </p>
+      <div class="grid sm:grid-cols-2 gap-6">
+        {mountingSystems.map(({ slug, name, description }) => (
+          <a
+            href={`${import.meta.env.BASE_URL}modules/${slug}/`}
+            class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col hover:border-neutral-600 transition-colors group"
+          >
+            <h3 class="text-lg font-semibold mb-2 text-white group-hover:text-amber-500 transition-colors">{name}</h3>
+            <p class="text-neutral-400 leading-relaxed mb-4 flex-1">{description}</p>
+            <span class="text-sm text-amber-500 group-hover:text-amber-400 transition-colors font-medium">
+              View 3D Model &rarr;
+            </span>
           </a>
-        </div>
+        ))}
       </div>
     </div>
   </section>
@@ -240,10 +349,10 @@ const repoUrl = "https://github.com/mmmaxwwwell/kanix";
         Available Modules
       </h2>
       <p class="text-neutral-400 text-center mb-12 max-w-xl mx-auto">
-        Each module mounts to a standard 3x3 Kanix™ bolt pattern with M5 hardware. Mix, match, and rearrange to suit your needs.
+        Every module bolts onto the universal Kanix™ grid. Mix, match, and rearrange to suit your needs.
       </p>
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {modules.map(({ slug, name, description }) => (
+        {accessoryModules.map(({ slug, name, description }) => (
           <a
             href={`${import.meta.env.BASE_URL}modules/${slug}/`}
             class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col hover:border-neutral-600 transition-colors group"
@@ -274,19 +383,37 @@ const repoUrl = "https://github.com/mmmaxwwwell/kanix";
     </div>
   </section>
 
-  <!-- Custom Modules -->
-  <section class="py-24 px-6">
+  <!-- Custom Requests -->
+  <section id="custom-requests" class="py-24 px-6">
     <div class="max-w-3xl mx-auto text-center">
       <h2 class="text-3xl sm:text-4xl font-bold tracking-tight mb-8">
-        Need a Custom Module?
+        Need Something That's Not Here Yet?
       </h2>
       <div class="text-neutral-400 leading-relaxed">
-        <p class="mb-4">
-          Don't see a module for your gear? Open an issue on our GitHub page and describe what
-          you need: the item you want to mount, its dimensions, and how you'd like it to attach.
+        <p class="mb-4 text-lg text-neutral-300">
+          Did we forget something? Have a new idea?
         </p>
+        <p class="mb-4">
+          Whether it's a <strong class="text-white">module for a piece of gear we don't cover yet</strong>
+          or <strong class="text-white">support for a different belt size</strong> — open an issue on our
+          GitHub page and describe what you need.
+        </p>
+        <ul class="mb-4 space-y-2 list-disc pl-6 text-left max-w-xl mx-auto">
+          <li>
+            <strong class="text-white">New module:</strong> tell us what you want to mount, its rough
+            dimensions, and how you'd like it to attach.
+          </li>
+          <li>
+            <strong class="text-white">New belt size:</strong> tell us the belt width (and thickness, if
+            unusual) plus a link to a representative product so we can size the plate correctly.
+          </li>
+          <li>
+            <strong class="text-white">Anything else:</strong> ideas, suggestions, improvements to an
+            existing module, or just a question — we want to hear it. No idea is too small.
+          </li>
+        </ul>
         <p class="mb-8">
-          An issue is just a message on our project page. You don't need to know how to code, just
+          An issue is just a message on our project page. You don't need to know how to code — just
           create a free GitHub account, click "New Issue," and tell us what you're looking for.
           We'll work with you to design it.
         </p>

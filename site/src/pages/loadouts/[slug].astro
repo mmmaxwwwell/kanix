@@ -1,0 +1,482 @@
+---
+import Base from "../../layouts/Base.astro";
+import Header from "../../components/Header.astro";
+import Footer from "../../components/Footer.astro";
+import { loadouts, resolveLoadout, summarizeLoadoutPrintList, collectLoadoutProducts, totalLoadoutScrews } from "../../data/loadouts";
+
+export function getStaticPaths() {
+  return loadouts.map((l) => ({
+    params: { slug: l.slug },
+    props: l,
+  }));
+}
+
+const loadout = Astro.props;
+const baseUrl = import.meta.env.BASE_URL;
+const resolved = resolveLoadout(loadout);
+const printList = summarizeLoadoutPrintList(loadout);
+const products = collectLoadoutProducts(loadout);
+const screwTotal = totalLoadoutScrews(loadout);
+
+// Split products into three subsections: required, pick-one groups, optional.
+// Pick-one groups stay contiguous so the page can label them with a header.
+const requiredProducts = products.filter((p) => p.required && !p.pickOneGroup);
+const optionalProducts = products.filter((p) => !p.required && !p.pickOneGroup);
+// Preserve order, then group by label.
+const pickOneGroups: Array<{ label: string; rows: typeof products }> = [];
+for (const r of products) {
+  if (!r.pickOneGroup) continue;
+  const existing = pickOneGroups.find((g) => g.label === r.pickOneGroup);
+  if (existing) existing.rows.push(r);
+  else pickOneGroups.push({ label: r.pickOneGroup, rows: [r] });
+}
+
+// Compute the longest "source tag" text across every product row so all
+// rows in every subsection align to one tag column on desktop. For
+// pick-one cluster rows the rendered tag is the *distinguishing* part of
+// the module name (whatever's in parentheses) — strip accordingly here
+// so the alignment matches the actual rendered text.
+function distinguishingName(moduleName: string): string {
+  const parenMatch = moduleName.match(/^[^(]+\(([^)]+)\)\s*$/);
+  return parenMatch ? parenMatch[1] : moduleName;
+}
+function tagText(r: typeof products[number]): string {
+  if (r.source.kind === "belt") return "Belt";
+  if (r.pickOneGroup) return distinguishingName(r.source.moduleName);
+  return `for ${r.source.moduleName}`;
+}
+const maxTagChars = Math.max(0, ...products.map((r) => tagText(r).length));
+// The tag text is rendered at text-[0.6rem] uppercase with tracking-wider —
+// roughly 0.36rem per char on average. Add ~1rem for chip padding/border.
+// Cap at 16rem so an unusually long tag doesn't crowd the product name.
+const tagColRem = Math.min(Math.max(maxTagChars * 0.36 + 1, 4), 16);
+const tagColStyle = `min-width: ${tagColRem.toFixed(2)}rem`;
+---
+
+<Base
+  title={`${loadout.name} Loadout - Kanix™`}
+  description={loadout.tagline}
+>
+  <Header />
+
+  <main id="main" class="pt-20 pb-16 px-4 sm:px-6">
+    <div class="max-w-5xl mx-auto">
+      <a
+        href={`${baseUrl}#loadouts`}
+        class="text-sm text-neutral-500 hover:text-white transition-colors mb-4 inline-block"
+      >
+        &larr; Back to all loadouts
+      </a>
+
+      <h1 class="text-2xl sm:text-4xl font-bold tracking-tight mb-2">{loadout.name}</h1>
+      <p class="text-amber-500 text-base sm:text-lg font-medium mb-6">{loadout.tagline}</p>
+      <p class="text-neutral-400 text-base sm:text-lg leading-relaxed mb-8">{loadout.description}</p>
+
+      {/* ── Recommended belt ─────────────────────────────────────── */}
+      {loadout.beltProduct ? (
+        <a
+          href={loadout.beltProduct.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="block bg-neutral-900 border border-amber-500/30 hover:border-amber-500 rounded-xl p-6 mb-10 transition-colors group"
+          aria-labelledby="belt-heading"
+        >
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0 flex-1">
+              <h2 id="belt-heading" class="text-xs font-semibold tracking-widest uppercase text-amber-500 mb-2">
+                Recommended belt — {loadout.belt}
+              </h2>
+              <p class="text-white font-semibold text-xl mb-1 group-hover:text-amber-400 transition-colors">
+                {loadout.beltProduct.name}
+              </p>
+              <p class="text-amber-500/80 text-xs font-medium mb-3 group-hover:text-amber-400 transition-colors">
+                Buy on Amazon &rarr;
+              </p>
+              <p class="text-neutral-400 text-sm leading-relaxed">{loadout.beltNote}</p>
+            </div>
+            <span class="flex-shrink-0 text-amber-500 group-hover:text-amber-400 transition-colors" aria-hidden="true">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </span>
+          </div>
+        </a>
+      ) : (
+        <section class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 mb-10" aria-labelledby="belt-heading">
+          <h2 id="belt-heading" class="text-xs font-semibold tracking-widest uppercase text-amber-500 mb-2">
+            Mounting system
+          </h2>
+          <p class="text-white font-semibold text-xl mb-2">No duty belt — belt clip adapters</p>
+          <p class="text-neutral-400 text-sm leading-relaxed">{loadout.beltNote}</p>
+        </section>
+      )}
+
+      {/* ── Module list ──────────────────────────────────────────── */}
+      <section aria-labelledby="modules-heading">
+        <h2 id="modules-heading" class="text-xl sm:text-2xl font-bold tracking-tight mb-2">
+          Modules in this loadout
+        </h2>
+        <p class="text-neutral-500 text-sm mb-6">
+          {resolved.length} modules. Click any module for the 3D viewer, STL download, and OpenSCAD source.
+        </p>
+
+        <ul class="rounded-xl overflow-hidden border border-neutral-800">
+          {resolved.map((entry, idx) => (
+            <li
+              class:list={[
+                "flex flex-col sm:flex-row sm:items-start gap-4 p-4",
+                idx % 2 === 0 ? "bg-neutral-900/30" : "bg-neutral-900/60",
+                idx > 0 ? "border-t border-neutral-800/80" : "",
+              ]}
+            >
+              {/* Left: fixed-size card. */}
+              {entry.kind === "group" ? (
+                <div class="sm:w-72 sm:flex-shrink-0 bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col relative">
+                  <span class="absolute top-4 right-4 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-500 rounded-full border border-amber-500/20">
+                    Pick one
+                  </span>
+                  <h3 class="text-lg font-semibold mb-4 text-white pr-20">
+                    {entry.groupLabel}
+                  </h3>
+                  <div class="flex flex-col gap-1.5 mt-auto">
+                    {entry.candidates.map(({ kind: ckind, module: cmod }) => (
+                      <a
+                        href={`${baseUrl}${ckind === "coming-soon" ? "coming-soon" : "modules"}/${cmod.slug}/`}
+                        class="text-sm text-amber-500 hover:text-amber-400 transition-colors font-medium flex items-center justify-between gap-2"
+                      >
+                        <span>{cmod.name}</span>
+                        <span class="flex items-center gap-1.5 flex-shrink-0">
+                          {ckind === "coming-soon" && (
+                            <span class="text-[0.55rem] font-semibold tracking-wider uppercase text-amber-500/80 bg-amber-500/10 border border-amber-500/20 rounded-full px-1.5 py-0.5">
+                              Soon
+                            </span>
+                          )}
+                          <span aria-hidden="true">&rarr;</span>
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <a
+                  href={`${baseUrl}${entry.kind === "coming-soon" ? "coming-soon" : "modules"}/${entry.module.slug}/`}
+                  class="sm:w-72 sm:flex-shrink-0 bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col hover:border-neutral-600 transition-colors group relative"
+                >
+                  {entry.kind === "coming-soon" && (
+                    <span class="absolute top-4 right-4 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-500 rounded-full border border-amber-500/20">
+                      Coming Soon
+                    </span>
+                  )}
+                  <h3 class:list={["text-lg font-semibold mb-2 text-white group-hover:text-amber-500 transition-colors flex-1", entry.kind === "coming-soon" ? "pr-24" : ""]}>
+                    {entry.module.name}
+                  </h3>
+                  <span class="text-sm text-amber-500 group-hover:text-amber-400 transition-colors font-medium">
+                    {entry.kind === "coming-soon" ? "View Details" : "View 3D Model"} &rarr;
+                  </span>
+                </a>
+              )}
+
+              {/* Right: loadout-specific info. */}
+              <div class="flex-1 min-w-0 flex flex-col items-start text-left px-2 sm:px-0 sm:pt-2">
+                <div class="flex flex-wrap items-center gap-2 mb-3">
+                  {entry.plate ? (
+                    <span class="text-[0.65rem] font-semibold tracking-wider uppercase text-neutral-400 bg-neutral-800/60 border border-neutral-700/60 rounded-full px-2.5 py-0.5">
+                      Mounts on: {entry.plate.replace(/^plates\//, "").replace(/\.stl$/, "")}
+                    </span>
+                  ) : (
+                    <span class="text-[0.65rem] font-semibold tracking-wider uppercase text-neutral-400 bg-neutral-800/60 border border-neutral-700/60 rounded-full px-2.5 py-0.5">
+                      No mount — loops on belt
+                    </span>
+                  )}
+                  {entry.kind !== "group" && entry.variant && (
+                    Array.isArray(entry.variant) ? (
+                      entry.variant.map((v) => (
+                        <span class="text-[0.65rem] font-semibold tracking-wider uppercase text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-full px-2.5 py-0.5">
+                          Variant: {v}
+                        </span>
+                      ))
+                    ) : (
+                      <span class="text-[0.65rem] font-semibold tracking-wider uppercase text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-full px-2.5 py-0.5">
+                        Variant: {entry.variant}
+                      </span>
+                    )
+                  )}
+                </div>
+                {entry.kind !== "group" && (
+                  <p class="text-neutral-400 text-sm leading-relaxed mb-3">
+                    {entry.module.description}
+                  </p>
+                )}
+                {entry.kind === "group" && entry.groupDescription && (
+                  <p class="text-neutral-400 text-sm leading-relaxed mb-3">
+                    {entry.groupDescription}
+                  </p>
+                )}
+                {entry.note && (
+                  <p class="text-neutral-300 text-sm leading-relaxed pl-3 border-l-2 border-amber-500/40">
+                    <span class="text-amber-500/80 text-xs font-semibold uppercase tracking-wider mr-2">Why</span>
+                    {entry.note}
+                  </p>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* ── Products for this loadout ────────────────────────────── */}
+      <section class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 mt-10" aria-labelledby="products-heading">
+        <h2 id="products-heading" class="text-xl sm:text-2xl font-bold tracking-tight mb-2">
+          Products for this loadout
+        </h2>
+        <p class="text-neutral-500 text-sm mb-6">
+          Everything you'll buy alongside the 3D-printed parts. <span class="text-amber-500 font-semibold">Required</span> items come first — you can't run this loadout without them. After that come the <span class="text-amber-500 font-semibold">Pick one of</span> clusters (one product from each cluster), and finally <span class="text-neutral-300 font-semibold">Optional</span> accessories that go well with this build.
+        </p>
+
+        {requiredProducts.length > 0 && (
+          <div class="mb-6">
+            <h3 class="text-xs font-semibold tracking-widest uppercase text-amber-500 mb-3">Required</h3>
+            <ul class="rounded-lg overflow-hidden border border-amber-500/20">
+              {requiredProducts.map((r, idx) => (
+                <li>
+                  <a
+                    href={r.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class:list={[
+                      "flex items-center justify-between gap-3 text-sm py-3 px-4 transition-colors group",
+                      idx % 2 === 0 ? "bg-neutral-900/30" : "bg-neutral-900/60",
+                      idx > 0 ? "border-t border-neutral-800/80" : "",
+                      "hover:bg-neutral-900/90 hover:text-amber-500",
+                    ]}
+                  >
+                    <span class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0 flex-1">
+                      <span class="text-[0.6rem] font-semibold tracking-wider uppercase text-neutral-400 bg-neutral-800/60 border border-neutral-700/60 rounded-full px-2 py-0.5 whitespace-nowrap flex-shrink-0 self-start text-center transition-colors group-hover:text-amber-500 group-hover:bg-amber-500/10 group-hover:border-amber-500/30" style={tagColStyle}>
+                        {r.source.kind === "belt" ? "Belt" : `for ${r.source.moduleName}`}
+                      </span>
+                      <span class="text-neutral-200 group-hover:text-amber-400 transition-colors truncate">{r.name}</span>
+                    </span>
+                    <span class="text-amber-500 group-hover:text-amber-400 transition-colors text-xs font-medium flex-shrink-0">
+                      Amazon &rarr;
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {pickOneGroups.length > 0 && (
+          <div class="mb-6">
+            <h3 class="text-xs font-semibold tracking-widest uppercase text-amber-500 mb-3">Pick one of</h3>
+            <div class="space-y-4">
+              {pickOneGroups.map((g) => (
+                <div>
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-[0.6rem] font-semibold tracking-wider uppercase text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-0.5 whitespace-nowrap">
+                      Pick one of
+                    </span>
+                    <span class="text-neutral-200 text-sm font-semibold">{g.label}</span>
+                  </div>
+                  <ul class="rounded-lg overflow-hidden border border-amber-500/20">
+                    {g.rows.map((r, idx) => (
+                      <li>
+                        <a
+                          href={r.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class:list={[
+                            "flex items-center justify-between gap-3 text-sm py-3 px-4 transition-colors group",
+                            idx % 2 === 0 ? "bg-neutral-900/30" : "bg-neutral-900/60",
+                            idx > 0 ? "border-t border-neutral-800/80" : "",
+                            "hover:bg-neutral-900/90 hover:text-amber-500",
+                          ]}
+                        >
+                          <span class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0 flex-1">
+                            <span class="text-[0.6rem] font-semibold tracking-wider uppercase text-neutral-400 bg-neutral-800/60 border border-neutral-700/60 rounded-full px-2 py-0.5 whitespace-nowrap flex-shrink-0 self-start text-center transition-colors group-hover:text-amber-500 group-hover:bg-amber-500/10 group-hover:border-amber-500/30" style={tagColStyle}>
+                              {(() => {
+                                if (r.source.kind !== "module") return "";
+                                // Strip the cluster's common prefix from the module name so each
+                                // row only shows the distinguishing part (e.g. "Mini Educator"
+                                // instead of "for E-Collar Holder (Mini Educator)"). The group
+                                // header already names the cluster.
+                                const name = r.source.moduleName;
+                                const parenMatch = name.match(/^[^(]+\(([^)]+)\)\s*$/);
+                                if (parenMatch) return parenMatch[1];
+                                return name;
+                              })()}
+                            </span>
+                            <span class="text-neutral-200 group-hover:text-amber-400 transition-colors truncate">{r.name}</span>
+                          </span>
+                          <span class="text-amber-500 group-hover:text-amber-400 transition-colors text-xs font-medium flex-shrink-0">
+                            Amazon &rarr;
+                          </span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {optionalProducts.length > 0 && (
+          <div>
+            <h3 class="text-xs font-semibold tracking-widest uppercase text-neutral-400 mb-3">Optional</h3>
+            <ul class="rounded-lg overflow-hidden border border-amber-500/20">
+              {optionalProducts.map((r, idx) => (
+                <li>
+                  <a
+                    href={r.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class:list={[
+                      "flex items-center justify-between gap-3 text-sm py-3 px-4 transition-colors group",
+                      idx % 2 === 0 ? "bg-neutral-900/30" : "bg-neutral-900/60",
+                      idx > 0 ? "border-t border-neutral-800/80" : "",
+                      "hover:bg-neutral-900/90 hover:text-amber-500",
+                    ]}
+                  >
+                    <span class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0 flex-1">
+                      <span class="text-[0.6rem] font-semibold tracking-wider uppercase text-neutral-400 bg-neutral-800/60 border border-neutral-700/60 rounded-full px-2 py-0.5 whitespace-nowrap flex-shrink-0 self-start text-center transition-colors group-hover:text-amber-500 group-hover:bg-amber-500/10 group-hover:border-amber-500/30" style={tagColStyle}>
+                        {r.source.kind === "belt" ? "Belt" : `for ${r.source.moduleName}`}
+                      </span>
+                      <span class="text-neutral-200 group-hover:text-amber-400 transition-colors truncate">{r.name}</span>
+                    </span>
+                    <span class="text-amber-500 group-hover:text-amber-400 transition-colors text-xs font-medium flex-shrink-0">
+                      Amazon &rarr;
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
+
+      {/* ── Mounting hardware ────────────────────────────────────── */}
+      {screwTotal > 0 && (
+        <section class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 mt-10" aria-labelledby="hardware-heading">
+          <h2 id="hardware-heading" class="text-xl sm:text-2xl font-bold tracking-tight mb-2">
+            Mounting hardware
+          </h2>
+          <p class="text-neutral-500 text-sm mb-6">
+            Every module bolts onto its plate with M5×10 button-head cap screws — the Kanix™ standard. This is the total count across every module in this loadout.
+          </p>
+          <ul class="rounded-lg overflow-hidden border border-amber-500/20">
+            <li>
+              <a
+                href="https://www.amazon.com/dp/B08DS7XJN8"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex items-center justify-between gap-3 text-sm py-3 px-4 bg-neutral-900/30 hover:bg-neutral-900/90 transition-colors group"
+              >
+                <span class="flex items-center gap-3 min-w-0 flex-1">
+                  <span class="text-[0.6rem] font-semibold tracking-wider uppercase text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-0.5 whitespace-nowrap">
+                    Required
+                  </span>
+                  <span class="text-neutral-200 group-hover:text-amber-400 transition-colors truncate">M5×10 button-head cap screws</span>
+                  <span class="text-xs font-semibold text-neutral-300 bg-neutral-800 rounded-full px-2 py-0.5 flex-shrink-0">
+                    ×{screwTotal}
+                  </span>
+                </span>
+                <span class="text-amber-500 group-hover:text-amber-400 transition-colors text-xs font-medium flex-shrink-0">
+                  Amazon &rarr;
+                </span>
+              </a>
+            </li>
+          </ul>
+          <details class="mt-4">
+            <summary class="text-neutral-500 text-xs cursor-pointer hover:text-neutral-300 transition-colors">Per-module breakdown</summary>
+            <ul class="mt-3 space-y-1 pl-3 border-l-2 border-neutral-800/80">
+              {resolved.map((entry) => {
+                if (entry.kind === "group") {
+                  // Show the max across candidates with a "pick one" note.
+                  let maxCount = 0;
+                  for (const c of entry.candidates) {
+                    if (typeof c.module.screwCount === "number") {
+                      maxCount = Math.max(maxCount, c.module.screwCount);
+                    }
+                  }
+                  if (maxCount === 0) return null;
+                  return (
+                    <li class="flex items-center justify-between text-xs text-neutral-400 py-0.5">
+                      <span class="truncate">{entry.groupLabel} <span class="text-neutral-600">(any candidate)</span></span>
+                      <span class="text-neutral-300">×{maxCount}</span>
+                    </li>
+                  );
+                }
+                if (typeof entry.module.screwCount !== "number") return null;
+                const multiplier = Array.isArray(entry.variant) ? entry.variant.length : 1;
+                const subtotal = entry.module.screwCount * multiplier;
+                return (
+                  <li class="flex items-center justify-between text-xs text-neutral-400 py-0.5">
+                    <span class="truncate">
+                      {entry.module.name}
+                      {multiplier > 1 && (
+                        <span class="text-neutral-600"> ({multiplier} on one plate)</span>
+                      )}
+                    </span>
+                    <span class="text-neutral-300">×{subtotal}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </details>
+        </section>
+      )}
+
+      {/* ── Full print list ──────────────────────────────────────── */}
+      <section class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 mt-10" aria-labelledby="print-list-heading">
+        <h2 id="print-list-heading" class="text-xl sm:text-2xl font-bold tracking-tight mb-2">
+          Full print list
+        </h2>
+        <p class="text-neutral-500 text-sm mb-6">
+          Everything you need to 3D-print this loadout — mounts (the plates or belt clips everything bolts to) followed by the modules themselves. The count is how many copies of each STL to print.
+        </p>
+        <ul class="space-y-2">
+          {printList.map(({ kind, stl, count, label }) => (
+            <li class="flex items-center justify-between gap-3 text-sm py-2 border-b border-neutral-800/60 last:border-b-0">
+              <span class="flex items-center gap-3 min-w-0">
+                <span
+                  class:list={[
+                    "text-[0.65rem] font-semibold tracking-wider uppercase rounded-full px-2 py-0.5 whitespace-nowrap",
+                    kind === "mount"
+                      ? "text-amber-500 bg-amber-500/10 border border-amber-500/20"
+                      : "text-neutral-400 bg-neutral-800/60 border border-neutral-700/60",
+                  ]}
+                >
+                  {kind === "mount" ? "Mount" : "Module"}
+                </span>
+                <span class="text-neutral-200 truncate">{label}</span>
+              </span>
+              <span class="flex items-center gap-3 flex-shrink-0">
+                <span class="text-xs font-semibold text-neutral-300 bg-neutral-800 rounded-full px-2 py-0.5">
+                  ×{count}
+                </span>
+                <a
+                  href={`${baseUrl}models/${stl}`}
+                  download
+                  class="text-amber-500 hover:text-amber-400 transition-colors text-xs font-medium"
+                >
+                  STL &rarr;
+                </a>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* ── Footer disclaimer ────────────────────────────────────── */}
+      <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 mt-10">
+        <h3 class="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-3">Disclaimer</h3>
+        <p class="text-neutral-500 text-xs leading-relaxed">
+          Suggested loadouts are starting points, not prescriptions. Build yours based on the dogs you handle, the environments you work in, and the gear you already own. Kanix™ is not affiliated with, endorsed by, or associated with any product manufacturers referenced on this site. All product names, trademarks, and registered trademarks are the property of their respective owners. Product links are provided for reference only.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <Footer />
+</Base>
