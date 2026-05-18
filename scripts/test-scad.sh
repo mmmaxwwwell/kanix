@@ -5,8 +5,9 @@ SCAD_DIR="$(cd "$(dirname "$0")/../scad" && pwd)"
 FAILED=0
 PASSED=0
 
-for scad in "$SCAD_DIR"/*.scad; do
-  name="$(basename "$scad")"
+for scad in "$SCAD_DIR"/*.scad "$SCAD_DIR"/plates/*.scad; do
+  # Use a relative-ish name so plates/ files are distinguishable in output.
+  name="${scad#$SCAD_DIR/}"
 
   tmpfile="$(mktemp /tmp/kanix-test-XXXXXX.stl)"
   if openscad -o "$tmpfile" "$scad" 2>&1; then

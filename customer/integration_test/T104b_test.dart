@@ -62,7 +62,7 @@ void main() {
       // Pump a NavigationBar matching AppShell's structure to assert the
       // Support tab exists at index 2 between Cart and Orders.
       await tester.pumpWidget(
-        const MaterialApp(
+        MaterialApp(
           home: Scaffold(
             bottomNavigationBar: NavigationBar(
               selectedIndex: 2,

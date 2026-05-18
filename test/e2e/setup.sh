@@ -300,14 +300,34 @@ fi
 # was a stale node from an earlier run.
 api_already_running=false
 
-# Fast path: if the API health endpoint is already responding, skip the
-# PID-file and port-ownership checks entirely.  This handles the common
-# case where the API was started by a prior setup.sh run whose process
-# lives in a different PID namespace (containers, Claude Code sandbox)
-# and is invisible to lsof / kill / ps — but the service itself is fine.
-if curl -sf "http://127.0.0.1:${PORT_API}/health" >/dev/null 2>&1; then
+# Detect stale binary: any .ts source newer than dist/index.js means the
+# running API is executing pre-fix code. The fast-path below MUST NOT
+# skip restart in that case — that's exactly the bug (T104c iter 4 + 6)
+# where verify scripts hit a stale binary and 5 iterations of work were
+# wasted before the runner gave up.
+api_dist_stale=false
+if [ -f "$PROJECT_ROOT/api/dist/index.js" ]; then
+  if [ -n "$(find "$PROJECT_ROOT/api/src" -name '*.ts' \
+              -newer "$PROJECT_ROOT/api/dist/index.js" \
+              -print -quit 2>/dev/null)" ]; then
+    api_dist_stale=true
+  fi
+else
+  api_dist_stale=true
+fi
+
+# Fast path: if the API health endpoint is already responding AND the
+# compiled bundle is up to date, skip the PID-file and port-ownership
+# checks entirely.  This handles the common case where the API was
+# started by a prior setup.sh run whose process lives in a different
+# PID namespace (containers, Claude Code sandbox) and is invisible to
+# lsof / kill / ps — but the service itself is fine.
+if [ "$api_dist_stale" = false ] \
+   && curl -sf "http://127.0.0.1:${PORT_API}/health" >/dev/null 2>&1; then
   api_already_running=true
   log "  API already healthy on port ${PORT_API}, skipping start"
+elif [ "$api_dist_stale" = true ]; then
+  log "  API source newer than dist/index.js — forcing rebuild + restart"
 fi
 
 if [ "$api_already_running" = false ] && [ -f "$STATE_DIR/api.pid" ]; then
@@ -317,7 +337,11 @@ if [ "$api_already_running" = false ] && [ -f "$STATE_DIR/api.pid" ]; then
     pid_cmd=$(ps -p "$old_api_pid" -o args= 2>/dev/null || true)
   fi
   port_pids=$(pids_on_port "$PORT_API")
-  if [ -n "$old_api_pid" ] \
+  if [ "$api_dist_stale" = true ] && [ -n "$old_api_pid" ]; then
+    log "  Killing stale API (pid ${old_api_pid}) so the rebuild can take effect"
+    kill -9 "$old_api_pid" 2>/dev/null || true
+    rm -f "$STATE_DIR/api.pid"
+  elif [ -n "$old_api_pid" ] \
      && echo "$pid_cmd" | grep -qE "(dist/index\.js|tsx .*src/index\.ts)" \
      && echo "$port_pids" | tr ' ' '\n' | grep -qx "$old_api_pid"; then
     api_already_running=true

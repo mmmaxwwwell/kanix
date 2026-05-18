@@ -1,5 +1,16 @@
 # Kanix - Claude Code Instructions
 
+## Agent policy: no auto-memory in this repo
+
+Do **not** write to the auto-memory system (`~/.claude/projects/-home-max-git-kanix/memory/`) while working in this repo. Project knowledge belongs in version-controlled docs, not in per-machine memory files that other contributors can't see.
+
+If a gotcha or convention seems worth remembering, put it in a `CLAUDE.md`:
+
+- **Repo-wide** instructions → this file ([CLAUDE.md](CLAUDE.md)).
+- **Subsystem-specific** instructions → a `CLAUDE.md` at the subsystem root (e.g. [stl-pipeline/CLAUDE.md](stl-pipeline/CLAUDE.md), [api/CLAUDE.md](api/CLAUDE.md) when one exists).
+
+Do not read from auto-memory either — treat the kanix memory directory as empty.
+
 ## Quick Start
 
 ```bash

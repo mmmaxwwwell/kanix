@@ -76,6 +76,16 @@ kanix_grid_4x2 = [
 ];
 
 // ----- 52mm belt (2" duty), 3 rows -----
+kanix_grid_2x3 = [
+    ["name",          "2x3"],
+    ["hole_cols",      2],
+    ["hole_rows",      3],
+    ["hole_spacing",   kanix_hole_spacing],
+    ["plate_w",        kanix_grid_plate_w(2)],   // 33.05
+    ["plate_h",        52],
+    ["pilot_hole_d",   kanix_screw_d]
+];
+
 kanix_grid_3x3 = [
     ["name",          "3x3"],
     ["hole_cols",      3],

@@ -39,3 +39,4 @@
 - attempt 1: service=? port=? patterns=none at=2026-04-25T22:26:13
 - attempt 1: service=? port=? patterns=none at=2026-04-25T23:29:01
 - attempt 1: service=mcp-android port=? patterns=mcp-launch-failed,race-between-ready-and-registered at=2026-04-26T05:00:00 fix=wrapped mcp-android in flake.nix with pre-flight adb gate that restarts emulator if offline before exec-ing real binary; prevents indefinite block at module-level get_device()
+- attempt 1: service=? port=? patterns=none at=2026-04-26T20:11:37

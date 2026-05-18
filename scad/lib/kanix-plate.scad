@@ -37,9 +37,9 @@ module kanix_plate(
     counterbore_d = 11.5,    // Counterbore for M5 bolt heads
     hole_cols = 3,           // Number of bolt-hole columns
     hole_rows = 3,           // Number of bolt-hole rows
-    main_hinge_segments = 7,         // Segments for main belt hinge
-    latch_hinge_segments = 7,        // Segments for latch hinge
-    middle_clip_hinge_segments = 7,  // Segments for middle clip hinges
+    main_hinge_segments = undef,         // undef = auto-size to match 3x3 52mm width
+    latch_hinge_segments = undef,        // undef = auto-size to match 3x3 52mm width
+    middle_clip_hinge_segments = undef,  // undef = auto-size to match 3x3 52mm width
     view = "open"            // "open" or "closed"
 ) {
     counterbore_depth = 2.4;
@@ -60,6 +60,22 @@ module kanix_plate(
     rx_wall_width = 2;
     tx_tip_cutoff = 1.5;
     locking_tab_width = plate_w - side_locking_tab_depth*4 - hinge_gap * 2;
+
+    // Auto-size hinge segments so every plate's segment width stays close to
+    // the 3x3 52mm reference. Two distinct targets:
+    //   - main hinge (front↔back belt hinge) spans plate_w → 52/7 ≈ 7.4286
+    //   - latch + middle-clip hinges span locking_tab_width → 31.4/7 ≈ 4.4857
+    // Minimum 3 segments so the hinge still functions on small plates.
+    main_segment_target  = 52 / 7;            // ≈ 7.4286 mm
+    latch_segment_target = (52 - 5*4 - 0.3*2) / 7;  // = 31.4 / 7 ≈ 4.4857 mm
+    // Round to nearest, force odd (hinges must alternate inner/outer and end
+    // on the same side they start), min 3.
+    function _to_odd(n) = (n % 2 == 0) ? n + 1 : n;
+    auto_main_segments  = max(3, _to_odd(round(plate_w / main_segment_target)));
+    auto_latch_segments = max(3, _to_odd(round(locking_tab_width / latch_segment_target)));
+    _main_hinge_segments        = is_undef(main_hinge_segments)        ? auto_main_segments  : main_hinge_segments;
+    _latch_hinge_segments       = is_undef(latch_hinge_segments)       ? auto_latch_segments : latch_hinge_segments;
+    _middle_clip_hinge_segments = is_undef(middle_clip_hinge_segments) ? auto_latch_segments : middle_clip_hinge_segments;
 
     middle_clip_interface_depth = 4;
     middle_clip_interface_diameter = plate_thickness * 0.75;
@@ -106,7 +122,7 @@ module kanix_plate(
             gap = hinge_gap,
             length = locking_tab_width,
             outer_diam = plate_thickness,
-            segments = latch_hinge_segments,
+            segments = _latch_hinge_segments,
             inner = inner,
             cutout = cutout
         );
@@ -124,7 +140,7 @@ module kanix_plate(
             gap = hinge_gap,
             length = plate_w,
             outer_diam = hinge_od,
-            segments = main_hinge_segments,
+            segments = _main_hinge_segments,
             inner = inner
         );
     }
@@ -135,7 +151,7 @@ module kanix_plate(
             gap = hinge_gap,
             length = plate_w,
             outer_diam = hinge_od,
-            segments = main_hinge_segments,
+            segments = _main_hinge_segments,
             inner = inner,
             cutout = true
         );
@@ -325,7 +341,7 @@ module kanix_plate(
         // axes when reused on top/bottom and sides — overshoot is trimmed by
         // the surrounding plate body.
         rotate([0, 0, 90])
-        right_angle_fillet(diameter = plate_thickness/2, length = max(plate_w, plate_h)*2);
+        right_angle_fillet(diameter = 5, length = max(plate_w, plate_h)*2);
     }
 
     module front_edge_fillet(){
@@ -372,7 +388,7 @@ module kanix_plate(
             gap = hinge_gap,
             length = locking_tab_width + hinge_gap * 2,
             outer_diam = plate_thickness,
-            segments = middle_clip_hinge_segments,
+            segments = _middle_clip_hinge_segments,
             inner = inner,
             cutout = cutout
         );
@@ -383,7 +399,7 @@ module kanix_plate(
             gap = hinge_gap,
             length = locking_tab_width,
             outer_diam = plate_thickness,
-            segments = middle_clip_hinge_segments,
+            segments = _middle_clip_hinge_segments,
             inner = inner,
             cutout = cutout
         );
@@ -409,7 +425,20 @@ module kanix_plate(
                     cube([locking_tab_width ,middle_clip_length - hinge_gap * 2,plate_thickness], center = true);
                 }
                 translate([0,- middle_clip_length/2,plate_thickness*1.5 - middle_clip_interface_depth/4 - hinge_gap]){
-                    cube([locking_tab_width ,middle_clip_length - hinge_gap * 2,plate_thickness], center = true);
+                    intersection(){
+                        cube([locking_tab_width ,middle_clip_length - hinge_gap * 2,plate_thickness], center = true);
+                        // 45° chamfer on the two top X-end edges (2mm)
+                        rotate([90,0,0])
+                        linear_extrude(height = middle_clip_length - hinge_gap * 2, center = true)
+                        polygon(points = [
+                            [-locking_tab_width/2,           -plate_thickness/2],
+                            [ locking_tab_width/2,           -plate_thickness/2],
+                            [ locking_tab_width/2,            plate_thickness/2 - 2],
+                            [ locking_tab_width/2 - 2,        plate_thickness/2],
+                            [-locking_tab_width/2 + 2,        plate_thickness/2],
+                            [-locking_tab_width/2,            plate_thickness/2 - 2]
+                        ]);
+                    }
                 }
             }
             translate([0,- middle_clip_length/2,plate_thickness*1.5 - middle_clip_interface_depth/4 - hinge_gap])

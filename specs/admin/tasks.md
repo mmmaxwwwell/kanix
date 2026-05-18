@@ -709,10 +709,10 @@ Each task below creates a NEW file under `api/src/flows/` that walks the same mu
 - [x] T104 Security boundary tests [SC-008, SC-015]
   Done when: scripted API-level test: unauthenticated → 401 on all protected endpoints; wrong permission → 403; SQL injection attempts → rejected; XSS in input → sanitized in response; invalid webhook signature → rejected; runs in CI
 
-- [ ] T104a E2E: guest-order → account linking [FR-066] [needs: mcp-browser, e2e-loop]
+- [x] T104a E2E: guest-order → account linking [FR-066] [needs: mcp-browser, e2e-loop]
   Done when: MCP agent completes 3 guest checkouts on Astro with email `jane@example.com` → signup with same email → MCP verifies verification email link (reads from `logs/emails.jsonl` stub) → verify → login → all 3 orders appear in customer order history with customer_id populated in DB; Playwright regression test
 
-- [ ] T104b E2E: warranty claim submission [FR-055] [needs: mcp-android, e2e-loop] [android-app: customer]
+- [x] T104b E2E: warranty claim submission [FR-055] [needs: mcp-android, e2e-loop] [android-app: customer]
   Done when: MCP agent on Flutter customer app: login → order history → select delivered order within warranty window → file warranty claim (describe defect, upload 2 photos via MCP file-picker interaction) → verify support_ticket created with category=warranty_claim, priority=high, attachments accessible; MCP switches to admin app and verifies ticket in queue via WebSocket update; expired-warranty claim rejected with clear error (separate case); Patrol regression test
 
 - [ ] T104c E2E: admin refund (full + partial) through Stripe [FR-030] [needs: mcp-android, e2e-loop, stripe-listen] [android-app: admin]

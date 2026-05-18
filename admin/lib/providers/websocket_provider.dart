@@ -32,6 +32,7 @@ class WsMessage {
 class WebSocketNotifier extends StateNotifier<AsyncValue<void>> {
   final _controller = StreamController<WsMessage>.broadcast();
   WebSocketChannel? _channel;
+  StreamSubscription<dynamic>? _subscription;
   final Ref _ref;
 
   WebSocketNotifier(Ref ref)
@@ -60,7 +61,7 @@ class WebSocketNotifier extends StateNotifier<AsyncValue<void>> {
 
     try {
       _channel = WebSocketChannel.connect(uri);
-      _channel!.stream.listen(
+      _subscription = _channel!.stream.listen(
         (raw) => _handleMessage(raw as String),
         onError: (_) => _reconnect(),
         onDone: () => _reconnect(),
@@ -82,7 +83,7 @@ class WebSocketNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       final json = jsonDecode(raw) as Map<String, dynamic>;
       final type = json['type'] as String?;
-      if (type != null && type != 'connected') {
+      if (type != null && type != 'connected' && !_controller.isClosed) {
         _controller.add(WsMessage.fromJson(json));
       }
     } catch (_) {
@@ -92,6 +93,7 @@ class WebSocketNotifier extends StateNotifier<AsyncValue<void>> {
 
   @override
   void dispose() {
+    _subscription?.cancel();
     _channel?.sink.close();
     _controller.close();
     super.dispose();

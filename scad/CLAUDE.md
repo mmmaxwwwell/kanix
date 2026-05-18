@@ -38,11 +38,12 @@ Available grids:
 
 | Grid              | Cols × Rows | Plate (W × H mm) | Belt height |
 |-------------------|-------------|------------------|-------------|
-| `kanix_grid_2x2`  | 2 × 2       | 38 × 38          | 38 (1.5")   |
-| `kanix_grid_3x2`  | 3 × 2       | 57.1 × 38        | 38 (1.5")   |
-| `kanix_grid_4x2`  | 4 × 2       | 76.15 × 38       | 38 (1.5")   |
-| `kanix_grid_3x3`  | 3 × 3       | 52 × 52          | 52 (2")     |
-| `kanix_grid_4x3`  | 4 × 3       | 76.15 × 52       | 52 (2")     |
+| `kanix_grid_2x2`  | 2 × 2       | 33.05 × 38       | 38 (1.5")   |
+| `kanix_grid_3x2`  | 3 × 2       | 52.10 × 38       | 38 (1.5")   |
+| `kanix_grid_4x2`  | 4 × 2       | 71.15 × 38       | 38 (1.5")   |
+| `kanix_grid_2x3`  | 2 × 3       | 33.05 × 52       | 52 (2")     |
+| `kanix_grid_3x3`  | 3 × 3       | 52.10 × 52       | 52 (2")     |
+| `kanix_grid_4x3`  | 4 × 3       | 71.15 × 52       | 52 (2")     |
 
 ### `kanix_belt_<h>x<t>` — belt-only fields (clip)
 
@@ -74,10 +75,11 @@ A plate fixture exists at `scad/plates/` for every valid grid × belt pair.
 
 | Grid \ Belt | `52x6.5` (6.5mm) | `52x12` (12mm) |
 |-------------|------------------|----------------|
+| `2x3`       | `kanix_plate_2x3_52x6.5.scad` | `kanix_plate_2x3_52x12.scad` |
 | `3x3`       | `kanix_plate_3x3_52x6.5.scad` | `kanix_plate_3x3_52x12.scad` |
 | `4x3`       | `kanix_plate_4x3_52x6.5.scad` | `kanix_plate_4x3_52x12.scad` |
 
-Total: **7 plate fixtures**, all rendering full clips.
+Total: **9 plate fixtures**, all rendering full clips.
 
 ### How to read a preset
 

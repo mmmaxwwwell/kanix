@@ -270,9 +270,7 @@ describe("concurrent inventory (T102, SC-003)", () => {
         inv400++;
       } else {
         // Unexpected status — fail with details
-        throw new Error(
-          `Unexpected status ${res.statusCode}: ${res.body}`,
-        );
+        throw new Error(`Unexpected status ${res.statusCode}: ${res.body}`);
       }
     }
 
