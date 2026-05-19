@@ -5,6 +5,9 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# What to scan. Defaults to the whole repo (manual runs); ci-local.sh sets
+# SCAN_PATH="$REPO_ROOT/api" to match the CI workflow which uses scan-ref: ./api.
+SCAN_PATH="${SCAN_PATH:-$REPO_ROOT}"
 OUTPUT_DIR="$REPO_ROOT/test-logs/security"
 
 mkdir -p "$OUTPUT_DIR"
@@ -20,7 +23,7 @@ if command -v trivy &>/dev/null; then
   trivy fs --format json --output "$OUTPUT_DIR/trivy.json" \
     --severity CRITICAL,HIGH,MEDIUM,LOW \
     --scanners vuln,secret,misconfig \
-    "$REPO_ROOT" 2>/dev/null
+    "$SCAN_PATH" 2>/dev/null
   TRIVY_EXIT=$?
 
   if [ -f "$OUTPUT_DIR/trivy.json" ]; then
@@ -62,7 +65,7 @@ fi
 echo "Running semgrep scan..."
 if command -v semgrep &>/dev/null; then
   semgrep scan --config auto --json --output "$OUTPUT_DIR/semgrep.json" \
-    "$REPO_ROOT" 2>/dev/null
+    "$SCAN_PATH" 2>/dev/null
   SEMGREP_EXIT=$?
 
   if [ -f "$OUTPUT_DIR/semgrep.json" ]; then
@@ -101,7 +104,7 @@ fi
 # ─── Gitleaks scan ───────────────────────────────────────────────────────────
 echo "Running gitleaks scan..."
 if command -v gitleaks &>/dev/null; then
-  gitleaks detect --source "$REPO_ROOT" --report-format json \
+  gitleaks detect --source "$SCAN_PATH" --report-format json \
     --report-path "$OUTPUT_DIR/gitleaks.json" 2>/dev/null
   GITLEAKS_EXIT=$?
 
@@ -209,10 +212,20 @@ print(json.dumps(summary, indent=2))
 "
 
 # ─── Exit code ───────────────────────────────────────────────────────────────
-if [ "$CRITICAL_FOUND" -gt 0 ]; then
+# CI behavior: the GitHub workflow appends `|| true` to every scanner step,
+# so findings never fail CI — they're reported via SARIF upload. To match
+# that here, set SECURITY_SCAN_STRICT=0 (the default). Set it to 1 to make
+# any critical finding fail the script, which is useful for pre-commit gates.
+STRICT="${SECURITY_SCAN_STRICT:-0}"
+if [ "$STRICT" = "1" ] && [ "$CRITICAL_FOUND" -gt 0 ]; then
   echo ""
-  echo "FAIL: Critical findings detected."
+  echo "FAIL: Critical findings detected (SECURITY_SCAN_STRICT=1)."
   exit 1
+elif [ "$CRITICAL_FOUND" -gt 0 ]; then
+  echo ""
+  echo "INFO: $CRITICAL_FOUND critical finding(s) — non-gating (matches CI)."
+  echo "      Re-run with SECURITY_SCAN_STRICT=1 to fail on these."
+  exit 0
 else
   echo ""
   echo "PASS: No critical findings."

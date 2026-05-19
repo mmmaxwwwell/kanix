@@ -29,6 +29,62 @@ to add, edit, or reorder a loadout:
 Do not edit `loadouts.ts` directly without also updating `loadouts.md` —
 the next regeneration will silently undo the change.
 
+## Run `scripts/ci-local.sh` before pushing
+
+This repo has four GitHub Actions workflows (`api-ci.yml`, `test.yml`,
+`e2e.yml`, `deploy.yml`). To predict whether they'll pass **without**
+pushing, run [scripts/ci-local.sh](scripts/ci-local.sh). It auto-re-execs
+under `nix develop`, so you can invoke it from any shell.
+
+**Default invocation** (covers everything CI can reasonably run locally):
+
+```bash
+scripts/ci-local.sh
+```
+
+This runs four jobs in sequence and writes a structured summary to
+[test-logs/ci-local/summary.json](test-logs/ci-local/summary.json) plus
+per-job logs at `test-logs/ci-local/<job>.log`:
+
+| Job        | Mirrors                          | Notes                                   |
+|------------|----------------------------------|-----------------------------------------|
+| `api`      | api-ci.yml lint-typecheck-test   | `pnpm install --frozen-lockfile` + lint + typecheck + test |
+| `security` | api-ci.yml security-scan         | Scopes scanners to `./api` (matches CI's `scan-ref: ./api`); non-gating like CI |
+| `scad`     | test.yml test-scad               | OpenSCAD compile of every model         |
+| `site`     | test.yml test-site / deploy.yml  | `npm ci && npm run build && npm test`   |
+
+**Not run by default** (need running infra):
+
+- `e2e` (Playwright) — needs the API on `:3000` and Astro on `:4321`.
+  Start them, then `scripts/ci-local.sh --with e2e`.
+- Patrol Flutter tests — need an Android emulator; use
+  `scripts/e2e-launch-{admin,customer}.sh` manually.
+
+**Useful flags**:
+
+```bash
+scripts/ci-local.sh --only api          # one job
+scripts/ci-local.sh --only api,site     # comma-separated
+scripts/ci-local.sh --skip security     # skip jobs
+scripts/ci-local.sh --fast              # skip slow jobs (security)
+scripts/ci-local.sh --with e2e          # include Playwright
+scripts/ci-local.sh --json              # also print JSON summary to stdout
+```
+
+### Agent guidance
+
+When an agent has finished a code change, **always run
+`scripts/ci-local.sh` before pushing or opening a PR.** Parse
+`test-logs/ci-local/summary.json` to decide pass/fail — the top-level
+`overall` field is `"pass"` or `"fail"`, and each `jobs[].status` is
+`"PASS"` or `"FAIL"`. If anything fails, read the corresponding
+`jobs[].log` path for full output, fix the root cause, and re-run.
+
+The `security` job mirrors CI's non-gating behavior (CI workflow uses
+`|| true` on every scanner). Use `SECURITY_SCAN_STRICT=1
+scripts/ci-local.sh --only security` for a stricter local pre-commit
+gate.
+
 ## Quick Start
 
 ```bash
