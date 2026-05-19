@@ -8,12 +8,12 @@ interface Props {
 const { variant = "marketing", showModulesAnchor = false, activePath } = Astro.props;
 const base = import.meta.env.BASE_URL;
 
-// Marketing nav uses page-anchor links for Loadouts and Modules (the
-// landing page sections), then Contributing as a top-level route. Shop /
-// Warranty / Returns / Kits are hidden from the marketing variant for
-// now — the storefront isn't surfaced from the landing page.
+// Marketing nav uses page-anchor links for Belts and Modules (the landing
+// page sections), then Contributing as a top-level route. Shop / Warranty
+// / Returns / Kits are hidden from the marketing variant for now — the
+// storefront isn't surfaced from the landing page.
 const baseLinks = [
-  { href: `${base}#loadouts`, label: "Loadouts", path: "loadouts" },
+  { href: `${base}#loadouts`, label: "Belts", path: "loadouts" },
   { href: `${base}#modules`, label: "Modules", path: "modules" },
   { href: `${base}contributions/`, label: "Contributing", path: "contributions" },
 ];

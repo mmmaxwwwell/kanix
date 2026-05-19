@@ -55,61 +55,31 @@ export interface Loadout {
   // of the "Products for this loadout" section with a required chip.
   // Optional: Freeform uses belt clips on a regular pants belt — no
   // specific duty belt to recommend.
-  beltProduct?: { name: string; url: string };
+  beltProduct?: { name: string; url: string; costCents?: number };
   modules: LoadoutModule[];
 }
 
 export const loadouts: Loadout[] = [
   {
-    slug: "trainer",
-    name: "The Trainer",
-    tagline: "Built for people who work with dogs all day.",
-    description:
-      "A working setup for professional and amateur trainers, laid out for a 2\" MOLLE duty belt. Clockwise from the top: clicker, treat bag, e-collar, MK3 spray, waste bags, flashlight, dump bag, heel lead, and a carabiner. Everything is exactly where your hand expects it.",
-    belt: '2"',
-    beltNote:
-      "Built around the IDOGEAR SPORTS 2\" MOLLE duty belt. The extra MOLLE webbing carries the non-Kanix gear (water, radio) that doesn't bolt to a plate.",
-    beltProduct: {
-      name: 'IDOGEAR SPORTS Tactical 2" Heavy-Duty MOLLE Belt',
-      url: "https://www.amazon.com/dp/B0G2PTBGF2",
-    },
-    modules: [
-      { slug: "clicker-holder", plate: "plates/kanix_plate_3x3_52x12.stl", note: "Clicker rides on the 12mm plate behind the buckle where the belt doubles over." },
-      { slug: "treat-bag-mount", plate: "plates/kanix_plate_3x3_52x6.5.stl", note: "Wilderdog treat bag on your dominant-hand side — fastest possible reinforcement." },
-      {
-        groupLabel: "E-Collar Holster",
-        groupDescription:
-          "Pick the holster that matches the e-collar receiver you already own. All e-collar holsters use the same 3×3 / 52mm / 6.5mm plate, so the mount is identical no matter which one you print.",
-        choices: ["mini-educator-holder", "dogtra-200ncpt-202c-arc-holder", "dogtra-280x-arcx-holder"],
-        plate: "plates/kanix_plate_3x3_52x6.5.stl",
-        note: "Click any of the candidates to see which e-collars it supports.",
-      },
-      { slug: "mk3-canister-holder", plate: "plates/kanix_plate_3x3_52x6.5.stl", note: "Off-leash dog approach — the most likely emergency on a session." },
-      { slug: "waste-bag-dispenser", plate: "plates/kanix_plate_3x3_52x6.5.stl" },
-      { slug: "flashlight-holster-c3", plate: "plates/kanix_plate_3x3_52x6.5.stl", note: "Wuben C3 — early-morning and late-evening sessions." },
-      { slug: "dump-bag-mount", plate: "plates/kanix_plate_3x3_52x6.5.stl", note: "Catch-all storage — backup leashes, wipes, extras you pick up on a session." },
-      { slug: "quick-detach-biothane-heel-lead", note: "BioThane heel lead. Loops directly around the belt — no plate." },
-      { slug: "carabiner-clip", plate: "plates/kanix_plate_2x3_52x6.5.stl", variant: ["tiny", "small"], note: "Two 1×2 carabiner clips share one plate — a tiny clip and a small clip stacked. Clip on a second leash, keys, or a water bottle without burning a full module slot." },
-    ],
-  },
-  {
     slug: "walker",
     name: "The Walker",
     tagline: "Hands-free for the daily neighborhood loop.",
     description:
-      "The minimal everyday carry: waste bags, treats, and a flashlight for early or late walks. No bulk, no extras — just what you reach for on every walk.",
+      "Three Kanix™ modules on a 1.5\" duty belt plus a hands-free BioThane heel lead — the lead loops straight onto the belt so you never have to hold a leash on the daily loop. Wuben C3 flashlight stacks with a tiny attachment loop on one module, waste bags on another, two more attachment loops share the third. Light enough to disappear under everyday clothing.",
     belt: '1.5"',
     beltNote:
       "A 1.5\" duty belt is plenty for a light loadout and tucks under everyday clothing better than a 2\" belt.",
     beltProduct: {
       name: "IDOGEAR SPORTS Tactical Ratchet Belt (1.5\")",
       url: "https://www.amazon.com/dp/B0FJDMN78R",
+      costCents: 2500,
     },
     modules: [
-      { slug: "waste-bag-dispenser", plate: "plates/kanix_plate_2x2_38x5.3.stl" },
-      { slug: "treat-bag-mount", plate: "plates/kanix_plate_2x2_38x5.3.stl", note: "A small reward stash for everyday training opportunities." },
-      { slug: "flashlight-holster-g5", plate: "plates/kanix_plate_2x2_38x5.3.stl", note: "Compact EDC light for the dark side of the daily loop." },
-      { slug: "carabiner-clip", plate: "plates/kanix_plate_2x2_38x5.3.stl", note: "Clip keys or a phone tether so they're not in your pocket." },
+      { slug: "flashlight-holster-c3", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: "38mm", note: "Wuben C3 (38mm 2×2 variant) shares its 3×2 plate with a tiny attachment loop for clipping keys or a phone tether." },
+      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: "tiny", note: "Tiny attachment loop stacked on the C3's plate — clip your own carabiner, snap hook, or D-clip to it." },
+      { slug: "quick-detach-biothane-heel-lead", note: "BioThane lead, used here as a slip lead. Loops directly around the belt — no plate." },
+      { slug: "waste-bag-dispenser", plate: "plates/kanix_plate_3x2_38x5.3.stl" },
+      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: ["small", "small"], note: "Two of the larger 1×2 attachment loops on one 3×2 plate — clip a second leash, water bottle, or anything that needs more than a tiny loop." },
     ],
   },
   {
@@ -117,41 +87,76 @@ export const loadouts: Loadout[] = [
     name: "The Hiker",
     tagline: "Configured for trails, long days, and the unexpected.",
     description:
-      "Built for full-day outings where you might be hours from a vehicle. Carries everything from a backup leash to a first aid kit, plus options for terrain hazards (other dogs, wildlife, dim light). The dump pouch handles whatever you pick up on the trail — extra layers, gloves, a packed-out poop bag — so it isn't living in your hand.",
+      "Five Kanix™ modules on a 2\" MOLLE belt for full-day outings where you might be hours from a vehicle: first aid kit, MK3 spray for off-leash encounters, Wuben C3 flashlight for dawn-and-dusk legs, waste bags, and an attachment loop for tethering keys or a second leash. Covers the terrain hazards (other dogs, wildlife, dim light) without weighing you down.",
     belt: '2"',
     beltNote:
       "A 2\" duty belt distributes weight better on long days and keeps the loadout from bouncing on technical terrain.",
     beltProduct: {
       name: 'IDOGEAR SPORTS Tactical 2" Heavy-Duty MOLLE Belt',
       url: "https://www.amazon.com/dp/B0G2PTBGF2",
+      costCents: 3000,
     },
     modules: [
       { slug: "first-aid-kit-mount", plate: "plates/kanix_plate_3x3_52x6.5.stl", note: "Hours from a trailhead — first aid is non-negotiable." },
       { slug: "waste-bag-dispenser", plate: "plates/kanix_plate_3x3_52x6.5.stl" },
-      { slug: "slip-lead-wrap-post", plate: "plates/kanix_plate_3x3_52x6.5.stl", note: "Backup leash in case the primary fails on the trail." },
-      { slug: "dump-bag-mount", plate: "plates/kanix_plate_3x3_52x6.5.stl", note: "Stash a packed-out bag, gloves, a layer, or extras you pick up on the trail." },
       { slug: "mk3-canister-holder", plate: "plates/kanix_plate_3x3_52x6.5.stl", note: "Off-leash dog encounters are most likely on shared trails." },
       { slug: "flashlight-holster-c3", plate: "plates/kanix_plate_3x3_52x6.5.stl", note: "Dawn starts and dusk returns — bring real light." },
-      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x3_52x6.5.stl", note: "Tether keys, a multitool, or a second leash." },
+      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x3_52x6.5.stl", variant: "tiny", note: "Tether keys, a multitool, or a second leash." },
     ],
   },
   {
-    slug: "freeform",
-    name: "The Freeform",
-    tagline: "Mix and match — build the belt that fits how you actually work.",
+    slug: "trainer",
+    name: "The Trainer",
+    tagline: "A purpose-built marker-training rig for handlers running real reward-based programs.",
     description:
-      "There's no single \"right\" Kanix™ setup. The Freeform is the open invitation: pick the modules you actually reach for, arrange them where your hands expect them, and skip the rest. This is a starting point for handlers whose workflow doesn't match the Trainer, Walker, or Hiker profiles — multi-dog handlers, kennel staff, sport competitors, anyone whose gear list is their own.",
+      "Five Kanix™ modules on a 1.5\" duty belt for people who train every day and are done improvising — pros doing 1:1 marker sessions, sport handlers prepping for trials, and dedicated owners working through structured plans with a real instructor. Clicker and Wilderdog treat pouch sit dominant-hand for sub-second reinforcement; waste bags, a dump pouch for the catch-all stuff, and a pair of attachment loops stay out of the way until you reach for them. A setup that stays put session after session instead of sliding around a soft training belt.",
     belt: '1.5"',
     beltNote:
-      "Built around the Kanix™ belt clip adapter — no duty belt required. Clip each module onto a regular pants belt; mix grid sizes as needed.",
+      "A 1.5\" duty belt is plenty for a training loadout and tucks under everyday clothing better than a 2\" belt.",
+    beltProduct: {
+      name: "IDOGEAR SPORTS Tactical Ratchet Belt (1.5\")",
+      url: "https://www.amazon.com/dp/B0FJDMN78R",
+      costCents: 2500,
+    },
     modules: [
-      { slug: "waste-bag-dispenser", plate: "belt_clip_2x2_38mm.stl" },
-      { slug: "treat-bag-mount", plate: "belt_clip_3x2_38mm.stl", note: "Always-useful, regardless of workflow." },
-      { slug: "clicker-holder", plate: "belt_clip_2x2_38mm.stl", note: "Add if you're doing any marker-based training." },
-      { slug: "slip-lead-wrap-post", plate: "belt_clip_2x2_38mm.stl", note: "Backup leash that fits any handler's worst-case." },
-      { slug: "flashlight-holster-c3", plate: "belt_clip_3x3_38mm.stl", note: "Pick C3 (or swap to G5 below) based on how much throw you want." },
-      { slug: "carabiner-clip", plate: "belt_clip_3x3_38mm.stl", note: "Multipurpose: keys, second leash, water bottle clip." },
-      { slug: "dump-bag-mount", plate: "belt_clip_3x3_38mm.stl", note: "Catch-all storage for whatever you end up carrying on a given day." },
+      { slug: "clicker-holder", plate: "plates/kanix_plate_3x2_38x5.3.stl", note: "Clicker on a 3×2 plate, dominant-hand side for fast marker work." },
+      { slug: "treat-bag-mount", plate: "plates/kanix_plate_3x2_38x5.3.stl", note: "Wilderdog treat pouch — fastest possible reinforcement." },
+      { slug: "waste-bag-dispenser", plate: "plates/kanix_plate_3x2_38x5.3.stl" },
+      { slug: "dump-bag-mount", plate: "plates/kanix_plate_3x2_38x5.3.stl", note: "Catch-all storage — backup leash, wipes, treats refill, whatever else you pick up on a session." },
+      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: ["small", "small"], note: "Two of the larger 1×2 attachment loops on one 3×2 plate — clip a second leash, water bottle, or anything that needs more than a tiny loop." },
+    ],
+  },
+  {
+    slug: "pro",
+    name: "The Pro",
+    tagline: "Everything The Trainer and The Walker carry, plus an e-collar and dump bag.",
+    description:
+      "Seven Kanix™ modules on a 1.5\" duty belt plus a hands-free BioThane heel lead — the lead loops directly onto the belt so both hands stay free for marker work, e-collar timing, and gear. Every Kanix™ module from The Trainer and The Walker, plus an e-collar holster for whichever receiver you run and a dump bag for the catch-all stuff. Clicker, treat pouch, e-collar, waste bags, C3 flashlight, dump bag, and three attachment loops (one tiny, two small) — all on 3×2 38mm plates. You don't have to wear them all every day: each Kanix™ module is a hinged belt clip that snaps on and off in seconds without tools, so a Trainer-day kit becomes a Walker-day kit on the way out the door.",
+    belt: '1.5"',
+    beltNote:
+      "A 1.5\" duty belt keeps the loadout compact even with the full Pro kit, and tucks under everyday clothing better than a 2\" belt.",
+    beltProduct: {
+      name: "IDOGEAR SPORTS Tactical Ratchet Belt (1.5\")",
+      url: "https://www.amazon.com/dp/B0FJDMN78R",
+      costCents: 2500,
+    },
+    modules: [
+      { slug: "clicker-holder", plate: "plates/kanix_plate_3x2_38x5.3.stl", note: "Clicker on a 3×2 plate, dominant-hand side for fast marker work." },
+      { slug: "treat-bag-mount", plate: "plates/kanix_plate_3x2_38x5.3.stl", note: "Wilderdog treat pouch — fastest possible reinforcement." },
+      {
+        groupLabel: "E-Collar Holster",
+        groupDescription:
+          "Pick the holster that matches the e-collar receiver you already own. On a 1.5\" duty belt the holster's 3×3 hole pattern mounts to a 3×2 plate — the top row of holes is unused.",
+        choices: ["mini-educator-holder", "dogtra-200ncpt-202c-arc-holder", "dogtra-280x-arcx-holder"],
+        plate: "plates/kanix_plate_3x2_38x5.3.stl",
+        note: "Pick the holster that matches the e-collar receiver you already own.",
+      },
+      { slug: "quick-detach-biothane-heel-lead", note: "BioThane lead, used as a heel/slip lead. Loops directly around the belt — no plate." },
+      { slug: "waste-bag-dispenser", plate: "plates/kanix_plate_3x2_38x5.3.stl" },
+      { slug: "flashlight-holster-c3", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: "38mm", note: "Wuben C3 (38mm 2×2 variant) shares its 3×2 plate with a tiny attachment loop for clipping keys or a phone tether." },
+      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: "tiny", note: "Tiny attachment loop stacked on the C3's plate — clip your own carabiner, snap hook, or D-clip to it." },
+      { slug: "dump-bag-mount", plate: "plates/kanix_plate_3x2_38x5.3.stl", note: "Catch-all storage — backup leashes, wipes, extras you pick up on a session." },
+      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: ["small", "small"], note: "Two of the larger 1×2 attachment loops on one 3×2 plate — clip a second leash, water bottle, or anything that needs more than a tiny loop." },
     ],
   },
 ];
@@ -440,4 +445,96 @@ export function plateLabel(plate: string | undefined | null): string {
     return `Belt Clip — ${grid} grid, ${belt}mm belt`;
   }
   return plate;
+}
+
+// ─── Kit pricing ─────────────────────────────────────────────────────────
+//
+// Sell-price calculation for a loadout sold as a complete, pre-assembled
+// kit. Data only — not surfaced in the UI yet. Sums:
+//
+//   - One `kitModulePriceCents` per kit-eligible loadout entry (the
+//     module is hand-priced, e.g. $35 for a typical plate-and-module
+//     line, $50 for the BioThane heel lead). The carabiner-clip line
+//     covers a plate plus up to two clips of any size for one price.
+//   - For every `required: true` product on each module, `costCents`
+//     marked up by `accessoryMarkup` (default 1.10).
+//   - The belt at `beltProduct.costCents × accessoryMarkup`.
+//
+// Modules with no `kitModulePriceCents` contribute nothing and are
+// flagged in `LoadoutPriceBreakdown.missingModuleSlugs` so the caller
+// can decide whether the kit is sellable yet.
+
+export interface LoadoutPriceBreakdown {
+  // Sum of every kit-eligible module line (flat sell prices).
+  moduleCents: number;
+  // Sum of every required product's marked-up cost.
+  accessoriesCents: number;
+  // Belt cost × markup.
+  beltCents: number;
+  // moduleCents + accessoriesCents + beltCents.
+  totalCents: number;
+  // Slugs of modules that are part of this loadout but have no
+  // kitModulePriceCents yet. If non-empty, the kit isn't fully priced.
+  missingModuleSlugs: string[];
+  // Names of required products that are missing costCents. If non-empty,
+  // the accessory total under-counts.
+  missingProductNames: string[];
+}
+
+export interface PriceLoadoutOptions {
+  // Markup applied to purchased accessories and the belt. Default 1.10.
+  accessoryMarkup?: number;
+}
+
+export function priceLoadout(
+  loadout: Loadout,
+  options: PriceLoadoutOptions = {},
+): LoadoutPriceBreakdown {
+  const accessoryMarkup = options.accessoryMarkup ?? 1.1;
+  let moduleCents = 0;
+  let accessoriesCents = 0;
+  const missingModuleSlugs: string[] = [];
+  const missingProductNames: string[] = [];
+
+  // For "pick one of" groups, use the first candidate's pricing data —
+  // every candidate in a group is the same size of plate-with-holster,
+  // and the kit doesn't bundle the receiver itself, so the price is the
+  // same regardless of choice.
+  for (const resolved of resolveLoadout(loadout)) {
+    const mod =
+      resolved.kind === "group" ? resolved.candidates[0]?.module : resolved.module;
+    if (!mod) continue;
+
+    const kitPrice = (mod as Module).kitModulePriceCents;
+    if (kitPrice === undefined) {
+      missingModuleSlugs.push(mod.slug);
+    } else {
+      moduleCents += kitPrice;
+    }
+
+    for (const product of mod.products ?? []) {
+      if (!product.required) continue;
+      if (product.costCents === undefined) {
+        missingProductNames.push(product.name);
+        continue;
+      }
+      accessoriesCents += Math.round(product.costCents * accessoryMarkup);
+    }
+  }
+
+  let beltCents = 0;
+  if (loadout.beltProduct?.costCents !== undefined) {
+    beltCents = Math.round(loadout.beltProduct.costCents * accessoryMarkup);
+  } else if (loadout.beltProduct) {
+    missingProductNames.push(loadout.beltProduct.name);
+  }
+
+  return {
+    moduleCents,
+    accessoriesCents,
+    beltCents,
+    totalCents: moduleCents + accessoriesCents + beltCents,
+    missingModuleSlugs,
+    missingProductNames,
+  };
 }

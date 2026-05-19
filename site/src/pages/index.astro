@@ -3,7 +3,7 @@ import Base from "../layouts/Base.astro";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
 import { modules, comingSoonModules } from "../data/modules";
-import { loadouts } from "../data/loadouts";
+import { loadouts, resolveLoadout } from "../data/loadouts";
 
 const repoUrl = "https://github.com/mmmaxwwwell/kanix";
 
@@ -43,7 +43,7 @@ const accessoryModules = modules.filter((m) => !MOUNTING_SLUGS.has(m.slug));
         href="#loadouts"
         class="inline-flex items-center gap-2 px-8 py-3 bg-white text-neutral-950 font-semibold rounded-lg hover:bg-neutral-200 transition-colors"
       >
-        View Loadouts
+        View Belts
       </a>
     </div>
   </section>
@@ -204,39 +204,108 @@ const accessoryModules = modules.filter((m) => !MOUNTING_SLUGS.has(m.slug));
     </div>
   </section>
 
-  <!-- Suggested Loadouts -->
+  <!-- Suggested Kanix Belts -->
   <section id="loadouts" class="py-24 px-6">
     <div class="max-w-5xl mx-auto">
       <h2 class="text-3xl sm:text-4xl font-bold tracking-tight mb-4 text-center">
-        Suggested Loadouts
+        Suggested Kanix™ Belts
       </h2>
       <p class="text-neutral-400 text-center mb-4 max-w-2xl mx-auto">
-        Not sure where to start? Pick a loadout built for how you actually work with dogs. Each one is a starting point — swap modules in or out to match your setup.
+        Not sure where to start? Pick a Kanix™ Belt built for how you actually work with dogs. Each one is a starting point — swap modules in or out to match your setup.
       </p>
       <p class="text-neutral-500 text-center mb-12 max-w-2xl mx-auto text-sm">
         Or skip the suggestions and <a href="#modules" class="text-amber-500 hover:text-amber-400 transition-colors">build your own from scratch</a> — every module is browsable below.
       </p>
       <div class="grid sm:grid-cols-2 lg:grid-cols-2 gap-6">
-        {loadouts.map(({ slug, name, tagline, belt, modules: mods }) => (
-          <a
-            href={`${import.meta.env.BASE_URL}loadouts/${slug}/`}
-            class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col hover:border-neutral-600 transition-colors group"
-          >
-            <div class="flex items-start justify-between gap-3 mb-2">
-              <h3 class="text-xl font-bold text-white group-hover:text-amber-500 transition-colors">{name}</h3>
-              <span class="px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-500 rounded-full border border-amber-500/20 whitespace-nowrap">
-                {slug === "freeform" ? "No belt — clips" : `${belt} belt`}
+        {loadouts.map((loadout) => {
+          const { slug, name, tagline, belt } = loadout;
+          const resolved = resolveLoadout(loadout);
+          // Collapse repeats (e.g. two carabiner-clip entries) into a single
+          // bullet with a "× N" badge. A variant array counts as that many
+          // instances; a single variant or no variant counts as one.
+          // Look up a variant id's display label (e.g. "tiny" → "Tiny") so
+          // collapsed bullets like "Carabiner Clip (Tiny) ×2" stay readable.
+          // Skips "Belt size" groups — those are already implied by the
+          // loadout's belt chip and would just be noise on the card.
+          const variantLabel = (mod, variantId) => {
+            const gv = "genericVariants" in mod ? mod.genericVariants : undefined;
+            if (!gv) return null;
+            for (const g of gv.groups) {
+              if (g.label === "Belt size") continue;
+              const opt = g.options.find((o) => o.id === variantId);
+              if (opt) return opt.label;
+            }
+            return null;
+          };
+          // Collapse on (slug, variant) so a tiny carabiner and two small
+          // carabiners stay distinguishable on the card.
+          const counts = new Map();
+          const isCarabiner = (entry) =>
+            entry.kind !== "group" && entry.module.slug === "carabiner-clip";
+          for (const entry of resolved) {
+            if (entry.kind === "group") {
+              const key = `group:${entry.groupLabel}`;
+              const existing = counts.get(key);
+              if (existing) existing.count += 1;
+              else counts.set(key, { label: entry.groupLabel, count: 1, isCarabiner: false });
+              continue;
+            }
+            const variants = Array.isArray(entry.variant)
+              ? entry.variant
+              : entry.variant
+                ? [entry.variant]
+                : [null];
+            for (const v of variants) {
+              const display = v ? variantLabel(entry.module, v) : null;
+              const key = `mod:${entry.module.slug}:${display ?? ""}`;
+              const label = display
+                ? `${entry.module.name} (${display})`
+                : entry.module.name;
+              const existing = counts.get(key);
+              if (existing) existing.count += 1;
+              else counts.set(key, { label, count: 1, isCarabiner: isCarabiner(entry) });
+            }
+          }
+          // Always sort carabiner-clip rows to the end of the card list —
+          // preserves their relative order, just bumps them after everything
+          // else so the "primary" gear shows first.
+          const moduleEntries = Array.from(counts.values()).sort((a, b) => {
+            if (a.isCarabiner === b.isCarabiner) return 0;
+            return a.isCarabiner ? 1 : -1;
+          });
+          return (
+            <a
+              href={`${import.meta.env.BASE_URL}loadouts/${slug}/`}
+              class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col hover:border-neutral-600 transition-colors group"
+            >
+              <div class="flex items-start justify-between gap-3 mb-2">
+                <h3 class="text-xl font-bold text-white group-hover:text-amber-500 transition-colors">{name}</h3>
+                <div class="flex flex-wrap gap-1.5 justify-end">
+                  <span class="px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-500 rounded-full border border-amber-500/20 whitespace-nowrap">
+                    {`${belt} belt`}
+                  </span>
+                  <span class="px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-500 rounded-full border border-amber-500/20 whitespace-nowrap">
+                    {`${moduleEntries.length} Kanix™ ${moduleEntries.length === 1 ? "module" : "modules"}`}
+                  </span>
+                </div>
+              </div>
+              <p class="text-neutral-400 leading-relaxed mb-4">{tagline}</p>
+              <ul class="text-sm text-neutral-300 mb-4 flex-1 space-y-1 list-disc list-inside marker:text-amber-500/60">
+                {moduleEntries.map(({ label, count }) => (
+                  <li>
+                    {label}
+                    {count > 1 && (
+                      <span class="ml-1.5 text-xs text-neutral-500">×{count}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <span class="text-sm text-amber-500 group-hover:text-amber-400 transition-colors font-medium">
+                View belt &rarr;
               </span>
-            </div>
-            <p class="text-neutral-400 leading-relaxed mb-4 flex-1">{tagline}</p>
-            <p class="text-xs text-neutral-500 mb-4">
-              {mods.length} modules
-            </p>
-            <span class="text-sm text-amber-500 group-hover:text-amber-400 transition-colors font-medium">
-              View loadout &rarr;
-            </span>
-          </a>
-        ))}
+            </a>
+          );
+        })}
       </div>
     </div>
   </section>

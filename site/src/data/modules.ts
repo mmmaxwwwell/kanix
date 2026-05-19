@@ -12,6 +12,11 @@ export interface Product {
   // marker. Kept so existing data renders, but new entries should not set
   // it — required: true is the new authoritative flag.
   recommended?: boolean;
+  // Kanix's wholesale/retail buy-cost for this item, in cents. When a kit
+  // bundles this product (required: true), the kit sell price for the line
+  // is `costCents × 1.10`. Not surfaced in the UI yet — pricing helpers in
+  // loadouts.ts consume this.
+  costCents?: number;
 }
 
 // One concrete plate fixture (one grid x one belt-thickness combo).
@@ -90,6 +95,13 @@ export interface Module {
   // simpler grouped-chip picker used for everything else.
   variants?: PlateVariants;
   genericVariants?: GenericVariants;
+  // Flat sell price (cents) for this module as one line in a kit — covers
+  // the plate plus whatever modules ride on it (e.g. the carabiner-clip
+  // entry covers a plate with up to two clips of any size). Distinct from
+  // `Product.costCents` because the printed-piece price is hand-set, not
+  // cost-up. Undefined means "not yet kit-eligible." Not surfaced in the
+  // UI — consumed by priceLoadout() in loadouts.ts.
+  kitModulePriceCents?: number;
 }
 
 export interface ComingSoonModule {
@@ -99,6 +111,8 @@ export interface ComingSoonModule {
   products?: Product[];
   // Same semantics as `Module.screwCount`.
   screwCount?: number;
+  // Same semantics as `Module.kitModulePriceCents`.
+  kitModulePriceCents?: number;
 }
 
 export const modules: Module[] = [
@@ -215,11 +229,13 @@ export const modules: Module[] = [
     scadFile: "scad/earth-rated-waste-bag-holder.scad",
     stlFile: "earth-rated-waste-bag-holder.stl",
     screwCount: 6,
+    kitModulePriceCents: 3500,
     products: [
       {
         name: "Earth Rated Dog Waste Bags",
         url: "https://www.amazon.com/Earth-Rated-Leak-Proof-Extra-Thick-Unscented/dp/B0CS8GCYS1",
         required: true,
+        costCents: 1000,
       },
     ],
   },
@@ -230,26 +246,31 @@ export const modules: Module[] = [
       "Minimal mounting plate with a center cutout for strap pass-through. Attach your individual first aid kit exactly where you need it.",
     scadFile: "scad/first-aid-kit-mount.scad",
     stlFile: "first-aid-kit-mount.stl",
+    kitModulePriceCents: 3500,
     products: [
       {
         name: "Individual First Aid Kit",
         url: "https://www.amazon.com/dp/B0F311WTPC",
+        required: true,
+        costCents: 2000,
       },
     ],
   },
   {
     slug: "mk3-canister-holder",
-    name: "MK3 Canister Holder",
+    name: "MK3 (Pepper Spray) Canister Holster",
     description:
       "Purpose-built holder for an MK-3 pepper spray canister. Quick-draw access when you need it most.",
     scadFile: "scad/mk3-canister-holder.scad",
     stlFile: "mk3-canister-holder.stl",
     screwCount: 6,
+    kitModulePriceCents: 3500,
     products: [
       {
         name: "Sabre Protector Dog Spray (MK-3)",
         url: "https://www.amazon.com/dp/B00AU6J68Q",
         required: true,
+        costCents: 1500,
       },
     ],
   },
@@ -274,6 +295,8 @@ export const modules: Module[] = [
       "A hands-free, belt-mounted heel lead. Long enough to keep the dog in heel, short enough to stay out of the way. Quick-detach Cobra buckle at the belt, dual-action carabiner at the collar.",
     noModel: true,
     screwCount: 0,
+    // Kanix-made item, hand-priced (not cost-up). Sell price in cents.
+    kitModulePriceCents: 5000,
     details: [
       "Hands-free belt-mounted lead — keeps both hands available for training, gear, or another dog.",
       "Cut to a heel-position length: long enough for the dog to walk at your hip, short enough that there's no slack to manage.",
@@ -291,11 +314,13 @@ export const modules: Module[] = [
     scadFile: "scad/wilderdog-treat-bag-mount.scad",
     stlFile: "wilderdog-treat-bag-mount.stl",
     screwCount: 4,
+    kitModulePriceCents: 3500,
     products: [
       {
         name: "Wilderdog Treat Bag",
         url: "https://www.amazon.com/Wilderdog-Training-Magnetic-Carabiner-Adjustable/dp/B0FCVFF9J9",
         required: true,
+        costCents: 2500,
       },
     ],
   },
@@ -307,11 +332,13 @@ export const modules: Module[] = [
     scadFile: "scad/wuben-c3-holster.scad",
     stlFile: "wuben-c3-holster.stl",
     screwCount: 6,
+    kitModulePriceCents: 3500,
     products: [
       {
         name: "Wuben C3 Flashlight",
         url: "https://www.amazon.com/dp/B086WJBB7K",
         required: true,
+        costCents: 2500,
       },
     ],
     genericVariants: {
@@ -375,11 +402,13 @@ export const modules: Module[] = [
     scadFile: "scad/clicker_holder_52x65.scad",
     stlFile: "clicker_holder_52x65.stl",
     screwCount: 6,
+    kitModulePriceCents: 3500,
     products: [
       {
         name: "Training Clicker",
         url: "https://www.amazon.com/dp/B0GRWPSYSD",
         required: true,
+        costCents: 500,
       },
     ],
     genericVariants: {
@@ -409,12 +438,14 @@ export const modules: Module[] = [
   },
   {
     slug: "carabiner-clip",
-    name: "Carabiner Clip",
+    name: "Attachment Loop",
     description:
-      "Bolt-on carabiner loop for clipping leashes, keys, or gear to the side of your belt. Five sizes across two grid widths.",
+      "A printed plastic ring bolted to a plate or belt clip — clip your own carabiner, snap hook, or D-clip onto it. Five diameters so the loop matches the gate of whatever you actually use.",
     scadFile: "scad/carabiner_clip_1x3_52x65_medium.scad",
     stlFile: "carabiner_clip_1x3_52x65_medium.stl",
     screwCount: 2,
+    // Kit price covers a plate plus up to two carabiner clips of any size.
+    kitModulePriceCents: 3500,
     genericVariants: {
       defaultId: "medium",
       groups: [
@@ -478,11 +509,13 @@ export const modules: Module[] = [
     scadFile: "scad/dump-bag-mount.scad",
     stlFile: "dump-bag-mount.stl",
     screwCount: 4,
+    kitModulePriceCents: 3500,
     products: [
       {
         name: "LIVANS Tactical Molle Dump Pouch",
         url: "https://www.amazon.com/dp/B07Y7CCJDK",
         required: true,
+        costCents: 1500,
       },
       {
         name: "Aurora Pet Wipes — 60-Count Travel Pack",
@@ -548,6 +581,9 @@ export const comingSoonModules: ComingSoonModule[] = [
     description:
       "Compact holder for Dogtra 200NCPT/202C series e-collar receivers. Keep your remote trainer secured on your belt for instant access during training sessions. Also fits the Dogtra 280C, Tom Davis 280C 2.0, and Dogtra ARC receivers.",
     screwCount: 6,
+    // The e-collar receiver itself is not bundled in the kit — buyer owns
+    // one already. Kit price covers only the holster module + plate.
+    kitModulePriceCents: 5500,
     products: [
       {
         name: "Dogtra 200NCPT",
@@ -573,6 +609,7 @@ export const comingSoonModules: ComingSoonModule[] = [
     description:
       "Dual-purpose holder designed for the Dogtra 280X compact receiver and the slim ARC-X receiver. Two profiles, one module.",
     screwCount: 6,
+    kitModulePriceCents: 5500,
     products: [
       {
         name: "Dogtra 280X",
@@ -590,6 +627,7 @@ export const comingSoonModules: ComingSoonModule[] = [
     description:
       "Purpose-built holder for the Mini Educator ET-300 receiver, the most popular remote trainer among professional dog trainers. Also fits the Educator ET-400 (identical receiver) and Micro Educator ME-300.",
     screwCount: 6,
+    kitModulePriceCents: 5500,
     products: [
       {
         name: "Mini Educator ET-300",

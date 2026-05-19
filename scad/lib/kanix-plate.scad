@@ -225,25 +225,30 @@ module kanix_plate(
     }
 
     module front_cutout_feature(){
+        // Front cutout / middle-clip latch geometry is sized off the 3x3 52mm
+        // plate and does NOT scale with plate_h — the latch's travel and the
+        // protrusion's shape are mechanical constants. Anchor the feature so
+        // its top end stays pinned to plate_h/2 regardless of plate_h.
+        ref_h = 52;
         offset = 2;
-        translate([plate_w/2 - side_locking_tab_depth*0.75 -side_locking_tab_depth * 2,0,plate_thickness/2]){
+        translate([plate_w/2 - side_locking_tab_depth*0.75 -side_locking_tab_depth * 2,-(ref_h - plate_h)/2,plate_thickness/2]){
             translate([offset/2,0,0])
             hull(){
                 cylinder(d = side_locking_tab_depth * 1.5 - 2, h=plate_thickness + 1, center=true, $fn=32);
-                translate([0,plate_h,0])
+                translate([0,ref_h,0])
                 cylinder(d = side_locking_tab_depth * 1.5 - 2, h=plate_thickness + 1, center=true, $fn=32);
 
             }
             hull(){
                 translate([side_locking_tab_depth * 2.5/3,0,0]){
                     cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
-                    translate([0,plate_h/2 - side_locking_tab_depth * 0.75,0])
+                    translate([0,ref_h/2 - side_locking_tab_depth * 0.75,0])
                     cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
                 }
 
                 translate([offset,0,0]){
                     cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
-                        translate([0,plate_h/2 - side_locking_tab_depth * 0.75,0])
+                        translate([0,ref_h/2 - side_locking_tab_depth * 0.75,0])
                     cylinder(d = side_locking_tab_depth * 1.5, h=plate_thickness + 1, center=true, $fn=32);
                 }
             }
