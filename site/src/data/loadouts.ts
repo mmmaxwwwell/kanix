@@ -42,6 +42,13 @@ export interface LoadoutModule {
   groupLabel?: string;
   // One-paragraph description shown on the group card.
   groupDescription?: string;
+  // Position on the belt for the top-down "belt layout" visualization.
+  // Degrees clockwise from the buckle (front center) as seen from above the
+  // wearer: 0 = front center, +90 = right hip, -90 (or 270) = left hip,
+  // 180 = small of back. Entries without an angle are omitted from the
+  // visualization (e.g. the BioThane heel lead, which loops around the
+  // belt without a fixed position).
+  angle?: number;
 }
 
 export interface Loadout {
@@ -75,11 +82,11 @@ export const loadouts: Loadout[] = [
       costCents: 2500,
     },
     modules: [
-      { slug: "flashlight-holster-c3", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: "38mm", note: "Wuben C3 (38mm 2×2 variant) shares its 3×2 plate with a tiny attachment loop for clipping keys or a phone tether." },
-      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: "tiny", note: "Tiny attachment loop stacked on the C3's plate — clip your own carabiner, snap hook, or D-clip to it." },
+      { slug: "flashlight-holster-c3", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: "38mm", angle: 60, note: "Wuben C3 (38mm 2×2 variant) shares its 3×2 plate with a tiny attachment loop for clipping keys or a phone tether." },
+      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: "tiny", angle: 60, note: "Tiny attachment loop stacked on the C3's plate — clip your own carabiner, snap hook, or D-clip to it." },
       { slug: "quick-detach-biothane-heel-lead", note: "BioThane lead, used here as a slip lead. Loops directly around the belt — no plate." },
-      { slug: "waste-bag-dispenser", plate: "plates/kanix_plate_3x2_38x5.3.stl" },
-      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: ["small", "small"], note: "Two of the larger 1×2 attachment loops on one 3×2 plate — clip a second leash, water bottle, or anything that needs more than a tiny loop." },
+      { slug: "waste-bag-dispenser", plate: "plates/kanix_plate_3x2_38x5.3.stl", angle: -45 },
+      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: ["small", "small"], angle: 20, note: "Two of the larger 1×2 attachment loops on one 3×2 plate — clip a second leash, water bottle, or anything that needs more than a tiny loop." },
     ],
   },
   {
@@ -97,11 +104,11 @@ export const loadouts: Loadout[] = [
       costCents: 3000,
     },
     modules: [
-      { slug: "first-aid-kit-mount", plate: "plates/kanix_plate_3x3_52x6.5.stl", note: "Hours from a trailhead — first aid is non-negotiable." },
-      { slug: "waste-bag-dispenser", plate: "plates/kanix_plate_3x3_52x6.5.stl" },
-      { slug: "mk3-canister-holder", plate: "plates/kanix_plate_3x3_52x6.5.stl", note: "Off-leash dog encounters are most likely on shared trails." },
-      { slug: "flashlight-holster-c3", plate: "plates/kanix_plate_3x3_52x6.5.stl", note: "Dawn starts and dusk returns — bring real light." },
-      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x3_52x6.5.stl", variant: "tiny", note: "Tether keys, a multitool, or a second leash." },
+      { slug: "first-aid-kit-mount", plate: "plates/kanix_plate_3x3_52x6.5.stl", angle: 135, note: "Hours from a trailhead — first aid is non-negotiable." },
+      { slug: "waste-bag-dispenser", plate: "plates/kanix_plate_3x3_52x6.5.stl", angle: -45 },
+      { slug: "mk3-canister-holder", plate: "plates/kanix_plate_3x3_52x6.5.stl", angle: -90, note: "Off-leash dog encounters are most likely on shared trails." },
+      { slug: "flashlight-holster-c3", plate: "plates/kanix_plate_3x3_52x6.5.stl", angle: 90, note: "Dawn starts and dusk returns — bring real light." },
+      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x3_52x6.5.stl", variant: "tiny", angle: 30, note: "Tether keys, a multitool, or a second leash." },
     ],
   },
   {
@@ -119,11 +126,11 @@ export const loadouts: Loadout[] = [
       costCents: 2500,
     },
     modules: [
-      { slug: "clicker-holder", plate: "plates/kanix_plate_3x2_38x5.3.stl", note: "Clicker on a 3×2 plate, dominant-hand side for fast marker work." },
-      { slug: "treat-bag-mount", plate: "plates/kanix_plate_3x2_38x5.3.stl", note: "Wilderdog treat pouch — fastest possible reinforcement." },
-      { slug: "waste-bag-dispenser", plate: "plates/kanix_plate_3x2_38x5.3.stl" },
-      { slug: "dump-bag-mount", plate: "plates/kanix_plate_3x2_38x5.3.stl", note: "Catch-all storage — backup leash, wipes, treats refill, whatever else you pick up on a session." },
-      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: ["small", "small"], note: "Two of the larger 1×2 attachment loops on one 3×2 plate — clip a second leash, water bottle, or anything that needs more than a tiny loop." },
+      { slug: "clicker-holder", plate: "plates/kanix_plate_3x2_38x5.3.stl", angle: 30, note: "Clicker on a 3×2 plate, dominant-hand side for fast marker work." },
+      { slug: "treat-bag-mount", plate: "plates/kanix_plate_3x2_38x5.3.stl", angle: 75, note: "Wilderdog treat pouch — fastest possible reinforcement." },
+      { slug: "waste-bag-dispenser", plate: "plates/kanix_plate_3x2_38x5.3.stl", angle: -90 },
+      { slug: "dump-bag-mount", plate: "plates/kanix_plate_3x2_38x5.3.stl", angle: -45, note: "Catch-all storage — backup leash, wipes, treats refill, whatever else you pick up on a session." },
+      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: ["small", "small"], angle: 130, note: "Two of the larger 1×2 attachment loops on one 3×2 plate — clip a second leash, water bottle, or anything that needs more than a tiny loop." },
     ],
   },
   {
@@ -131,7 +138,7 @@ export const loadouts: Loadout[] = [
     name: "The Pro",
     tagline: "Everything The Trainer and The Walker carry, plus an e-collar and dump bag.",
     description:
-      "Seven Kanix™ modules on a 1.5\" duty belt plus a hands-free BioThane heel lead — the lead loops directly onto the belt so both hands stay free for marker work, e-collar timing, and gear. Every Kanix™ module from The Trainer and The Walker, plus an e-collar holster for whichever receiver you run and a dump bag for the catch-all stuff. Clicker, treat pouch, e-collar, waste bags, C3 flashlight, dump bag, and three attachment loops (one tiny, two small) — all on 3×2 38mm plates. You don't have to wear them all every day: each Kanix™ module is a hinged belt clip that snaps on and off in seconds without tools, so a Trainer-day kit becomes a Walker-day kit on the way out the door.",
+      "Seven Kanix™ modules on a 1.5\" duty belt plus a hands-free BioThane heel lead — the lead loops directly onto the belt so both hands stay free for marker work, e-collar timing, and gear. Every Kanix™ module from The Trainer and The Walker, plus an e-collar holster for whichever receiver you run and a dump bag for the catch-all stuff. Clicker, treat pouch, e-collar, waste bags, C3 flashlight, dump bag, and two small attachment loops — one stacked on the clicker's 2×2 plate, one stacked on the C3's 2×2 plate, both filling the leftover 1×2 row. All on 3×2 38mm plates. You don't have to wear them all every day: each Kanix™ module is a hinged belt clip that snaps on and off in seconds without tools, so a Trainer-day kit becomes a Walker-day kit on the way out the door.",
     belt: '1.5"',
     beltNote:
       "A 1.5\" duty belt keeps the loadout compact even with the full Pro kit, and tucks under everyday clothing better than a 2\" belt.",
@@ -141,22 +148,23 @@ export const loadouts: Loadout[] = [
       costCents: 2500,
     },
     modules: [
-      { slug: "clicker-holder", plate: "plates/kanix_plate_3x2_38x5.3.stl", note: "Clicker on a 3×2 plate, dominant-hand side for fast marker work." },
-      { slug: "treat-bag-mount", plate: "plates/kanix_plate_3x2_38x5.3.stl", note: "Wilderdog treat pouch — fastest possible reinforcement." },
+      { slug: "clicker-holder", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: "38mm", angle: 22.5, note: "Clicker on the 38mm 2×2 variant of a 3×2 plate, dominant-hand side for fast marker work. Shares its 3×2 plate with a small attachment loop." },
+      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: "small", angle: 22.5, note: "Small attachment loop stacked on the clicker's plate — clip a second leash, water bottle, or anything that needs more than a tiny loop." },
+      { slug: "treat-bag-mount", plate: "plates/kanix_plate_3x2_38x5.3.stl", angle: 45, note: "Wilderdog treat pouch — fastest possible reinforcement." },
       {
         groupLabel: "E-Collar Holster",
         groupDescription:
           "Pick the holster that matches the e-collar receiver you already own. On a 1.5\" duty belt the holster's 3×3 hole pattern mounts to a 3×2 plate — the top row of holes is unused.",
         choices: ["mini-educator-holder", "dogtra-200ncpt-202c-arc-holder", "dogtra-280x-arcx-holder"],
         plate: "plates/kanix_plate_3x2_38x5.3.stl",
+        angle: 67.5,
         note: "Pick the holster that matches the e-collar receiver you already own.",
       },
-      { slug: "quick-detach-biothane-heel-lead", note: "BioThane lead, used as a heel/slip lead. Loops directly around the belt — no plate." },
-      { slug: "waste-bag-dispenser", plate: "plates/kanix_plate_3x2_38x5.3.stl" },
-      { slug: "flashlight-holster-c3", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: "38mm", note: "Wuben C3 (38mm 2×2 variant) shares its 3×2 plate with a tiny attachment loop for clipping keys or a phone tether." },
-      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: "tiny", note: "Tiny attachment loop stacked on the C3's plate — clip your own carabiner, snap hook, or D-clip to it." },
-      { slug: "dump-bag-mount", plate: "plates/kanix_plate_3x2_38x5.3.stl", note: "Catch-all storage — backup leashes, wipes, extras you pick up on a session." },
-      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: ["small", "small"], note: "Two of the larger 1×2 attachment loops on one 3×2 plate — clip a second leash, water bottle, or anything that needs more than a tiny loop." },
+      { slug: "waste-bag-dispenser", plate: "plates/kanix_plate_3x2_38x5.3.stl", angle: 90 },
+      { slug: "dump-bag-mount", plate: "plates/kanix_plate_3x2_38x5.3.stl", angle: -157.5, note: "Catch-all storage — backup leashes, wipes, extras you pick up on a session." },
+      { slug: "quick-detach-biothane-heel-lead", angle: -146.25, note: "BioThane lead, used as a heel/slip lead. Loops directly around the belt — no plate." },
+      { slug: "flashlight-holster-c3", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: "38mm", angle: -135, note: "Wuben C3 (38mm 2×2 variant) shares its 3×2 plate with a small attachment loop for clipping keys or a phone tether." },
+      { slug: "carabiner-clip", plate: "plates/kanix_plate_3x2_38x5.3.stl", variant: "small", angle: -135, note: "Small attachment loop stacked on the C3's plate — clip your own carabiner, snap hook, or D-clip to it." },
     ],
   },
 ];
@@ -170,6 +178,7 @@ export type ResolvedLoadoutModule =
       plate?: string;
       variant?: string | string[];
       note?: string;
+      angle?: number;
     }
   | {
       kind: "group";
@@ -180,6 +189,7 @@ export type ResolvedLoadoutModule =
       candidates: Array<{ kind: "module" | "coming-soon"; module: Module | ComingSoonModule }>;
       plate?: string;
       note?: string;
+      angle?: number;
     };
 
 // Helper: resolve each entry. For a normal entry, look up the slug in
@@ -209,16 +219,17 @@ export function resolveLoadout(loadout: Loadout): ResolvedLoadoutModule[] {
           candidates,
           plate: entry.plate,
           note: entry.note,
+          angle: entry.angle,
         };
       }
       if (!entry.slug) return null;
       const mod = modules.find((m) => m.slug === entry.slug);
       if (mod) {
-        return { kind: "module", module: mod, plate: entry.plate, variant: entry.variant, note: entry.note };
+        return { kind: "module", module: mod, plate: entry.plate, variant: entry.variant, note: entry.note, angle: entry.angle };
       }
       const cs = comingSoonModules.find((m) => m.slug === entry.slug);
       if (cs) {
-        return { kind: "coming-soon", module: cs, plate: entry.plate, variant: entry.variant, note: entry.note };
+        return { kind: "coming-soon", module: cs, plate: entry.plate, variant: entry.variant, note: entry.note, angle: entry.angle };
       }
       console.warn(
         `[loadouts] loadout "${loadout.slug}" references unknown module slug "${entry.slug}"`,

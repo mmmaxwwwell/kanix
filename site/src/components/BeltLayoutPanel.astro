@@ -1,0 +1,1087 @@
+---
+import type { Loadout } from "../data/loadouts";
+import { resolveLoadout } from "../data/loadouts";
+
+interface Props {
+  loadout: Loadout;
+  compact?: boolean;
+}
+
+const { loadout, compact = false } = Astro.props;
+const baseUrl = import.meta.env.BASE_URL;
+const resolved = resolveLoadout(loadout);
+
+interface ModuleRow {
+  name: string;
+  href?: string;
+  stl: string | null;
+}
+
+interface Cluster {
+  angle: number;
+  key: string;
+  side: "left" | "right";
+  rows: ModuleRow[];
+  idx: number;
+}
+
+const rawClusters: Omit<Cluster, "idx">[] = [];
+const unplaced: Array<{ name: string; href?: string }> = [];
+
+function sideForAngle(a: number): "left" | "right" {
+  return Math.sin((a * Math.PI) / 180) >= 0 ? "right" : "left";
+}
+
+function addToCluster(angle: number, key: string, row: ModuleRow): void {
+  const existing = rawClusters.find((c) => c.angle === angle && c.key === key);
+  if (existing) {
+    existing.rows.push(row);
+    return;
+  }
+  rawClusters.push({
+    angle,
+    key,
+    side: sideForAngle(angle),
+    rows: [row],
+  });
+}
+
+for (const entry of resolved) {
+  if (entry.kind === "group") {
+    const first = entry.candidates[0];
+    const stl = first && "stlFile" in first.module ? (first.module.stlFile ?? null) : null;
+    const name = entry.groupLabel;
+    const href = first
+      ? `${baseUrl}${first.kind === "coming-soon" ? "coming-soon" : "modules"}/${first.module.slug}/`
+      : undefined;
+    if (typeof entry.angle === "number" && entry.plate) {
+      addToCluster(entry.angle, entry.plate, { name, href, stl });
+    } else if (typeof entry.angle === "number") {
+      addToCluster(entry.angle, `group:${name}`, { name, href, stl });
+    } else {
+      unplaced.push({ name, href });
+    }
+    continue;
+  }
+  const mod = entry.module;
+  const baseHref = `${baseUrl}${entry.kind === "coming-soon" ? "coming-soon" : "modules"}/${mod.slug}/`;
+  const variantIds: Array<string | undefined> =
+    "genericVariants" in mod && mod.genericVariants && entry.variant
+      ? Array.isArray(entry.variant)
+        ? entry.variant
+        : [entry.variant]
+      : [undefined];
+  for (const vid of variantIds) {
+    let name: string = mod.name;
+    let stl: string | null = "stlFile" in mod ? (mod.stlFile ?? null) : null;
+    let href = baseHref;
+    if (vid && "genericVariants" in mod && mod.genericVariants) {
+      for (const g of mod.genericVariants.groups) {
+        if (g.label === "Belt size") continue;
+        const opt = g.options.find((o) => o.id === vid);
+        if (opt) {
+          name = `${mod.name} (${opt.label})`;
+          if (opt.stlFile) stl = opt.stlFile;
+          break;
+        }
+      }
+      const variantExists = mod.genericVariants.groups
+        .flatMap((g) => g.options)
+        .some((o) => o.id === vid);
+      if (variantExists) href = `${baseHref}#${vid}`;
+    }
+    if (typeof entry.angle !== "number") {
+      unplaced.push({ name, href });
+      continue;
+    }
+    const key = entry.plate ?? `module:${mod.slug}`;
+    addToCluster(entry.angle, key, { name, href, stl });
+  }
+}
+
+function norm(a: number): number {
+  let v = a % 360;
+  if (v > 180) v -= 360;
+  if (v <= -180) v += 360;
+  return v;
+}
+for (const c of rawClusters) c.angle = norm(c.angle);
+
+// Stable index by authoring order so dots and bubbles can refer to the
+// same cluster across DOM trees (desktop + two mobile stages share data).
+const clusters: Cluster[] = rawClusters.map((c, i) => ({ ...c, idx: i }));
+
+// Column ordering: top of the column = front of the wearer (small |angle|);
+// bottom = back of the wearer (|angle| near 180).
+// Right column (angles 0..180): ascending puts front on top.
+// Left column (angles -180..0): descending puts -near-0 on top (front).
+const rightClusters: Cluster[] = clusters
+  .filter((c) => c.side === "right")
+  .sort((a, b) => a.angle - b.angle);
+const leftClusters: Cluster[] = clusters
+  .filter((c) => c.side === "left")
+  .sort((a, b) => b.angle - a.angle);
+
+const id = `belt-layout-${loadout.slug}`;
+
+// Belt visual sizing. Held in two places: as a CSS clamp() on the wrapper
+// (drives layout) and as the SVG viewBox (intrinsic to the drawing). Each
+// is self-consistent; they don't need to agree on pixels.
+const beltWrapClass = compact
+  ? "w-[clamp(140px,30vw,200px)]"
+  : "w-[clamp(160px,28vw,260px)]";
+const beltMobileWrapClass = "w-[clamp(60px,19vw,90px)]";
+
+// Pre-compute dot positions in the belt SVG's intrinsic coords. The belt
+// is drawn as an ellipse centered at (50, 50) in a 100×100 viewBox.
+const BELT_CX = 50;
+const BELT_CY = 50;
+const BELT_RX = 38;
+const BELT_RY = 38;
+const dots = clusters.map((c) => {
+  const rad = (c.angle * Math.PI) / 180;
+  return {
+    idx: c.idx,
+    cx: BELT_CX + BELT_RX * Math.sin(rad),
+    cy: BELT_CY - BELT_RY * Math.cos(rad),
+  };
+});
+---
+
+<section
+  id={id}
+  class:list={[
+    "belt-layout-panel",
+    "bg-neutral-900 border border-neutral-800 rounded-xl",
+    compact ? "px-3 py-4 sm:px-4 sm:py-5" : "px-3 py-5 sm:px-6 sm:py-8",
+    "mb-10",
+  ]}
+  aria-label="Belt layout diagram"
+>
+  {/* ─── Desktop: belt centered between two label columns ───────────── */}
+  <div class="belt-layout-desktop hidden md:block">
+    <div
+      class="belt-layout-stage relative grid items-stretch gap-4 lg:gap-6"
+      style="grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);"
+      data-stage="desktop"
+    >
+      {/* Left column */}
+      <div class="flex flex-col gap-3 justify-center justify-self-start w-max max-w-full">
+        {leftClusters.map((c) => (
+          <div
+            class="belt-bubble relative z-10 flex flex-col gap-2 rounded-xl bg-neutral-900 border border-amber-500/40 p-3 shadow-md w-full"
+            data-bubble-idx={`${c.idx}`}
+            data-bubble-side="left"
+          >
+            {c.rows.map((row) => (
+              <div class="belt-row flex items-center gap-2 flex-row-reverse">
+                {row.stl ? (
+                  <div
+                    class="belt-layout-preview shrink-0 rounded-md bg-neutral-950 border border-neutral-800 overflow-hidden w-12 h-12 sm:w-14 sm:h-14"
+                    data-belt-stl={`${baseUrl}models/${row.stl}`}
+                    role="img"
+                    aria-label={`Rotating 3D preview of ${row.name}`}
+                  />
+                ) : (
+                  <div
+                    class="belt-layout-preview shrink-0 rounded-md bg-neutral-950 border border-neutral-800 flex items-center justify-center text-neutral-600 text-xs w-12 h-12 sm:w-14 sm:h-14"
+                    aria-hidden="true"
+                  >
+                    N/A
+                  </div>
+                )}
+                <a
+                  href={row.href}
+                  class="text-sm text-white hover:text-amber-400 transition-colors leading-tight text-right min-w-0"
+                >
+                  {row.name}
+                </a>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* Belt SVG (center column) */}
+      <div class:list={["relative z-10 shrink-0 self-center", beltWrapClass]} style="aspect-ratio: 1 / 1;">
+        <svg
+          class="belt-svg w-full h-full"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="xMidYMid meet"
+          data-belt="desktop"
+          aria-hidden="true"
+        >
+          <ellipse cx={BELT_CX} cy={BELT_CY} rx={BELT_RX} ry={BELT_RY} fill="none" stroke="#f59e0b" stroke-width="2.4" stroke-opacity="0.7" />
+          <ellipse cx={BELT_CX} cy={BELT_CY} rx={BELT_RX - 4} ry={BELT_RY - 4} fill="none" stroke="#f59e0b" stroke-width="0.8" stroke-opacity="0.35" />
+          {/* Buckle at the front (top) */}
+          <rect x={BELT_CX - 4} y={BELT_CY - BELT_RY - 2} width="8" height="4.5" rx="0.8" fill="#1f2937" stroke="#f59e0b" stroke-width="0.7" />
+          {dots.map((d) => (
+            <circle cx={d.cx.toFixed(3)} cy={d.cy.toFixed(3)} r="2.4" fill="#f59e0b" data-dot-idx={`${d.idx}`} />
+          ))}
+        </svg>
+      </div>
+
+      {/* Right column */}
+      <div class="flex flex-col gap-3 justify-center justify-self-end w-max max-w-full">
+        {rightClusters.map((c) => (
+          <div
+            class="belt-bubble relative z-10 flex flex-col gap-2 rounded-xl bg-neutral-900 border border-amber-500/40 p-3 shadow-md w-full"
+            data-bubble-idx={`${c.idx}`}
+            data-bubble-side="right"
+          >
+            {c.rows.map((row) => (
+              <div class="belt-row flex items-center gap-2">
+                {row.stl ? (
+                  <div
+                    class="belt-layout-preview shrink-0 rounded-md bg-neutral-950 border border-neutral-800 overflow-hidden w-12 h-12 sm:w-14 sm:h-14"
+                    data-belt-stl={`${baseUrl}models/${row.stl}`}
+                    role="img"
+                    aria-label={`Rotating 3D preview of ${row.name}`}
+                  />
+                ) : (
+                  <div
+                    class="belt-layout-preview shrink-0 rounded-md bg-neutral-950 border border-neutral-800 flex items-center justify-center text-neutral-600 text-xs w-12 h-12 sm:w-14 sm:h-14"
+                    aria-hidden="true"
+                  >
+                    N/A
+                  </div>
+                )}
+                <a
+                  href={row.href}
+                  class="text-sm text-white hover:text-amber-400 transition-colors leading-tight min-w-0"
+                >
+                  {row.name}
+                </a>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* Connector overlay — covers the entire stage in pixel coords. */}
+      <svg
+        class="belt-overlay absolute inset-0 w-full h-full pointer-events-none"
+        data-overlay="desktop"
+        style="overflow: visible;"
+        aria-hidden="true"
+      >
+        <g data-lines></g>
+      </svg>
+    </div>
+  </div>
+
+  {/* ─── Mobile: two stacked single-side belts ───────────────────────── */}
+  <div class="belt-layout-mobile md:hidden flex flex-col gap-6">
+    {/* Top stage: belt on left, right-side bubbles on right. */}
+    <div
+      class="belt-layout-stage relative grid items-stretch gap-3"
+      style="grid-template-columns: auto minmax(0, 1fr);"
+      data-stage="mobile-right"
+    >
+      <div class:list={["relative shrink-0 self-center", beltMobileWrapClass]} style="aspect-ratio: 1 / 1;">
+        <svg
+          class="belt-svg w-full h-full"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="xMidYMid meet"
+          data-belt="mobile-right"
+          aria-hidden="true"
+        >
+          <ellipse cx={BELT_CX} cy={BELT_CY} rx={BELT_RX} ry={BELT_RY} fill="none" stroke="#f59e0b" stroke-width="2.4" stroke-opacity="0.7" />
+          <ellipse cx={BELT_CX} cy={BELT_CY} rx={BELT_RX - 4} ry={BELT_RY - 4} fill="none" stroke="#f59e0b" stroke-width="0.8" stroke-opacity="0.35" />
+          <rect x={BELT_CX - 4} y={BELT_CY - BELT_RY - 2} width="8" height="4.5" rx="0.8" fill="#1f2937" stroke="#f59e0b" stroke-width="0.7" />
+          {dots.map((d) => (
+            <circle cx={d.cx.toFixed(3)} cy={d.cy.toFixed(3)} r="2.4" fill="#f59e0b" data-dot-idx={`${d.idx}`} />
+          ))}
+        </svg>
+      </div>
+      <div class="flex flex-col gap-3 justify-center justify-self-end w-max max-w-full">
+        {rightClusters.map((c) => (
+          <div
+            class="belt-bubble relative z-10 flex flex-col gap-2 rounded-xl bg-neutral-900 border border-amber-500/40 p-3 shadow-md w-full"
+            data-bubble-idx={`${c.idx}`}
+            data-bubble-side="right"
+          >
+            {c.rows.map((row) => (
+              <div class="belt-row flex items-center gap-2">
+                {row.stl ? (
+                  <div
+                    class="belt-layout-preview shrink-0 rounded-md bg-neutral-950 border border-neutral-800 overflow-hidden w-10 h-10"
+                    data-belt-stl={`${baseUrl}models/${row.stl}`}
+                    role="img"
+                    aria-label={`Rotating 3D preview of ${row.name}`}
+                  />
+                ) : (
+                  <div
+                    class="belt-layout-preview shrink-0 rounded-md bg-neutral-950 border border-neutral-800 flex items-center justify-center text-neutral-600 text-xs w-10 h-10"
+                    aria-hidden="true"
+                  >
+                    N/A
+                  </div>
+                )}
+                <a
+                  href={row.href}
+                  class="text-xs text-white hover:text-amber-400 transition-colors leading-tight min-w-0"
+                >
+                  {row.name}
+                </a>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <svg
+        class="belt-overlay absolute inset-0 w-full h-full pointer-events-none"
+        data-overlay="mobile-right"
+        style="overflow: visible;"
+        aria-hidden="true"
+      >
+        <g data-lines></g>
+      </svg>
+    </div>
+
+    {/* Bottom stage: left-side bubbles on left, belt on right. */}
+    <div
+      class="belt-layout-stage relative grid items-stretch gap-3"
+      style="grid-template-columns: minmax(0, 1fr) auto;"
+      data-stage="mobile-left"
+    >
+      <div class="flex flex-col gap-3 justify-center justify-self-start w-max max-w-full">
+        {leftClusters.map((c) => (
+          <div
+            class="belt-bubble relative z-10 flex flex-col gap-2 rounded-xl bg-neutral-900 border border-amber-500/40 p-3 shadow-md w-full"
+            data-bubble-idx={`${c.idx}`}
+            data-bubble-side="left"
+          >
+            {c.rows.map((row) => (
+              <div class="belt-row flex items-center gap-2 flex-row-reverse">
+                {row.stl ? (
+                  <div
+                    class="belt-layout-preview shrink-0 rounded-md bg-neutral-950 border border-neutral-800 overflow-hidden w-10 h-10"
+                    data-belt-stl={`${baseUrl}models/${row.stl}`}
+                    role="img"
+                    aria-label={`Rotating 3D preview of ${row.name}`}
+                  />
+                ) : (
+                  <div
+                    class="belt-layout-preview shrink-0 rounded-md bg-neutral-950 border border-neutral-800 flex items-center justify-center text-neutral-600 text-xs w-10 h-10"
+                    aria-hidden="true"
+                  >
+                    N/A
+                  </div>
+                )}
+                <a
+                  href={row.href}
+                  class="text-xs text-white hover:text-amber-400 transition-colors leading-tight text-right min-w-0"
+                >
+                  {row.name}
+                </a>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div class:list={["relative shrink-0 self-center", beltMobileWrapClass]} style="aspect-ratio: 1 / 1;">
+        <svg
+          class="belt-svg w-full h-full"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="xMidYMid meet"
+          data-belt="mobile-left"
+          aria-hidden="true"
+        >
+          <ellipse cx={BELT_CX} cy={BELT_CY} rx={BELT_RX} ry={BELT_RY} fill="none" stroke="#f59e0b" stroke-width="2.4" stroke-opacity="0.7" />
+          <ellipse cx={BELT_CX} cy={BELT_CY} rx={BELT_RX - 4} ry={BELT_RY - 4} fill="none" stroke="#f59e0b" stroke-width="0.8" stroke-opacity="0.35" />
+          <rect x={BELT_CX - 4} y={BELT_CY - BELT_RY - 2} width="8" height="4.5" rx="0.8" fill="#1f2937" stroke="#f59e0b" stroke-width="0.7" />
+          {dots.map((d) => (
+            <circle cx={d.cx.toFixed(3)} cy={d.cy.toFixed(3)} r="2.4" fill="#f59e0b" data-dot-idx={`${d.idx}`} />
+          ))}
+        </svg>
+      </div>
+      <svg
+        class="belt-overlay absolute inset-0 w-full h-full pointer-events-none"
+        data-overlay="mobile-left"
+        style="overflow: visible;"
+        aria-hidden="true"
+      >
+        <g data-lines></g>
+      </svg>
+    </div>
+  </div>
+
+  {unplaced.length > 0 && (
+    <p class="mt-6 text-xs text-neutral-500 text-center max-w-prose mx-auto">
+      No fixed position on the belt: {unplaced.map((u, i) => (
+        <Fragment>
+          {i > 0 ? ", " : null}
+          {u.href ? (
+            <a href={u.href} class="text-neutral-300 hover:text-amber-400 transition-colors underline decoration-neutral-700 underline-offset-2">{u.name}</a>
+          ) : (
+            <span class="text-neutral-300">{u.name}</span>
+          )}
+        </Fragment>
+      ))}.
+    </p>
+  )}
+</section>
+
+<style>
+  .belt-overlay { overflow: visible; }
+</style>
+
+<script>
+  import * as THREE from "three";
+  import { STLLoader } from "three/addons/loaders/STLLoader.js";
+
+  function mountPreview(container: HTMLElement) {
+    const stlPath = container.dataset.beltStl;
+    if (!stlPath) return;
+    if (container.dataset.beltMounted === "true") return;
+    container.dataset.beltMounted = "true";
+
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    if (width === 0 || height === 0) {
+      // Mount later when the container has a size (e.g. mobile branch
+      // hidden behind a media query at the moment the script ran).
+      const probe = new ResizeObserver(() => {
+        if (container.clientWidth > 0 && container.clientHeight > 0) {
+          probe.disconnect();
+          container.dataset.beltMounted = "";
+          mountPreview(container);
+        }
+      });
+      probe.observe(container);
+      return;
+    }
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 2000);
+    camera.up.set(0, 0, 1);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x000000, 0);
+    container.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const dir1 = new THREE.DirectionalLight(0xffffff, 0.9);
+    dir1.position.set(1, 1, 1);
+    scene.add(dir1);
+    const dir2 = new THREE.DirectionalLight(0xffffff, 0.4);
+    dir2.position.set(-1, -0.5, -1);
+    scene.add(dir2);
+
+    const pivot = new THREE.Group();
+    scene.add(pivot);
+
+    new STLLoader().load(
+      stlPath,
+      (geometry) => {
+        geometry.computeVertexNormals();
+        const material = new THREE.MeshStandardMaterial({
+          color: 0xf59e0b,
+          metalness: 0.1,
+          roughness: 0.6,
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        geometry.computeBoundingBox();
+        const box = geometry.boundingBox!;
+        const center = new THREE.Vector3();
+        box.getCenter(center);
+        mesh.position.sub(center);
+        pivot.add(mesh);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = camera.fov * (Math.PI / 180);
+        const dist = (maxDim / (2 * Math.tan(fov / 2))) * 1.6;
+        camera.position.set(dist * 0.7, -dist * 0.7, dist * 0.5);
+        camera.lookAt(0, 0, 0);
+      },
+      undefined,
+      () => {},
+    );
+
+    let rafId = 0;
+    function animate() {
+      pivot.rotation.z += 0.012;
+      renderer.render(scene, camera);
+      rafId = requestAnimationFrame(animate);
+    }
+    animate();
+
+    const ro = new ResizeObserver(() => {
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (w === 0 || h === 0) return;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    });
+    ro.observe(container);
+
+    const io = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting && rafId === 0) animate();
+        else if (!entry.isIntersecting && rafId !== 0) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
+      }
+    });
+    io.observe(container);
+  }
+
+  // ─── Connector lines per stage ───────────────────────────────────────
+  // For each stage, draw one line per bubble in that stage from the
+  // bubble's inner edge to the cluster's dot on the belt. The overlay's
+  // viewBox is set equal to the stage pixel box, so we work in pixels.
+  function layoutStage(stage: HTMLElement) {
+    const stageKey = stage.dataset.stage;
+    if (!stageKey) return;
+    const overlay = stage.querySelector<SVGSVGElement>(`svg[data-overlay="${stageKey}"]`);
+    const beltSvg = stage.querySelector<SVGSVGElement>(`svg[data-belt="${stageKey}"]`);
+    if (!overlay || !beltSvg) return;
+    const linesGroup = overlay.querySelector<SVGGElement>("[data-lines]");
+    if (!linesGroup) return;
+
+    function place() {
+      const rect = stage.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      if (w === 0 || h === 0) return;
+      overlay.setAttribute("viewBox", `0 0 ${w} ${h}`);
+
+      while (linesGroup.firstChild) linesGroup.removeChild(linesGroup.firstChild);
+
+      // ─── Boundary labeling with PO-leaders ─────────────────────────
+      // Each line is one polyline: dot → 8-axis exit → optional post-exit
+      // chamfer → horizontal#1 → optional case-B inset (45°+V+45°) → final
+      // horizontal into bubble inner-edge midpoint. Lanes are uniquely
+      // assigned per rank so verticals can never share x; the chamfer
+      // fix-up pass lifts h#1 only when the natural exit-end y would
+      // cross another line's vertical.
+
+      const STUB_FROM_BELT = 8;
+      const LANE_STEP = 18;
+      const EXIT_LEN_MIN = 16;
+      const FINAL_HORIZ_MIN = 4;
+      const CHAMFER_MIN = 14;
+
+      interface Connector {
+        idx: string;
+        dotCx: number;
+        dotCy: number;
+        anchorX: number;
+        anchorY: number;
+        side: "left" | "right";
+      }
+
+      const beltRect = beltSvg.getBoundingClientRect();
+      const beltLeft = beltRect.left - rect.left;
+      const beltRight = beltRect.right - rect.left;
+      const beltCx = (beltRect.left + beltRect.right) / 2 - rect.left;
+      const beltCy = (beltRect.top + beltRect.bottom) / 2 - rect.top;
+
+      const conns: Connector[] = [];
+      const bubbles = stage.querySelectorAll<HTMLElement>("[data-bubble-idx]");
+      bubbles.forEach((bubble) => {
+        const idx = bubble.dataset.bubbleIdx;
+        if (!idx) return;
+        const dot = beltSvg.querySelector<SVGCircleElement>(`[data-dot-idx="${idx}"]`);
+        if (!dot) return;
+        const dotRect = dot.getBoundingClientRect();
+        const dotCx = dotRect.left + dotRect.width / 2 - rect.left;
+        const dotCy = dotRect.top + dotRect.height / 2 - rect.top;
+        const bRect = bubble.getBoundingClientRect();
+        const side = bubble.dataset.bubbleSide === "right" ? "right" : "left";
+        const bLeft = bRect.left - rect.left;
+        const bRight = bRect.right - rect.left;
+        const bTop = bRect.top - rect.top;
+        const bBottom = bRect.bottom - rect.top;
+        const anchorX = side === "right" ? bLeft : bRight;
+        const anchorY = (bTop + bBottom) / 2;
+        conns.push({ idx, dotCx, dotCy, anchorX, anchorY, side });
+      });
+
+      // Snap the outward direction at a dot to one of the 5 axes that
+      // point toward the bubble side (cardinal + 2 diagonals). Filter
+      // out candidates whose y-direction is opposite to where the
+      // anchor sits — otherwise the line would push y AWAY from its
+      // destination, forcing reversal turns. Then pick the remaining
+      // candidate whose dot product with the natural outward direction
+      // (ux, uy) is largest.
+      function snapExit(ux: number, uy: number, dirX: number, slopeYPre: number): { ex: number; ey: number } {
+        const SQ = Math.SQRT1_2;
+        const all: Array<[number, number]> = [
+          [dirX, 0],
+          [0, -1],
+          [0, 1],
+          [dirX * SQ, -SQ],
+          [dirX * SQ, SQ],
+        ];
+        // Filter: drop candidates whose ey opposes slopeYPre (pushes y
+        // away from the anchor). slopeYPre=+1 means anchor below dot;
+        // we want ey ≥ 0. slopeYPre=-1 means anchor above; want ey ≤ 0.
+        let cand = all.filter((c) => slopeYPre === 0 || c[1] * slopeYPre >= -0.01);
+        if (cand.length === 0) cand = all;
+        let best = cand[0];
+        let bestDot = -Infinity;
+        for (const c of cand) {
+          const d = c[0] * ux + c[1] * uy;
+          if (d > bestDot) { bestDot = d; best = c; }
+        }
+        return { ex: best[0], ey: best[1] };
+      }
+
+      // ─── PCB-trace routing ────────────────────────────────────────
+      //
+      // Each line uses one of two canonical shapes — A or B — chosen by
+      // geometry:
+      //
+      //   A (most lines):  dot → exit → 45° diagonal → final-h
+      //     The single 45° covers the entire vGap; lines on the same
+      //     side share the same slope sign so the diagonals look like
+      //     parallel PCB traces.
+      //
+      //   B (when vGap > corridor): dot → exit → 45° approach → vertical
+      //     → 45° landing → final-h
+      //     The verticals sit on per-line LANES (unique x-offsets) so
+      //     they never overlap.
+      //
+      // The exit segment is 8-axis snapped to the dot's outward
+      // direction, restricted to point toward the bubble side and to
+      // not push y away from the anchor.
+
+      interface G {
+        c: Connector;
+        ex: number; ey: number;
+        exitEndX: number;
+        exitEndY: number;
+        anchorOff: number;
+        slopeY: number;          // +1 down to anchor, -1 up
+        vGap: number;            // |anchorY - exitEndY|
+        corridorX: number;       // x-room from exitEndX to anchorX along dirX
+        kind: "A" | "B";
+        laneOff: number;         // case B only: x-offset of the vertical lane
+      }
+
+      for (const side of ["left", "right"] as const) {
+        const same = conns.filter((c) => c.side === side);
+        if (same.length === 0) continue;
+
+        same.sort((a, b) => a.anchorY - b.anchorY);
+
+        const dirX = side === "right" ? 1 : -1;
+        const beltEdgeX = side === "right" ? beltRight : beltLeft;
+
+        // Build per-line geometry (initial exit length = EXIT_LEN_MIN;
+        // refined below by exit-stagger so adjacent same-slope diagonals
+        // don't visually overlap).
+        const lines: G[] = same.map((c) => {
+          const dx = c.dotCx - beltCx;
+          const dy = c.dotCy - beltCy;
+          const rn = Math.hypot(dx, dy) || 1;
+          const ux = dx / rn;
+          const uy = dy / rn;
+          let slopeY: 1 | -1 | 0 =
+            c.anchorY > c.dotCy + 0.5 ? 1 : c.anchorY < c.dotCy - 0.5 ? -1 : 0;
+          const { ex, ey } = snapExit(ux, uy, dirX, slopeY);
+          const anchorOff = (c.anchorX - beltEdgeX) * dirX;
+          return {
+            c,
+            ex, ey,
+            exitEndX: c.dotCx + ex * EXIT_LEN_MIN,
+            exitEndY: c.dotCy + ey * EXIT_LEN_MIN,
+            anchorOff,
+            slopeY: (slopeY === 0 ? 1 : slopeY) as 1 | -1,
+            vGap: 0,
+            corridorX: 0,
+            kind: "A",
+            laneOff: 0,
+          } as G;
+        });
+
+        // Stagger exit lengths within each slope-group so parallel
+        // diagonals are visually separated. Within a slope-group
+        // (sorted from "innermost diagonal" to "outermost diagonal"),
+        // each subsequent line gets an exit longer by EXIT_STAGGER.
+        // The "innermost diagonal" is the one closest to the belt — for
+        // the DOWN-group on the right side, that's the line whose
+        // anchor is least-far down (smallest anchorY); for the UP-group,
+        // largest anchorY (least-far up). The OUTERMOST diagonal sits
+        // farthest from the belt's near edge and so needs the longest
+        // exit to keep its diagonal parallel and offset.
+        //
+        // CONSTRAINT: never stagger a line so far that it tips from
+        // case A into case B — case-B verticals collide with adjacent
+        // case-A diagonals and there's no clean fix-up.
+        // Stagger exits within each slope-group so parallel 45°
+        // diagonals are visually separated. For two parallel 45°s
+        // (after the exit segment) sharing slope s = slopeY*dirX,
+        // the perpendicular distance between their infinite lines is
+        // |Δz| / √2  where  z = exitEndY - s*exitEndX.
+        //
+        // For each line we search exit lengths in [EXIT_MIN_HARD, maxLen]
+        // and pick the length that maximizes the MINIMUM perp distance
+        // to every OTHER line in the same slope-group. We iterate the
+        // whole group a few times so updates propagate.
+        //
+        // The max exit length per line is the largest that still
+        // preserves case A (going longer would tip into case B, which
+        // creates verticals that visually clash with adjacent case-A
+        // diagonals — no clean fix-up).
+        const STAGGER_Z = 22; // perp ≥ ~15.5px when achievable
+        const EXIT_MIN_HARD = 12; // never shrink the visible exit shorter than this
+        const PCB_NO_FINAL_H_BONUS = 4000; // reward lines that land directly at anchor
+        const sOf = (l: G) => l.slopeY * dirX;
+        const zOf = (l: G) => l.exitEndY - sOf(l) * l.exitEndX;
+        function maxCaseAExitLen(g: G): number {
+          let lo = 0, hi = 600;
+          for (let i = 0; i < 20; i++) {
+            const mid = (lo + hi) / 2;
+            const newX = g.c.dotCx + g.ex * mid;
+            const newY = g.c.dotCy + g.ey * mid;
+            const vGap = Math.abs(g.c.anchorY - newY);
+            const corr = (g.c.anchorX - newX) * dirX - FINAL_HORIZ_MIN;
+            if (vGap <= corr + 0.5) lo = mid; else hi = mid;
+          }
+          return lo;
+        }
+
+        const upGroup = lines.filter((l) => l.slopeY === -1);
+        const downGroup = lines.filter((l) => l.slopeY === 1);
+        for (const group of [upGroup, downGroup]) {
+          if (group.length < 2) continue;
+          // All same-slope lines participate (both case-A and case-B
+          // share the same approach-diagonal slope after the exit, so
+          // they all need stagger to avoid visual overlap with each
+          // other and with the next-group's diagonals).
+          const participants = group;
+          // Pre-compute per-line max exit length:
+          //   - For lines that ARE case-A at EXIT_LEN_MIN: cap so they
+          //     stay case-A (going longer tips them into case B → bad
+          //     micro-vertical).
+          //   - For lines that are forced case-B even at EXIT_LEN_MIN:
+          //     cap by the corridor (so the approach diagonal can still
+          //     reach the lane before colliding with bubble).
+          const maxLens = new Map<G, number>();
+          for (const p of participants) {
+            const vAt0 = Math.abs(p.c.anchorY - p.c.dotCy - p.ey * EXIT_LEN_MIN);
+            const cAt0 = (p.c.anchorX - p.c.dotCx - p.ex * EXIT_LEN_MIN) * dirX - FINAL_HORIZ_MIN;
+            const isCaseA = vAt0 <= cAt0 + 0.5;
+            if (isCaseA) {
+              maxLens.set(p, Math.max(EXIT_LEN_MIN, maxCaseAExitLen(p)));
+            } else {
+              // Case B: just cap to "corridor minus a chamfer".
+              const corridorAvail = (p.c.anchorX - p.c.dotCx) * dirX - FINAL_HORIZ_MIN - CHAMFER_MIN * 2;
+              maxLens.set(p, Math.max(EXIT_LEN_MIN, Math.min(corridorAvail, 200)));
+            }
+          }
+          // Iterate to convergence — adjusting one line shifts the
+          // perp gaps to its neighbours, which may then need re-adjust.
+          for (let pass = 0; pass < 8; pass++) {
+            let changed = false;
+            for (const cur of participants) {
+              const others = participants.filter((p) => p !== cur);
+              const maxLen = maxLens.get(cur)!;
+              const lenLo = Math.max(EXIT_MIN_HARD, Math.min(EXIT_LEN_MIN, maxLen));
+              // Sweep candidate exit lengths and pick the one whose
+              // minimum |Δz| to all others is largest (clamped at STAGGER_Z).
+              const curLenBase = cur.ex !== 0
+                ? (cur.exitEndX - cur.c.dotCx) / cur.ex
+                : cur.ey !== 0
+                  ? (cur.exitEndY - cur.c.dotCy) / cur.ey
+                  : EXIT_LEN_MIN;
+              let bestLen = curLenBase;
+              let bestScore = -Infinity;
+              const evalLen = (len: number) => {
+                const newX = cur.c.dotCx + cur.ex * len;
+                const newY = cur.c.dotCy + cur.ey * len;
+                // Disqualify exits that overshoot the stage bounds —
+                // we never want the routing to climb above y=0 or below
+                // y=h (the stage); the lines must stay inside the panel.
+                if (newY < 4 || newY > h - 4) return -Infinity;
+                const z = newY - sOf(cur) * newX;
+                let minGap = Infinity;
+                for (const o of others) {
+                  const dz = Math.abs(z - zOf(o));
+                  if (dz < minGap) minGap = dz;
+                }
+                const clamped = Math.min(minGap, STAGGER_Z);
+                // Final-h length under this exit: for case A,
+                // corner3_x = newX + dirX*vGap; final-h length =
+                // (anchorX - corner3_x)*dirX. Smaller is cleaner.
+                const vGap = Math.abs(cur.c.anchorY - newY);
+                const corner3X = newX + dirX * vGap;
+                const finalHSigned = (cur.c.anchorX - corner3X) * dirX;
+                if (finalHSigned < -0.5) return -Infinity;
+                const finalH = Math.max(0, finalHSigned);
+                // Bonus for "no final-h" geometry. Only fires when exit
+                // is reasonably short (we don't want lines exploding off
+                // the panel just to eliminate a tiny final-h).
+                // Only reward the "line lands directly at anchor"
+                // geometry — no gradient. A long final-h that's only
+                // partially shorter doesn't justify a long exit.
+                const lands = finalH < 1 && len <= 200;
+                const landsBonus = lands ? PCB_NO_FINAL_H_BONUS : 0;
+                // Mild penalty on exit length (only matters for ties).
+                return clamped * 1000 + landsBonus - len * 0.5;
+              };
+              // Search len in [lenLo, maxLen] with 1px granularity.
+              const hi = Math.max(lenLo, Math.floor(maxLen));
+              for (let len = Math.floor(lenLo); len <= hi; len += 1) {
+                const sc = evalLen(len);
+                if (sc > bestScore) { bestScore = sc; bestLen = len; }
+              }
+              if (Math.abs(bestLen - curLenBase) > 0.5) {
+                cur.exitEndX = cur.c.dotCx + cur.ex * bestLen;
+                cur.exitEndY = cur.c.dotCy + cur.ey * bestLen;
+                changed = true;
+              }
+            }
+            if (!changed) break;
+          }
+        }
+
+        // Now classify A vs B and finalize vGap / corridorX.
+        for (const l of lines) {
+          l.vGap = Math.abs(l.c.anchorY - l.exitEndY);
+          l.corridorX = (l.c.anchorX - l.exitEndX) * dirX - FINAL_HORIZ_MIN;
+          l.kind = l.vGap <= l.corridorX + 0.5 ? "A" : "B";
+        }
+
+        // Lane assignment for case-B lines only.
+        //
+        // The vertical lane sits at offset laneOff from belt edge. To
+        // avoid crossings between case-B verticals, each gets a unique
+        // offset spaced by laneStep. Within case-B lines, the one with
+        // the LARGEST |vGap - corridor| (i.e., longest forced vertical)
+        // gets the OUTERMOST lane (closest to bubble) so its approach
+        // and landing 45°s are longest.
+        const caseB = lines.filter((l) => l.kind === "B");
+        if (caseB.length > 0) {
+          const tightestAnchorOff = Math.min(...caseB.map((l) => l.anchorOff));
+          const corridor = Math.max(
+            0,
+            tightestAnchorOff - FINAL_HORIZ_MIN - STUB_FROM_BELT,
+          );
+          const laneStep = caseB.length > 1
+            ? Math.max(6, Math.min(LANE_STEP, Math.floor(corridor / Math.max(1, caseB.length - 1))))
+            : LANE_STEP;
+          // Lane assignment for case-B verticals.
+          //
+          // Each case-B line's approach diagonal sweeps x from its
+          // exitEndX to its laneX. If line A's lane sits inside line
+          // B's approach-sweep, B's diagonal crosses A's vertical.
+          //
+          // Safe rule: the line with the LONGEST approach (largest
+          // vGap-corridor-deficit, i.e., the most-extreme anchor) gets
+          // the INNERMOST lane (closest to belt edge). Then its long
+          // approach diagonal sweeps the FULL corridor without crossing
+          // any outer lane (which sits closer to the bubble).
+          const sorted = [...caseB].sort(
+            (a, b) => Math.abs(b.c.anchorY - b.c.dotCy) - Math.abs(a.c.anchorY - a.c.dotCy),
+          );
+          // sorted[0] has the longest vGap → INNERMOST lane (rank 0
+          // from belt). Subsequent → outer.
+          sorted.forEach((l, rankFromInner) => {
+            const off = STUB_FROM_BELT + rankFromInner * laneStep;
+            const cap = Math.max(STUB_FROM_BELT, l.anchorOff - FINAL_HORIZ_MIN);
+            l.laneOff = Math.min(off, cap);
+          });
+        }
+
+        // Fix-up pass: for each case-A line, if any case-B line's
+        // vertical lies in the case-A's final-h x-range at a y inside
+        // the case-B's vertical y-span, extend the case-A's exit to
+        // push its corner3 past the case-B vertical (keeping case A).
+        // If we can't push far enough while staying case A, fall back
+        // to extending until corner3 is at anchor (best we can do).
+        const MARGIN = 6;
+        for (let pass = 0; pass < 4; pass++) {
+          let changed = false;
+          for (const a of lines) {
+            if (a.kind !== "A") continue;
+            const aCorner3X = a.exitEndX + dirX * a.vGap;
+            const aFinalHXMin = Math.min(aCorner3X, a.c.anchorX);
+            const aFinalHXMax = Math.max(aCorner3X, a.c.anchorX);
+            for (const b of lines) {
+              if (b === a) continue;
+              if (b.kind !== "B") continue;
+              // Compute b's vertical x and y-span. We need to mirror the
+              // emit-time geometry (approachLen/landingLen clamping).
+              const bLaneX = beltEdgeX + dirX * b.laneOff;
+              let bApproachLen = (bLaneX - b.exitEndX) * dirX;
+              if (bApproachLen < 0) bApproachLen = 0;
+              const bxRoomToAnchor = (b.c.anchorX - bLaneX) * dirX;
+              let bLandingLen = Math.max(0, bxRoomToAnchor - FINAL_HORIZ_MIN);
+              let bV = b.vGap - bApproachLen - bLandingLen;
+              if (bV < 0) {
+                bApproachLen = Math.max(0, b.vGap - bLandingLen);
+                bV = b.vGap - bApproachLen - bLandingLen;
+              }
+              const bApproachEndY = b.exitEndY + b.slopeY * bApproachLen;
+              const bVEndY = bApproachEndY + b.slopeY * bV;
+              const bVerticalX = b.exitEndX + dirX * bApproachLen;
+              const bYMin = Math.min(bApproachEndY, bVEndY);
+              const bYMax = Math.max(bApproachEndY, bVEndY);
+              // Conflict iff aFinal-h y (= a.anchorY) ∈ [bYMin, bYMax]
+              // AND bVerticalX ∈ [aFinalHXMin, aFinalHXMax].
+              if (a.c.anchorY < bYMin - 0.5 || a.c.anchorY > bYMax + 0.5) continue;
+              if (bVerticalX < aFinalHXMin + 0.5 || bVerticalX > aFinalHXMax - 0.5) continue;
+              // Push a's corner3 to the bubble side of bVerticalX.
+              // For dirX=+1 (right): need corner3_x ≥ bVerticalX + MARGIN.
+              // For dirX=-1 (left): need corner3_x ≤ bVerticalX - MARGIN.
+              const wantCorner3X = bVerticalX + dirX * MARGIN;
+              // corner3_x = exitEndX + dirX*vGap. Solve for exitEndX:
+              // exitEndX = wantCorner3X - dirX*vGap
+              const wantExitEndX = wantCorner3X - dirX * a.vGap;
+              // exitEndX = dotCx + ex*len. Solve len.
+              const wantLen = a.ex !== 0
+                ? (wantExitEndX - a.c.dotCx) / a.ex
+                : null;
+              if (wantLen === null) continue;
+              // Bound by case-A preservation and current corridor.
+              const maxLen = maxCaseAExitLen(a);
+              let useLen = Math.min(wantLen, maxLen);
+              // Don't push corner3 PAST anchor (no negative final-h).
+              const anchorLen = a.ex !== 0
+                ? ((a.c.anchorX - dirX * a.vGap) - a.c.dotCx) / a.ex
+                : maxLen;
+              useLen = Math.min(useLen, anchorLen);
+              useLen = Math.max(useLen, EXIT_LEN_MIN);
+              const curLen = a.ex !== 0
+                ? (a.exitEndX - a.c.dotCx) / a.ex
+                : EXIT_LEN_MIN;
+              if (useLen - curLen > 0.5) {
+                a.exitEndX = a.c.dotCx + a.ex * useLen;
+                a.exitEndY = a.c.dotCy + a.ey * useLen;
+                a.vGap = Math.abs(a.c.anchorY - a.exitEndY);
+                a.corridorX = (a.c.anchorX - a.exitEndX) * dirX - FINAL_HORIZ_MIN;
+                a.kind = a.vGap <= a.corridorX + 0.5 ? "A" : "B";
+                changed = true;
+              }
+            }
+          }
+          if (!changed) break;
+        }
+
+        // Emit each line.
+        for (const g of lines) {
+          const c = g.c;
+          const pts: Array<[number, number]> = [];
+          pts.push([c.dotCx, c.dotCy]);
+          pts.push([g.exitEndX, g.exitEndY]);
+
+          if (g.kind === "A") {
+            // Single 45° diagonal from exit-end to (corner3X, anchorY).
+            // corner3X = exitEndX + dirX*vGap (the 45° covers vGap in y
+            // and vGap in x). Then a flat final-h to (anchorX, anchorY).
+            const corner3X = g.exitEndX + dirX * g.vGap;
+            if (g.vGap > 0.5) {
+              pts.push([corner3X, c.anchorY]);
+            }
+            pts.push([c.anchorX, c.anchorY]);
+          } else {
+            // Case B: approach 45° + vertical + landing 45° + final-h.
+            // approachLen + landingLen = corridorX (saturated)
+            // approachLen + V + landingLen = vGap  ⇒  V = vGap - corridorX
+            // Place the vertical at x = exitEndX + dirX * approachLen.
+            // We want approachLen = laneOff_from_exit = (beltEdgeX +
+            // dirX*laneOff - exitEndX)*dirX. Solve laneX = beltEdgeX +
+            // dirX*laneOff → approachLen = (laneX - exitEndX)*dirX.
+            const laneX = beltEdgeX + dirX * g.laneOff;
+            let approachLen = (laneX - g.exitEndX) * dirX;
+            if (approachLen < 0) approachLen = 0;
+            // landingLen is whatever x-room remains between laneX and
+            // the corner-before-final-h. We reserve FINAL_HORIZ_MIN
+            // (or more if room) and let landingLen consume the rest.
+            const xRoomToAnchor = (c.anchorX - laneX) * dirX; // typically positive
+            let landingLen = Math.max(0, xRoomToAnchor - FINAL_HORIZ_MIN);
+            // Cap landingLen so approachLen + landingLen ≤ vGap (no V
+            // would be needed); but in case B vGap > corridor so this
+            // doesn't trigger normally. Just ensure landingLen ≥ 0.
+            // Ensure landing+approach together cover ≤ vGap; the
+            // remainder is the vertical V.
+            let V = g.vGap - approachLen - landingLen;
+            if (V < 0) {
+              // Approach overshot — shrink approach so V≥0.
+              approachLen = Math.max(0, g.vGap - landingLen);
+              V = g.vGap - approachLen - landingLen;
+            }
+            const approachEndX = g.exitEndX + dirX * approachLen;
+            const approachEndY = g.exitEndY + g.slopeY * approachLen;
+            const vEndY = approachEndY + g.slopeY * V;
+            const landEndX = approachEndX + dirX * landingLen;
+            const landEndY = vEndY + g.slopeY * landingLen;
+            pts.push([approachEndX, approachEndY]);
+            if (V > 0.5) pts.push([approachEndX, vEndY]);
+            pts.push([landEndX, landEndY]);
+            pts.push([c.anchorX, c.anchorY]);
+          }
+
+          const deduped = dedupePoints(pts);
+          const poly = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "polyline",
+          );
+          poly.setAttribute(
+            "points",
+            deduped.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" "),
+          );
+          poly.setAttribute("fill", "none");
+          poly.setAttribute("stroke", "#f59e0b");
+          poly.setAttribute("stroke-opacity", "0.65");
+          poly.setAttribute("stroke-width", "1.5");
+          poly.setAttribute("stroke-linejoin", "round");
+          poly.setAttribute("stroke-linecap", "round");
+          linesGroup.appendChild(poly);
+        }
+      }
+
+      function dedupePoints(pts: Array<[number, number]>): Array<[number, number]> {
+        const out: Array<[number, number]> = [];
+        for (const p of pts) {
+          if (out.length < 2) {
+            const prev = out[out.length - 1];
+            if (!prev || Math.hypot(p[0] - prev[0], p[1] - prev[1]) > 0.5) {
+              out.push(p);
+            }
+            continue;
+          }
+          const a = out[out.length - 2];
+          const b = out[out.length - 1];
+          const cross = (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+          if (Math.abs(cross) < 0.5) {
+            out[out.length - 1] = p;
+          } else if (Math.hypot(p[0] - b[0], p[1] - b[1]) > 0.5) {
+            out.push(p);
+          }
+        }
+        return out;
+      }
+
+    }
+
+    place();
+    requestAnimationFrame(place);
+
+    const ro = new ResizeObserver(place);
+    ro.observe(stage);
+    stage.querySelectorAll<HTMLElement>("[data-bubble-idx]").forEach((b) => ro.observe(b));
+    window.addEventListener("resize", place);
+    if (document.fonts && (document.fonts as any).ready) {
+      (document.fonts as any).ready.then(() => place());
+    }
+  }
+
+  document
+    .querySelectorAll<HTMLElement>(".belt-layout-panel")
+    .forEach((panel) => {
+      panel.querySelectorAll<HTMLElement>("[data-stage]").forEach(layoutStage);
+      panel
+        .querySelectorAll<HTMLElement>(".belt-layout-preview[data-belt-stl]")
+        .forEach(mountPreview);
+    });
+</script>

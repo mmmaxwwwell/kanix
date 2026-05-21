@@ -47,6 +47,18 @@ When the user asks to "regenerate the loadouts" (or similar), do this:
        `{variant=tiny,small}` → emits `variant: ["tiny", "small"]`. The
        module-list row shows each variant as its own chip; the plate is
        still printed once; each variant's STL is added to the print list.
+     - **Angle on the belt** is specified as its own brace block
+       `{angle=NN}` placed alongside (and separate from) any `{variant=…}`
+       block — order of the two blocks doesn't matter. Keeping it
+       separate avoids ambiguity with the comma-separated multi-variant
+       form. The angle is **degrees clockwise from the buckle (front
+       center) as seen from above the wearer**: `0` = directly in front
+       (over the buckle), `+90` = right hip, `-90` (or `270`) = left
+       hip, `180` = small of back. Modules without an angle are omitted
+       from the top-down belt visualization. The hands-free BioThane
+       heel lead and other `noModel` accessories that loop around the
+       belt generally should not get an angle — they don't have a fixed
+       position.
      The em-dash `—` separates the metadata from the note; if there is
      no note, omit the em-dash.
    - **The `[…]` bracket is optional** for modules that don't bolt to a
@@ -57,10 +69,12 @@ When the user asks to "regenerate the loadouts" (or similar), do this:
      (e.g. an e-collar holster that depends on the receiver they own),
      write a multi-line block like this:
      ```
-     - group "E-Collar Holster" [plates/kanix_plate_3x3_52x6.5.stl] — note
+     - group "E-Collar Holster" [plates/kanix_plate_3x3_52x6.5.stl] {angle=90} — note
          description: One-paragraph description shown on the group card.
          choices: mini-educator-holder, dogtra-200ncpt-202c-arc-holder, dogtra-280x-arcx-holder
      ```
+     The `{angle=…}` block on a group is optional and positions the
+     group's single shared mount on the belt visualization.
      The first line has a leading `group "<label>"` (in quotes) instead
      of a slug. The two indented sub-lines are required: `description:`
      and `choices: comma,separated,slugs`. The mount in brackets is still
@@ -145,11 +159,11 @@ https://www.amazon.com/dp/B0FJDMN78R
 
 ### Modules
 
-- flashlight-holster-c3 [plates/kanix_plate_3x2_38x5.3.stl] {variant=38mm} — Wuben C3 (38mm 2×2 variant) shares its 3×2 plate with a tiny attachment loop for clipping keys or a phone tether.
-- carabiner-clip [plates/kanix_plate_3x2_38x5.3.stl] {variant=tiny} — Tiny attachment loop stacked on the C3's plate — clip your own carabiner, snap hook, or D-clip to it.
+- flashlight-holster-c3 [plates/kanix_plate_3x2_38x5.3.stl] {variant=38mm} {angle=60} — Wuben C3 (38mm 2×2 variant) shares its 3×2 plate with a tiny attachment loop for clipping keys or a phone tether.
+- carabiner-clip [plates/kanix_plate_3x2_38x5.3.stl] {variant=tiny} {angle=60} — Tiny attachment loop stacked on the C3's plate — clip your own carabiner, snap hook, or D-clip to it.
 - quick-detach-biothane-heel-lead — BioThane lead, used here as a slip lead. Loops directly around the belt — no plate.
-- waste-bag-dispenser [plates/kanix_plate_3x2_38x5.3.stl]
-- carabiner-clip [plates/kanix_plate_3x2_38x5.3.stl] {variant=small,small} — Two of the larger 1×2 attachment loops on one 3×2 plate — clip a second leash, water bottle, or anything that needs more than a tiny loop.
+- waste-bag-dispenser [plates/kanix_plate_3x2_38x5.3.stl] {angle=-45}
+- carabiner-clip [plates/kanix_plate_3x2_38x5.3.stl] {variant=small,small} {angle=20} — Two of the larger 1×2 attachment loops on one 3×2 plate — clip a second leash, water bottle, or anything that needs more than a tiny loop.
 
 ---
 
@@ -186,11 +200,11 @@ https://www.amazon.com/dp/B0G2PTBGF2
 
 ### Modules
 
-- first-aid-kit-mount [plates/kanix_plate_3x3_52x6.5.stl] — Hours from a trailhead — first aid is non-negotiable.
-- waste-bag-dispenser [plates/kanix_plate_3x3_52x6.5.stl]
-- mk3-canister-holder [plates/kanix_plate_3x3_52x6.5.stl] — Off-leash dog encounters are most likely on shared trails.
-- flashlight-holster-c3 [plates/kanix_plate_3x3_52x6.5.stl] — Dawn starts and dusk returns — bring real light.
-- carabiner-clip [plates/kanix_plate_3x3_52x6.5.stl] {variant=tiny} — Tether keys, a multitool, or a second leash.
+- first-aid-kit-mount [plates/kanix_plate_3x3_52x6.5.stl] {angle=135} — Hours from a trailhead — first aid is non-negotiable.
+- waste-bag-dispenser [plates/kanix_plate_3x3_52x6.5.stl] {angle=-45}
+- mk3-canister-holder [plates/kanix_plate_3x3_52x6.5.stl] {angle=-90} — Off-leash dog encounters are most likely on shared trails.
+- flashlight-holster-c3 [plates/kanix_plate_3x3_52x6.5.stl] {angle=90} — Dawn starts and dusk returns — bring real light.
+- carabiner-clip [plates/kanix_plate_3x3_52x6.5.stl] {variant=tiny} {angle=30} — Tether keys, a multitool, or a second leash.
 
 ---
 
@@ -227,11 +241,11 @@ https://www.amazon.com/dp/B0FJDMN78R
 
 ### Modules
 
-- clicker-holder [plates/kanix_plate_3x2_38x5.3.stl] — Clicker on a 3×2 plate, dominant-hand side for fast marker work.
-- treat-bag-mount [plates/kanix_plate_3x2_38x5.3.stl] — Wilderdog treat pouch — fastest possible reinforcement.
-- waste-bag-dispenser [plates/kanix_plate_3x2_38x5.3.stl]
-- dump-bag-mount [plates/kanix_plate_3x2_38x5.3.stl] — Catch-all storage — backup leash, wipes, treats refill, whatever else you pick up on a session.
-- carabiner-clip [plates/kanix_plate_3x2_38x5.3.stl] {variant=small,small} — Two of the larger 1×2 attachment loops on one 3×2 plate — clip a second leash, water bottle, or anything that needs more than a tiny loop.
+- clicker-holder [plates/kanix_plate_3x2_38x5.3.stl] {angle=30} — Clicker on a 3×2 plate, dominant-hand side for fast marker work.
+- treat-bag-mount [plates/kanix_plate_3x2_38x5.3.stl] {angle=75} — Wilderdog treat pouch — fastest possible reinforcement.
+- waste-bag-dispenser [plates/kanix_plate_3x2_38x5.3.stl] {angle=-90}
+- dump-bag-mount [plates/kanix_plate_3x2_38x5.3.stl] {angle=-45} — Catch-all storage — backup leash, wipes, treats refill, whatever else you pick up on a session.
+- carabiner-clip [plates/kanix_plate_3x2_38x5.3.stl] {variant=small,small} {angle=130} — Two of the larger 1×2 attachment loops on one 3×2 plate — clip a second leash, water bottle, or anything that needs more than a tiny loop.
 
 ---
 
@@ -251,7 +265,7 @@ Everything The Trainer and The Walker carry, plus an e-collar and dump bag.
 
 ### Description
 
-Seven Kanix™ modules on a 1.5" duty belt plus a hands-free BioThane heel lead — the lead loops directly onto the belt so both hands stay free for marker work, e-collar timing, and gear. Every Kanix™ module from The Trainer and The Walker, plus an e-collar holster for whichever receiver you run and a dump bag for the catch-all stuff. Clicker, treat pouch, e-collar, waste bags, C3 flashlight, dump bag, and three attachment loops (one tiny, two small) — all on 3×2 38mm plates. You don't have to wear them all every day: each Kanix™ module is a hinged belt clip that snaps on and off in seconds without tools, so a Trainer-day kit becomes a Walker-day kit on the way out the door.
+Seven Kanix™ modules on a 1.5" duty belt plus a hands-free BioThane heel lead — the lead loops directly onto the belt so both hands stay free for marker work, e-collar timing, and gear. Every Kanix™ module from The Trainer and The Walker, plus an e-collar holster for whichever receiver you run and a dump bag for the catch-all stuff. Clicker, treat pouch, e-collar, waste bags, C3 flashlight, dump bag, and two small attachment loops — one stacked on the clicker's 2×2 plate, one stacked on the C3's 2×2 plate, both filling the leftover 1×2 row. All on 3×2 38mm plates. You don't have to wear them all every day: each Kanix™ module is a hinged belt clip that snaps on and off in seconds without tools, so a Trainer-day kit becomes a Walker-day kit on the way out the door.
 
 ### Belt
 
@@ -268,14 +282,14 @@ https://www.amazon.com/dp/B0FJDMN78R
 
 ### Modules
 
-- clicker-holder [plates/kanix_plate_3x2_38x5.3.stl] — Clicker on a 3×2 plate, dominant-hand side for fast marker work.
-- treat-bag-mount [plates/kanix_plate_3x2_38x5.3.stl] — Wilderdog treat pouch — fastest possible reinforcement.
-- group "E-Collar Holster" [plates/kanix_plate_3x2_38x5.3.stl] — Pick the holster that matches the e-collar receiver you already own.
+- clicker-holder [plates/kanix_plate_3x2_38x5.3.stl] {variant=38mm} {angle=22.5} — Clicker on the 38mm 2×2 variant of a 3×2 plate, dominant-hand side for fast marker work. Shares its 3×2 plate with a small attachment loop.
+- carabiner-clip [plates/kanix_plate_3x2_38x5.3.stl] {variant=small} {angle=22.5} — Small attachment loop stacked on the clicker's plate — clip a second leash, water bottle, or anything that needs more than a tiny loop.
+- treat-bag-mount [plates/kanix_plate_3x2_38x5.3.stl] {angle=45} — Wilderdog treat pouch — fastest possible reinforcement.
+- group "E-Collar Holster" [plates/kanix_plate_3x2_38x5.3.stl] {angle=67.5} — Pick the holster that matches the e-collar receiver you already own.
     description: Pick the holster that matches the e-collar receiver you already own. On a 1.5" duty belt the holster's 3×3 hole pattern mounts to a 3×2 plate — the top row of holes is unused.
     choices: mini-educator-holder, dogtra-200ncpt-202c-arc-holder, dogtra-280x-arcx-holder
-- quick-detach-biothane-heel-lead — BioThane lead, used as a heel/slip lead. Loops directly around the belt — no plate.
-- waste-bag-dispenser [plates/kanix_plate_3x2_38x5.3.stl]
-- flashlight-holster-c3 [plates/kanix_plate_3x2_38x5.3.stl] {variant=38mm} — Wuben C3 (38mm 2×2 variant) shares its 3×2 plate with a tiny attachment loop for clipping keys or a phone tether.
-- carabiner-clip [plates/kanix_plate_3x2_38x5.3.stl] {variant=tiny} — Tiny attachment loop stacked on the C3's plate — clip your own carabiner, snap hook, or D-clip to it.
-- dump-bag-mount [plates/kanix_plate_3x2_38x5.3.stl] — Catch-all storage — backup leashes, wipes, extras you pick up on a session.
-- carabiner-clip [plates/kanix_plate_3x2_38x5.3.stl] {variant=small,small} — Two of the larger 1×2 attachment loops on one 3×2 plate — clip a second leash, water bottle, or anything that needs more than a tiny loop.
+- waste-bag-dispenser [plates/kanix_plate_3x2_38x5.3.stl] {angle=90}
+- dump-bag-mount [plates/kanix_plate_3x2_38x5.3.stl] {angle=-157.5} — Catch-all storage — backup leashes, wipes, extras you pick up on a session.
+- quick-detach-biothane-heel-lead {angle=-146.25} — BioThane lead, used as a heel/slip lead. Loops directly around the belt — no plate.
+- flashlight-holster-c3 [plates/kanix_plate_3x2_38x5.3.stl] {variant=38mm} {angle=-135} — Wuben C3 (38mm 2×2 variant) shares its 3×2 plate with a small attachment loop for clipping keys or a phone tether.
+- carabiner-clip [plates/kanix_plate_3x2_38x5.3.stl] {variant=small} {angle=-135} — Small attachment loop stacked on the C3's plate — clip your own carabiner, snap hook, or D-clip to it.
